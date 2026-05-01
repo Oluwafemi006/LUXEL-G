@@ -1,0 +1,90 @@
+from rest_framework import serializers
+from .models import Client, Vehicule, Reparation, Stock, VisiteTechnique, LigneTravail, LignePiece, Facture, MouvementCaisse
+from django.contrib.auth.models import User
+
+class LigneTravailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LigneTravail
+        fields = '__all__'
+
+class LignePieceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LignePiece
+        fields = '__all__'
+
+class FactureSerializer(serializers.ModelSerializer):
+    client_name = serializers.ReadOnlyField(source='reparation.vehicule.client.nom')
+    vehicule_plate = serializers.ReadOnlyField(source='reparation.vehicule.immatriculation')
+    reste_a_payer = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Facture
+        fields = '__all__'
+
+    def get_reste_a_payer(self, obj):
+        return obj.total_ttc - obj.montant_paye
+
+class MouvementCaisseSerializer(serializers.ModelSerializer):
+    utilisateur_name = serializers.ReadOnlyField(source='utilisateur.username')
+    categorie_display = serializers.CharField(source='get_categorie_display', read_only=True)
+    
+    class Meta:
+        model = MouvementCaisse
+        fields = '__all__'
+
+class ReparationSerializer(serializers.ModelSerializer):
+    vehicule_plate = serializers.ReadOnlyField(source='vehicule.immatriculation')
+    technicien_name = serializers.ReadOnlyField(source='technicien.username')
+    travaux = LigneTravailSerializer(many=True, read_only=True)
+    pieces = LignePieceSerializer(many=True, read_only=True)
+    facture = FactureSerializer(read_only=True)
+    client_name = serializers.ReadOnlyField(source='vehicule.client.nom')
+    client_contact = serializers.ReadOnlyField(source='vehicule.client.contact')
+    email = serializers.ReadOnlyField(source='vehicule.client.email')
+
+    class Meta:
+        model = Reparation
+        fields = '__all__'
+
+class MiniVehiculeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Vehicule
+        fields = ['id', 'immatriculation', 'marque', 'modele']
+
+class VehiculeSerializer(serializers.ModelSerializer):
+    client_name = serializers.ReadOnlyField(source='client.nom')
+    reparations_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Vehicule
+        fields = '__all__'
+
+    def get_reparations_count(self, obj):
+        return obj.reparations.count()
+
+class ClientSerializer(serializers.ModelSerializer):
+    vehicule_count = serializers.SerializerMethodField()
+    vehicules_list = MiniVehiculeSerializer(source='vehicules', many=True, read_only=True)
+    
+    class Meta:
+        model = Client
+        fields = '__all__'
+
+    def get_vehicule_count(self, obj):
+        return obj.vehicules.count()
+
+class StockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Stock
+        fields = '__all__'
+
+class VisiteTechniqueSerializer(serializers.ModelSerializer):
+    vehicule_plate = serializers.ReadOnlyField(source='vehicule.immatriculation')
+    class Meta:
+        model = VisiteTechnique
+        fields = '__all__'
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name', 'last_name', 'email']
