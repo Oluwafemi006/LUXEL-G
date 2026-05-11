@@ -1,229 +1,209 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Bell, 
+  BellOff, 
+  Package, 
+  ShieldCheck, 
+  History, 
+  RefreshCcw, 
+  ArrowRight, 
+  AlertTriangle,
+  Clock,
+  TrendingDown,
+  Layers,
+  ChevronRight
+} from 'lucide-react';
+import api from '../services/api';
+
+interface Alert {
+  id: string;
+  type: 'STOCK' | 'VISIT' | 'MAINTENANCE';
+  title: string;
+  message: string;
+  date: string;
+  priority: 'HAUTE' | 'MOYENNE' | 'BASSE';
+  link: string;
+}
 
 const Notifications: React.FC = () => {
-  return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-on-surface">Notifications</h1>
-          <p className="text-lg text-on-surface-variant">Gérez les alertes système et l'historique des communications.</p>
-        </div>
-        <div className="flex gap-3">
-          <button className="bg-white border border-outline/20 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold text-on-surface-variant hover:bg-surface-container transition-colors shadow-sm">
-            <span className="material-symbols-outlined text-sm">filter_list</span>
-            Filtrer
-          </button>
-          <button className="bg-primary text-on-primary px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold shadow-md active:scale-95 transition-all">
-            <span className="material-symbols-outlined text-sm">check_circle</span>
-            Tout marquer comme lu
-          </button>
-        </div>
-      </div>
+  const navigate = useNavigate();
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
 
-      {/* Dashboard Summary Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-outline/10 shadow-sm">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-2 bg-primary/10 rounded-lg text-primary">
-              <span className="material-symbols-outlined">outbox</span>
-            </div>
-            <span className="text-primary text-xs font-bold flex items-center gap-1">
-              <span className="material-symbols-outlined text-xs">trending_up</span>
-              12%
-            </span>
-          </div>
-          <p className="text-[10px] uppercase font-bold text-on-surface-variant/60 tracking-wider mb-1">Messages Envoyés</p>
-          <h3 className="text-2xl font-bold text-on-surface">1,284</h3>
+  const fetchAlerts = async () => {
+    try {
+      setLoading(true);
+      const [stock, maintenance] = await Promise.all([
+        api.get('stock/'),
+        api.get('maintenance-predictive/alertes/')
+      ]);
+
+      const newAlerts: Alert[] = [];
+
+      // 1. Stock Alerts
+      stock.data.filter((s: any) => s.quantite < s.seuil_alerte).forEach((s: any) => {
+        newAlerts.push({
+          id: `stock-${s.id}`,
+          type: 'STOCK',
+          title: `Rupture Critique : ${s.nom}`,
+          message: `Niveau de stock alarmant (${s.quantite} unités). Veuillez approvisionner dès que possible pour éviter tout arrêt de service.`,
+          date: new Date().toISOString(),
+          priority: 'HAUTE',
+          link: '/stock'
+        });
+      });
+
+      // 2. Maintenance Alerts
+      maintenance.data.forEach((m: any) => {
+        newAlerts.push({
+          id: `maint-${m.id}`,
+          type: 'MAINTENANCE',
+          title: `Planification : ${m.vehicule_plate}`,
+          message: `Maintenance préventive (${m.type_maintenance.toLowerCase()}) rattachée au dossier technique, prévue pour le ${new Date(m.date_prochaine_prevue).toLocaleDateString('fr-FR')}.`,
+          date: new Date().toISOString(),
+          priority: 'BASSE',
+          link: '/reparations'
+        });
+      });
+
+      setAlerts(newAlerts);
+    } catch (error) {
+      console.error('Erreur chargement alertes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAlerts();
+  }, []);
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-10 pb-10">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 animate-in fade-in slide-in-from-top-4 duration-1000">
+        <div className="space-y-2">
+          <h1 className="text-5xl font-black text-slate-900 italic tracking-tighter uppercase">Notifications</h1>
+          <p className="text-slate-500 font-medium tracking-widest text-xs uppercase flex items-center gap-2">
+             <Bell className="w-4 h-4 text-emerald-500" />
+             Système de surveillance Luxury Elegance Garage
+          </p>
         </div>
-        <div className="bg-white p-6 rounded-xl border border-outline/10 shadow-sm">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
-              <span className="material-symbols-outlined">warning</span>
-            </div>
-            <span className="text-orange-600 text-xs font-bold flex items-center gap-1">
-              <span className="material-symbols-outlined text-xs">trending_down</span>
-              5%
-            </span>
-          </div>
-          <p className="text-[10px] uppercase font-bold text-on-surface-variant/60 tracking-wider mb-1">Alertes Critiques</p>
-          <h3 className="text-2xl font-bold text-on-surface">14</h3>
-        </div>
-        <div className="bg-white p-6 rounded-xl border border-outline/10 shadow-sm">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-              <span className="material-symbols-outlined">mark_email_read</span>
-            </div>
-            <span className="text-blue-600 text-xs font-bold flex items-center gap-1">
-              <span className="material-symbols-outlined text-xs">remove</span>
-              0%
-            </span>
-          </div>
-          <p className="text-[10px] uppercase font-bold text-on-surface-variant/60 tracking-wider mb-1">Taux d'Ouverture</p>
-          <h3 className="text-2xl font-bold text-on-surface">84.2%</h3>
+        <div className="flex gap-4">
+          <button 
+            onClick={fetchAlerts} 
+            className="flex items-center gap-3 bg-white border border-emerald-100 px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition-all duration-500 shadow-xl shadow-emerald-900/5 active:scale-95 group"
+          >
+            <RefreshCcw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-700" />
+            ACTUALISER
+          </button>
         </div>
       </div>
 
       {/* Notifications List */}
-      <div className="bg-white rounded-xl border border-outline/10 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-outline/10 flex items-center justify-between bg-surface-container/10">
-          <div className="flex gap-4">
-            <button className="text-primary font-bold text-sm border-b-2 border-primary pb-1">Toutes les Notifications</button>
-            <button className="text-on-surface-variant/60 font-bold text-sm hover:text-on-surface transition-colors pb-1">Alertes Système</button>
-            <button className="text-on-surface-variant/60 font-bold text-sm hover:text-on-surface transition-colors pb-1">SMS Clients</button>
+      <div className="card-luxury overflow-hidden min-h-[600px] flex flex-col animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-300">
+        <div className="px-10 py-8 border-b border-emerald-50/50 flex items-center justify-between bg-emerald-50/10">
+          <div className="flex gap-8">
+            <button className="text-emerald-600 font-black text-xs uppercase tracking-[0.2em] border-b-4 border-emerald-600 pb-2 transition-all">Flux d'Alertes ({alerts.length})</button>
           </div>
-          <div className="text-[10px] font-bold text-on-surface-variant/40 font-mono italic">Affichage de 42 entrées récentes</div>
-        </div>
-        <div className="divide-y divide-outline/10">
-          {/* Notification Row 1: System Alert */}
-          <div className="p-6 hover:bg-surface-container/20 transition-colors group cursor-pointer">
-            <div className="flex items-start gap-4">
-              <div className="mt-1">
-                <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                </span>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="font-bold text-on-surface group-hover:text-primary transition-colors">Alerte Inventaire : Huile Moteur (5W-30)</h4>
-                  <span className="text-[10px] font-bold text-on-surface-variant/40 font-mono">Il y a 2 min</span>
-                </div>
-                <p className="text-sm text-on-surface-variant/80 mb-3">Le niveau de stock est tombé sous les 10 unités. Actuellement : 4 unités. Veuillez commander auprès du fournisseur 'Castrol Direct'.</p>
-                <div className="flex items-center gap-3">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-600">Priorité Haute</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-container text-on-surface-variant">Inventaire</span>
-                  <button className="ml-auto text-[10px] font-bold text-primary hover:underline opacity-0 group-hover:opacity-100 transition-opacity">Gérer le stock</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          {/* Notification Row 2: Customer Update */}
-          <div className="p-6 hover:bg-surface-container/20 transition-colors group cursor-pointer">
-            <div className="flex items-start gap-4">
-              <div className="mt-1">
-                <div className="h-3 w-3 rounded-full bg-surface-container"></div>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="font-bold text-on-surface group-hover:text-primary transition-colors">Service Terminé : BMW X5 (ABC-1234)</h4>
-                  <span className="text-[10px] font-bold text-on-surface-variant/40 font-mono">Il y a 1 heure</span>
-                </div>
-                <p className="text-sm text-on-surface-variant/80 mb-3">Le client 'Jonathan Smith' a été notifié par SMS que son véhicule est prêt. Facture #INV-8821 générée.</p>
-                <div className="flex items-center gap-3">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-50 text-green-600">Succès</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-container text-on-surface-variant">Réparations</span>
-                  <button className="ml-auto text-[10px] font-bold text-primary hover:underline opacity-0 group-hover:opacity-100 transition-opacity">Voir Facture</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          {/* Notification Row 3: Scheduled Task */}
-          <div className="p-6 hover:bg-surface-container/20 transition-colors group cursor-pointer">
-            <div className="flex items-start gap-4">
-              <div className="mt-1">
-                <div className="h-3 w-3 rounded-full bg-surface-container"></div>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="font-bold text-on-surface group-hover:text-primary transition-colors">Rappel de Visite Technique</h4>
-                  <span className="text-[10px] font-bold text-on-surface-variant/40 font-mono">Il y a 3 heures</span>
-                </div>
-                <p className="text-sm text-on-surface-variant/80 mb-3">L'inspection de sécurité du 'Pont Hydraulique 4' est prévue demain à 09:00. Assigné au Technicien : David R.</p>
-                <div className="flex items-center gap-3">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600">À venir</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-container text-on-surface-variant">Maintenance</span>
-                  <button className="ml-auto text-[10px] font-bold text-primary hover:underline opacity-0 group-hover:opacity-100 transition-opacity">Voir Calendrier</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          {/* Notification Row 4: Customer Feedback */}
-          <div className="p-6 hover:bg-surface-container/20 transition-colors group cursor-pointer">
-            <div className="flex items-start gap-4">
-              <div className="mt-1">
-                <div className="h-3 w-3 rounded-full bg-surface-container"></div>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="font-bold text-on-surface group-hover:text-primary transition-colors">Nouvel Avis Client</h4>
-                  <span className="text-[10px] font-bold text-on-surface-variant/40 font-mono">Il y a 5 heures</span>
-                </div>
-                <p className="text-sm text-on-surface-variant/80 mb-3">Sarah Connor a laissé un avis 5 étoiles : "Excellent service et prix transparents. Je reviendrai sans hésiter."</p>
-                <div className="flex items-center gap-3">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-yellow-50 text-yellow-600">Avis</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-container text-on-surface-variant">Marketing</span>
-                  <button className="ml-auto text-[10px] font-bold text-primary hover:underline opacity-0 group-hover:opacity-100 transition-opacity">Répondre</button>
-                </div>
-              </div>
-            </div>
+          <div className="flex items-center gap-2 text-[10px] font-black text-slate-300 uppercase tracking-widest italic">
+             Temps réel activé
           </div>
         </div>
-        {/* Pagination */}
-        <div className="p-6 bg-surface-container/10 border-t border-outline/10 flex items-center justify-between">
-          <span className="text-xs font-bold text-on-surface-variant">Page 1 sur 4</span>
-          <div className="flex gap-2">
-            <button className="p-2 border border-outline/20 rounded-lg hover:bg-white transition-colors disabled:opacity-50" disabled>
-              <span className="material-symbols-outlined text-sm">chevron_left</span>
-            </button>
-            <button className="p-2 border border-outline/20 rounded-lg hover:bg-white transition-colors shadow-sm">
-              <span className="material-symbols-outlined text-sm">chevron_right</span>
-            </button>
-          </div>
+        
+        <div className="divide-y divide-emerald-50/30 flex-1">
+          {loading ? (
+            <div className="p-40 text-center flex flex-col items-center gap-6">
+               <div className="w-12 h-12 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
+               <p className="font-black text-emerald-600 uppercase text-xs tracking-[0.3em]">Interrogation des modules...</p>
+            </div>
+          ) : alerts.length === 0 ? (
+            <div className="p-40 text-center flex flex-col items-center justify-center opacity-20 grayscale space-y-8">
+              <div className="w-24 h-24 bg-emerald-50 rounded-[2.5rem] flex items-center justify-center shadow-inner">
+                 <BellOff className="w-12 h-12 text-emerald-600" />
+              </div>
+              <p className="font-black uppercase tracking-[0.5em] text-2xl">Statut Nominal</p>
+              <p className="text-[10px] font-bold tracking-[0.2em]">AUCUN ÉVÉNEMENT PRIORITAIRE À SIGNALER</p>
+            </div>
+          ) : (
+            <div className="animate-in fade-in duration-1000">
+              {alerts.map((alert) => (
+                <div 
+                  key={alert.id} 
+                  onClick={() => navigate(alert.link)} 
+                  className="p-10 hover:bg-emerald-50/30 transition-all duration-700 group cursor-pointer border-l-8 border-l-transparent hover:border-l-emerald-600 relative overflow-hidden"
+                >
+                  <div className="flex items-start gap-10 relative z-10">
+                    <div className={`shrink-0 p-5 rounded-[1.5rem] shadow-2xl transition-all duration-700 group-hover:rotate-3 group-hover:scale-110 ${
+                      alert.priority === 'HAUTE' ? 'bg-rose-600 text-white shadow-rose-200' : 
+                      alert.priority === 'MOYENNE' ? 'bg-orange-500 text-white shadow-orange-200' : 'bg-slate-900 text-emerald-400 shadow-slate-200'
+                    }`}>
+                      {alert.type === 'STOCK' ? <Package className="w-8 h-8" /> : alert.type === 'VISIT' ? <ShieldCheck className="w-8 h-8" /> : <History className="w-8 h-8" />}
+                    </div>
+                    <div className="flex-1 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-2xl font-black text-slate-900 group-hover:text-emerald-700 transition-colors duration-500 uppercase tracking-tight">{alert.title}</h4>
+                        <div className="flex items-center gap-2 text-slate-300">
+                           <Clock className="w-3.5 h-3.5" />
+                           <span className="text-[10px] font-black uppercase tracking-widest">Maintenant</span>
+                        </div>
+                      </div>
+                      <p className="text-base font-medium text-slate-500 leading-relaxed max-w-3xl italic">"{alert.message}"</p>
+                      <div className="flex items-center gap-6 pt-2">
+                        <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-[0.2em] shadow-lg ${
+                          alert.priority === 'HAUTE' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 
+                          alert.priority === 'MOYENNE' ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                        }`}>
+                          PRIORITÉ {alert.priority}
+                        </span>
+                        <span className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 bg-slate-50 px-5 py-2 rounded-full border border-slate-100">
+                          <Layers className="w-3 h-3" />
+                          MODULE: {alert.type}
+                        </span>
+                        <button className="ml-auto flex items-center gap-3 text-[10px] font-black text-emerald-600 uppercase tracking-[0.3em] opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0 transition-all duration-700">
+                          Consulter <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Effet déco interne */}
+                  <div className={`absolute -right-10 -bottom-10 w-40 h-40 opacity-0 group-hover:opacity-5 transition-all duration-1000 ${
+                     alert.priority === 'HAUTE' ? 'bg-rose-500' : 'bg-emerald-500'
+                  } rounded-full blur-3xl`}></div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Secondary Info Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-outline/10 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5">
-            <span className="material-symbols-outlined text-6xl">push_pin</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-500">
+          <div className="card-luxury p-10 bg-slate-900 text-white flex items-start gap-8 group overflow-hidden relative">
+             <div className="w-16 h-16 rounded-[1.25rem] bg-emerald-500/20 backdrop-blur-md flex items-center justify-center border border-emerald-500/30 relative z-10">
+                <ShieldCheck className="w-8 h-8 text-emerald-400" />
+             </div>
+             <div className="relative z-10 flex-1 space-y-2">
+                <h4 className="text-lg font-black italic tracking-tighter uppercase text-emerald-400">Certifié Luxury Elegance</h4>
+                <p className="text-sm font-medium text-slate-400 leading-relaxed">
+                   Toutes les alertes système sont vérifiées et synchronisées en temps réel avec la base de données centrale.
+                </p>
+             </div>
+             <ShieldCheck className="absolute -right-6 -bottom-6 w-32 h-32 text-white/5 rotate-12 group-hover:rotate-0 transition-transform duration-1000" />
           </div>
-          <h3 className="text-xl font-bold text-on-surface mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">push_pin</span>
-            Directives Épinglées
-          </h3>
-          <ul className="space-y-4">
-            <li className="flex items-start gap-3">
-              <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span className="material-symbols-outlined text-primary text-sm">check</span>
-              </div>
-              <p className="text-sm text-on-surface-variant font-medium">Toutes les alertes d'inventaire prioritaires doivent être acquittées sous 30 min par le superviseur.</p>
-            </li>
-            <li className="flex items-start gap-3">
-              <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span className="material-symbols-outlined text-primary text-sm">check</span>
-              </div>
-              <p className="text-sm text-on-surface-variant font-medium">Les SMS clients sont automatiquement désactivés après 20h00 conformément à la politique de communication.</p>
-            </li>
-          </ul>
-        </div>
-        <div className="bg-white p-6 rounded-xl border border-outline/10 shadow-sm">
-          <h3 className="text-xl font-bold text-on-surface mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-blue-600">query_stats</span>
-            Distribution des Notifications
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-xs font-bold mb-1">
-                <span className="text-on-surface-variant">Taux de distribution SMS</span>
-                <span className="font-mono text-primary">98.2%</span>
-              </div>
-              <div className="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
-                <div className="bg-primary h-full w-[98%]"></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-xs font-bold mb-1">
-                <span className="text-on-surface-variant">Taux de distribution Email</span>
-                <span className="font-mono text-blue-600">94.5%</span>
-              </div>
-              <div className="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
-                <div className="bg-blue-600 h-full w-[94%]"></div>
-              </div>
-            </div>
+
+          <div className="card-luxury p-10 flex items-start gap-8 group overflow-hidden relative">
+             <div className="w-16 h-16 rounded-[1.25rem] bg-rose-50 flex items-center justify-center border border-rose-100 relative z-10">
+                <AlertTriangle className="w-8 h-8 text-rose-600" />
+             </div>
+             <div className="relative z-10 flex-1 space-y-2">
+                <h4 className="text-lg font-black tracking-tighter uppercase text-rose-600">Surveillance Stock</h4>
+                <p className="text-sm font-medium text-slate-500 leading-relaxed">
+                   Les seuils d'alerte configurés permettent d'anticiper les ruptures et de maintenir une disponibilité optimale.
+                </p>
+             </div>
+             <TrendingDown className="absolute -right-6 -bottom-6 w-32 h-32 text-rose-600/5 rotate-12 group-hover:rotate-0 transition-transform duration-1000" />
           </div>
-        </div>
       </div>
     </div>
   );

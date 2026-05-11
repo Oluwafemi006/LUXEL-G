@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Car, Calendar, ShieldCheck, Warehouse, Info, X, CheckCircle2 } from 'lucide-react';
 import api from '../../services/api';
 
 interface Vehicle {
@@ -47,78 +48,95 @@ const VisitForm: React.FC<VisitFormProps> = ({ onSubmit, onCancel }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Véhicule</label>
-          <select 
-            name="vehicule"
-            required
-            className="w-full px-4 py-2.5 rounded-xl border border-outline/20 bg-surface-container/10 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all appearance-none"
-          >
-            <option value="">Sélectionner un véhicule</option>
-            {vehicles.map(v => (
-              <option key={v.id} value={v.id}>{v.immatriculation} ({v.marque} {v.modele})</option>
-            ))}
-          </select>
+    <form onSubmit={handleSubmit} className="space-y-10 animate-in fade-in duration-700">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-3">
+          <label className="text-[10px] font-black uppercase text-emerald-600 tracking-[0.2em] ml-2">Véhicule</label>
+          <div className="relative group">
+            <Car className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+            <select 
+              name="vehicule"
+              required
+              className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all appearance-none"
+            >
+              <option value="">Sélectionner un véhicule</option>
+              {vehicles.map(v => (
+                <option key={v.id} value={v.id}>{v.immatriculation} ({v.marque} {v.modele})</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Date de la Visite</label>
-          <input 
-            name="date_visite"
-            type="date"
-            required
-            className="w-full px-4 py-2.5 rounded-xl border border-outline/20 bg-surface-container/10 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Type d'Inspection</label>
-          <select 
-            name="type_inspection"
-            required
-            className="w-full px-4 py-2.5 rounded-xl border border-outline/20 bg-surface-container/10 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all appearance-none"
-          >
-            <option value="annuelle">Visite Technique Annuelle</option>
-            <option value="securite">Contrôle de Sécurité</option>
-            <option value="pollution">Test de Pollution</option>
-          </select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Centre de Contrôle</label>
-          <input 
-            name="centre"
-            className="w-full px-4 py-2.5 rounded-xl border border-outline/20 bg-surface-container/10 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-            placeholder="Nom du centre (ex: CNSR)"
-          />
+        <div className="space-y-3">
+          <label className="text-[10px] font-black uppercase text-emerald-600 tracking-[0.2em] ml-2">Date de l'Inspection</label>
+          <div className="relative group">
+            <Calendar className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+            <input 
+              name="date_visite"
+              type="date"
+              required
+              className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Notes Additionnelles</label>
-        <textarea 
-          name="notes"
-          rows={2}
-          className="w-full px-4 py-2.5 rounded-xl border border-outline/20 bg-surface-container/10 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
-          placeholder="Remarques particulières..."
-        ></textarea>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-3">
+          <label className="text-[10px] font-black uppercase text-emerald-600 tracking-[0.2em] ml-2">Type de Certification</label>
+          <div className="relative group">
+            <ShieldCheck className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+            <select 
+              name="type_inspection"
+              required
+              className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all appearance-none"
+            >
+              <option value="annuelle">Visite Technique Annuelle</option>
+              <option value="securite">Contrôle de Sécurité Privé</option>
+              <option value="pollution">Test d'Émissions / Pollution</option>
+            </select>
+          </div>
+        </div>
+        <div className="space-y-3">
+          <label className="text-[10px] font-black uppercase text-emerald-600 tracking-[0.2em] ml-2">Centre de Contrôle</label>
+          <div className="relative group">
+            <Warehouse className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+            <input 
+              name="centre"
+              className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
+              placeholder="Nom de l'organisme (ex: CNSR)"
+            />
+          </div>
+        </div>
       </div>
 
-      <div className="flex gap-3 pt-4 border-t border-outline/10 mt-8">
+      <div className="space-y-3">
+        <label className="text-[10px] font-black uppercase text-emerald-600 tracking-[0.2em] ml-2">Notes Additionnelles</label>
+        <div className="relative group">
+          <Info className="absolute left-6 top-6 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+          <textarea 
+            name="notes"
+            rows={2}
+            className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-medium text-slate-600 italic shadow-inner transition-all resize-none"
+            placeholder="Observations particulières relevées lors de l'inspection..."
+          ></textarea>
+        </div>
+      </div>
+
+      <div className="flex gap-6 pt-10 border-t border-emerald-50 mt-12">
         <button 
           type="button"
           onClick={onCancel}
-          className="flex-1 px-6 py-3 rounded-xl border border-outline/20 text-on-surface font-bold hover:bg-surface-container transition-all"
+          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-[1.5rem] border border-slate-100 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all duration-500"
         >
+          <X className="w-4 h-4" />
           Annuler
         </button>
         <button 
           type="submit"
-          className="flex-1 px-6 py-3 rounded-xl bg-primary text-on-primary font-bold shadow-lg shadow-primary/20 hover:bg-primary-container transition-all"
+          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-[1.5rem] bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest shadow-2xl hover:bg-emerald-600 transition-all duration-700 active:scale-95"
         >
-          Planifier la Visite
+          <CheckCircle2 className="w-4 h-4" />
+          Certifier la Visite
         </button>
       </div>
     </form>

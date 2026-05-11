@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 class Client(models.Model):
     nom = models.CharField(max_length=100)
@@ -66,10 +67,12 @@ class LigneTravail(models.Model):
 
 class LignePiece(models.Model):
     reparation = models.ForeignKey(Reparation, on_delete=models.CASCADE, related_name='pieces')
+    article_stock = models.ForeignKey('Stock', on_delete=models.SET_NULL, null=True, blank=True)
     reference = models.CharField(max_length=100, blank=True, null=True)
     description = models.CharField(max_length=255)
     quantite = models.IntegerField(default=1)
     prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2)
+    prix_achat = models.DecimalField(max_digits=12, decimal_places=2, default=0) # Stocké au moment de la vente
 
     def __str__(self):
         return f"{self.description} ({self.quantite})"
@@ -109,23 +112,37 @@ class Facture(models.Model):
     def __str__(self):
         return f"{self.type} - {self.numero_facture or 'Sans N°'}"
 
+class Devis(models.Model):
+    STATUT_CHOICES = [
+        ('BROUILLON', 'Brouillon'),
+        ('ENVOYE', 'Envoyé'),
+        ('ACCEPTE', 'Accepté'),
+        ('REFUSE', 'Refusé'),
+        ('FACTURE', 'Facturé'),
+    ]
+    reparation = models.ForeignKey(Reparation, on_delete=models.CASCADE, related_name='devis')
+    numero_devis = models.CharField(max_length=20, unique=True, blank=True, null=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_validite = models.DateField(blank=True, null=True)
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='BROUILLON')
+    
+    total_ht = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tva = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_ttc = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    notes = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Devis {self.numero_devis or 'Brouillon'} - {self.reparation.vehicule.immatriculation}"
+
 class MouvementCaisse(models.Model):
     TYPE_MOUVEMENT_CHOICES = [
         ('RECETTE', 'Recette'),
         ('DEPENSE', 'Dépense'),
     ]
-    CATEGORIE_CHOICES = [
-        ('ACHAT_PIECES', 'Achats pièces'),
-        ('SALAIRES', 'Salaires'),
-        ('LOYER', 'Loyer / Charges'),
-        ('CARBURATION', 'Carburation'),
-        ('RECETTE_CLIENT', 'Règlement Client'),
-        ('AUTRE_RECETTE', 'Autre Recette'),
-        ('AUTRE_DEPENSE', 'Autre Dépense'),
-    ]
     date_mouvement = models.DateField(default=models.functions.Now())
     type_mouvement = models.CharField(max_length=10, choices=TYPE_MOUVEMENT_CHOICES)
-    categorie = models.CharField(max_length=30, choices=CATEGORIE_CHOICES)
+    categorie = models.CharField(max_length=100) # Changé en CharField libre
     montant = models.DecimalField(max_digits=12, decimal_places=2)
     description = models.TextField(blank=True, null=True)
     facture = models.ForeignKey(Facture, on_delete=models.SET_NULL, null=True, blank=True, related_name='mouvements')
@@ -142,18 +159,80 @@ class Stock(models.Model):
     categorie = models.CharField(max_length=100)
     quantite = models.IntegerField(default=0)
     seuil_alerte = models.IntegerField(default=10)
+    prix_achat = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2)
     emplacement = models.CharField(max_length=50, blank=True, null=True)
 
     def __str__(self):
         return self.nom
 
-class VisiteTechnique(models.Model):
-    vehicule = models.ForeignKey(Vehicule, on_delete=models.CASCADE, related_name='visites')
-    date_visite = models.DateField()
-    date_expiration = models.DateField()
-    type_inspection = models.CharField(max_length=100)
-    centre = models.CharField(max_length=100, blank=True, null=True)
+class MaintenancePredictive(models.Model):
+    TYPE_MAINTENANCE = [
+        ('VIDANGE', 'Vidange'),
+        ('REVISION', 'Révision Générale'),
+        ('COURROIE', 'Courroie de Distribution'),
+        ('PNEUS', 'Changement Pneus'),
+    ]
+    vehicule = models.ForeignKey(Vehicule, on_delete=models.CASCADE, related_name='maintenances_futures')
+    type_maintenance = models.CharField(max_length=20, choices=TYPE_MAINTENANCE)
+    date_derniere_prestation = models.DateField(auto_now_add=True)
+    km_derniere_prestation = models.IntegerField()
+    
+    date_prochaine_prevue = models.DateField(null=True, blank=True)
+    km_prochain_prevu = models.IntegerField(null=True, blank=True)
+    
+    actif = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"Visite {self.vehicule.immatriculation} - Exp: {self.date_expiration}"
+        return f"{self.type_maintenance} prévue pour {self.vehicule.immatriculation}"
+
+class Appointment(models.Model):
+    STATUS_CHOICES = [
+        ('EN_ATTENTE', 'En attente'),
+        ('CONFIRME', 'Confirmé'),
+        ('ANNULE', 'Annulé'),
+        ('TERMINE', 'Terminé'),
+    ]
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='appointments', null=True, blank=True)
+    vehicule = models.ForeignKey(Vehicule, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # Champs pour clients non enregistrés (via portail public)
+    nom_client_public = models.CharField(max_length=200, blank=True, null=True)
+    telephone_client_public = models.CharField(max_length=20, blank=True, null=True)
+    
+    date_rdv = models.DateTimeField()
+    service_demande = models.CharField(max_length=200)
+    notes = models.TextField(blank=True, null=True)
+    statut = models.CharField(max_length=20, choices=STATUS_CHOICES, default='EN_ATTENTE')
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"RDV {self.nom_client_public or (self.client.nom if self.client else 'Inconnu')} - {self.date_rdv}"
+
+class NotificationClient(models.Model):
+    TYPE_CHOICES = [
+        ('REPARATION_TERMINEE', 'Réparation terminée'),
+        ('RAPPEL_MAINTENANCE', 'Rappel maintenance'),
+        ('RDV_CONFIRME', 'RDV Confirmé'),
+        ('FACTURE_ENVOYEE', 'Facture envoyée'),
+        ('DEVIS_ENVOYE', 'Devis envoyé'),
+    ]
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='notifications')
+    type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    message = models.TextField()
+    lu = models.BooleanField(default=False)
+    date_envoi = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Notif {self.client.nom} - {self.type}"
+
+class Avis(models.Model):
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='avis')
+    reparation = models.ForeignKey(Reparation, on_delete=models.SET_NULL, null=True, blank=True, related_name='avis')
+    note = models.IntegerField(default=5) # 1 à 5
+    commentaire = models.TextField()
+    date_creation = models.DateTimeField(auto_now_add=True)
+    affiche_public = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Avis {self.client.nom} - {self.note}/5"

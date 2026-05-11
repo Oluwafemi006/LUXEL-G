@@ -1,5 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { 
+  Search, 
+  PlusCircle, 
+  Car, 
+  Settings, 
+  ShieldCheck, 
+  Calendar, 
+  ChevronRight, 
+  History, 
+  Wrench, 
+  Users,
+  Edit,
+  Receipt,
+  CheckCircle2,
+  Clock,
+  Info
+} from 'lucide-react';
 import Modal from '../components/Modal';
 import VehicleForm from '../components/forms/VehicleForm';
 import api from '../services/api';
@@ -97,157 +114,203 @@ const Vehicles: React.FC = () => {
   });
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-8 pb-10">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-1000">
         <div>
-          <h1 className="text-3xl font-black text-on-surface">Parc Automobile</h1>
-          <p className="text-on-surface-variant font-medium">Suivi technique et administratif des véhicules.</p>
+          <h1 className="text-4xl font-black text-slate-900 italic tracking-tighter">Parc Automobile</h1>
+          <p className="text-slate-500 font-medium">Suivi technique et administratif des véhicules.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold hover:bg-primary-container shadow-lg transition-all active:scale-95"
+          className="btn-primary-luxury flex items-center gap-2"
         >
-          <span className="material-symbols-outlined">add_circle</span>
+          <PlusCircle className="w-4 h-4" />
           <span>Nouveau Véhicule</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-12 gap-6 h-[calc(100vh-200px)]">
+      <div className="grid grid-cols-12 gap-8 h-[calc(100vh-220px)] animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-300">
         {/* Liste des Véhicules (Gauche) */}
-        <div className="col-span-12 lg:col-span-4 bg-white rounded-2xl border border-outline/10 shadow-sm overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-outline/10 bg-surface-container/10">
+        <div className="col-span-12 lg:col-span-4 card-luxury overflow-hidden flex flex-col">
+          <div className="p-6 border-b border-emerald-50/50 bg-emerald-50/10">
             <div className="relative">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input 
                 type="text"
                 placeholder="Immatriculation, marque..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-white border border-outline/20 rounded-xl outline-none focus:border-primary transition-all text-sm font-medium"
+                className="w-full pl-12 pr-6 py-3 bg-white border border-emerald-100/50 rounded-2xl outline-none focus:border-emerald-500/50 transition-all duration-500 text-sm font-bold placeholder:text-slate-300 shadow-sm"
               />
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto divide-y divide-outline/5">
+          <div className="flex-1 overflow-y-auto divide-y divide-emerald-50/20 custom-scrollbar">
             {loading ? (
-              <div className="p-8 text-center animate-pulse text-primary font-bold">Chargement...</div>
+              <div className="p-12 text-center flex flex-col items-center gap-4">
+                <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
+                <p className="font-black text-emerald-600 uppercase text-[10px] tracking-widest">Analyse du parc...</p>
+              </div>
             ) : filteredVehicles.map((v) => (
               <div 
                 key={v.id} 
                 onClick={() => setSelectedVehicle(v)}
-                className={`p-4 cursor-pointer transition-all hover:bg-primary/5 flex items-center gap-4 ${selectedVehicle?.id === v.id ? 'bg-primary/10 border-l-4 border-l-primary' : ''}`}
+                className={`p-6 cursor-pointer transition-all duration-500 hover:bg-emerald-50/30 flex items-center gap-5 group ${selectedVehicle?.id === v.id ? 'bg-emerald-50/50 border-l-4 border-l-emerald-600 translate-x-1' : ''}`}
               >
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedVehicle?.id === v.id ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'}`}>
-                  <span className="material-symbols-outlined">directions_car</span>
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all duration-700 ${selectedVehicle?.id === v.id ? 'bg-emerald-600 text-white shadow-emerald-200 rotate-3' : 'bg-slate-50 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
+                  <Car className="w-7 h-7" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-mono font-black text-primary text-sm">{v.immatriculation}</p>
-                  <p className="text-xs font-bold text-on-surface truncate">{v.marque} {v.modele}</p>
-                  <p className="text-[10px] text-on-surface-variant font-medium truncate">{v.client_name}</p>
+                  <p className="font-mono font-black text-emerald-600 text-base tracking-tighter uppercase">{v.immatriculation}</p>
+                  <p className="text-xs font-black text-slate-900 uppercase tracking-tight truncate mt-0.5">{v.marque} {v.modele}</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest truncate mt-1">{v.client_name}</p>
                 </div>
+                <ChevronRight className={`w-4 h-4 transition-all duration-500 ${selectedVehicle?.id === v.id ? 'text-emerald-500 translate-x-1' : 'text-slate-200 group-hover:text-slate-400'}`} />
               </div>
             ))}
           </div>
         </div>
 
         {/* Détails du Véhicule (Droite) */}
-        <div className="col-span-12 lg:col-span-8 bg-white rounded-2xl border border-outline/10 shadow-lg overflow-hidden flex flex-col">
+        <div className="col-span-12 lg:col-span-8 card-luxury overflow-hidden flex flex-col relative">
           {selectedVehicle ? (
-            <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in duration-300">
+            <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in duration-700">
               {/* Entête Fiche Technique */}
-              <div className="p-6 bg-primary/[0.03] border-b border-outline/10 flex justify-between items-start">
-                <div className="flex gap-6 items-center">
-                   <div className="w-20 h-20 rounded-2xl bg-on-surface text-white flex flex-col items-center justify-center shadow-lg">
-                    <span className="material-symbols-outlined text-3xl">directions_car</span>
-                    <span className="text-[10px] font-black mt-1">VÉHICULE</span>
+              <div className="p-10 bg-emerald-50/10 border-b border-emerald-50/50 flex justify-between items-start">
+                <div className="flex gap-10 items-center">
+                   <div className="w-24 h-24 rounded-[2.5rem] bg-slate-900 text-white flex flex-col items-center justify-center shadow-2xl rotate-3 group transition-transform duration-700 hover:rotate-0">
+                    <Car className="w-10 h-10 mb-1" />
+                    <span className="text-[8px] font-black tracking-[0.4em] text-emerald-400">LUXEL-G</span>
                   </div>
-                  <div>
-                    <h2 className="text-3xl font-mono font-black text-primary italic">{selectedVehicle.immatriculation}</h2>
-                    <p className="text-on-surface font-bold text-lg">{selectedVehicle.marque} {selectedVehicle.modele}</p>
-                    <div className="mt-2 flex gap-3">
-                      <span className="flex items-center gap-1 text-[10px] font-black text-on-surface-variant bg-surface-container px-3 py-1 rounded-full uppercase tracking-widest">
-                        PROPRIÉTAIRE: {selectedVehicle.client_name}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-4">
+                      <h2 className="text-5xl font-mono font-black text-emerald-600 italic tracking-tighter uppercase">{selectedVehicle.immatriculation}</h2>
+                      <div className="h-2 w-10 bg-emerald-500 rounded-full opacity-20"></div>
+                    </div>
+                    <p className="text-slate-900 font-black text-2xl uppercase tracking-tighter">{selectedVehicle.marque} {selectedVehicle.modele}</p>
+                    <div className="pt-2 flex flex-wrap gap-3">
+                      <span className="flex items-center gap-2 text-[10px] font-black text-slate-500 bg-white border border-slate-100 px-4 py-2 rounded-2xl shadow-sm">
+                        <Users className="w-3 h-3 text-emerald-500" />
+                        PROPRIÉTAIRE: {selectedVehicle.client_name?.toUpperCase()}
                       </span>
                       {selectedVehicle.vin && (
-                        <span className="flex items-center gap-1 text-[10px] font-mono font-black text-primary bg-primary/10 px-3 py-1 rounded-full">
+                        <span className="flex items-center gap-2 text-[10px] font-mono font-black text-emerald-700 bg-emerald-50 border border-emerald-100/50 px-4 py-2 rounded-2xl shadow-sm">
+                          <ShieldCheck className="w-3 h-3" />
                           VIN: {selectedVehicle.vin}
                         </span>
                       )}
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-3">
+                   <button 
+                    onClick={() => navigate('/reception', { state: { vehicleId: selectedVehicle.id } })}
+                    className="p-3.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-2xl transition-all shadow-xl shadow-emerald-100 hover:-translate-y-1"
+                    title="Ouvrir une Réception"
+                  >
+                    <PlusCircle className="w-5 h-5" />
+                  </button>
                    <button 
                     onClick={() => navigate('/factures', { state: { vehicleId: selectedVehicle.id } })}
-                    className="p-2 bg-primary/10 text-primary hover:bg-primary hover:text-on-primary rounded-xl transition-all"
-                    title="Nouvelle Facture"
+                    className="p-3.5 bg-white text-slate-900 border border-slate-100 hover:bg-slate-50 rounded-2xl transition-all shadow-xl shadow-slate-900/5 hover:-translate-y-1"
+                    title="Voir Factures"
                   >
-                    <span className="material-symbols-outlined">receipt_long</span>
+                    <Receipt className="w-5 h-5" />
                   </button>
-                  <button className="p-2 hover:bg-surface-container rounded-xl transition-colors text-on-surface-variant">
-                    <span className="material-symbols-outlined">edit</span>
+                  <button className="p-3.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all duration-500">
+                    <Edit className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
               <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
                 {/* Spécifications */}
-                <div className="w-full lg:w-1/3 border-r border-outline/10 p-6 space-y-6 bg-surface-container/5 overflow-y-auto">
-                   <h3 className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Spécifications</h3>
-                   <div className="grid grid-cols-1 gap-4">
-                      <div className="p-3 bg-white rounded-xl border border-outline/5 shadow-sm">
-                        <p className="text-[9px] font-black text-on-surface-variant uppercase">Couleur</p>
-                        <p className="text-sm font-bold text-on-surface">{selectedVehicle.couleur || 'Non spécifiée'}</p>
+                <div className="w-full lg:w-1/3 border-r border-emerald-50/50 p-8 space-y-8 bg-emerald-50/5 overflow-y-auto custom-scrollbar">
+                   <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-2">Fiche Technique</h3>
+                   <div className="space-y-6">
+                      <div className="card-luxury p-5 bg-white/50 backdrop-blur-sm group hover:bg-white transition-all duration-500">
+                        <div className="flex items-center gap-3 mb-3">
+                          <Settings className="w-4 h-4 text-emerald-500" />
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Couleur Extérieure</p>
+                        </div>
+                        <p className="text-base font-black text-slate-900 uppercase tracking-tight">{selectedVehicle.couleur || 'Non spécifiée'}</p>
                       </div>
-                      <div className="p-3 bg-white rounded-xl border border-outline/5 shadow-sm">
-                        <p className="text-[9px] font-black text-on-surface-variant uppercase">Année</p>
-                        <p className="text-sm font-bold text-on-surface">{selectedVehicle.annee || 'Inconnue'}</p>
+                      <div className="card-luxury p-5 bg-white/50 backdrop-blur-sm group hover:bg-white transition-all duration-500">
+                        <div className="flex items-center gap-3 mb-3">
+                          <Calendar className="w-4 h-4 text-emerald-500" />
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Millésime / Année</p>
+                        </div>
+                        <p className="text-base font-black text-slate-900 uppercase tracking-tight">{selectedVehicle.annee || 'Inconnue'}</p>
                       </div>
-                      <div className="p-3 bg-white rounded-xl border border-outline/5 shadow-sm">
-                        <p className="text-[9px] font-black text-on-surface-variant uppercase">N° de Série (VIN)</p>
-                        <p className="text-xs font-mono font-black text-primary">{selectedVehicle.vin || 'Non renseigné'}</p>
+                      <div className="card-luxury p-5 bg-white/50 backdrop-blur-sm group hover:bg-white transition-all duration-500">
+                        <div className="flex items-center gap-3 mb-3">
+                          <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">N° de Série (VIN)</p>
+                        </div>
+                        <p className="text-xs font-mono font-black text-emerald-600 tracking-wider break-all">{selectedVehicle.vin || 'Non renseigné'}</p>
                       </div>
+                   </div>
+
+                   <div className="p-6 rounded-[2rem] bg-slate-900 text-white space-y-4 shadow-xl">
+                      <div className="flex items-center gap-2 text-emerald-400">
+                        <Info className="w-4 h-4" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Statut Administratif</span>
+                      </div>
+                      <p className="text-xs font-medium text-slate-400 leading-relaxed italic">Véhicule sous contrat de maintenance active chez Luxury Elegance Garage.</p>
                    </div>
                 </div>
 
                 {/* Historique */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-primary">Interventions & Services</h3>
-                    <span className="bg-primary/10 text-primary text-[10px] px-3 py-1 rounded-full font-black">
-                      {vehicleHistory.length} Dossiers
-                    </span>
+                    <h3 className="text-lg font-black uppercase tracking-tighter text-slate-900 flex items-center gap-3">
+                      <History className="w-6 h-6 text-emerald-500" />
+                      Interventions & Services
+                    </h3>
+                    <div className="flex items-center gap-2 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">{vehicleHistory.length} Dossiers</span>
+                    </div>
                   </div>
 
                   {historyLoading ? (
-                    <div className="py-20 text-center animate-pulse text-on-surface-variant font-bold uppercase text-xs tracking-widest">Mise à jour de l'historique...</div>
+                    <div className="py-40 text-center flex flex-col items-center gap-4">
+                      <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
+                      <p className="font-black text-emerald-600 uppercase text-[10px] tracking-widest">Extraction des données...</p>
+                    </div>
                   ) : vehicleHistory.length === 0 ? (
-                    <div className="py-20 text-center text-on-surface-variant opacity-40">
-                      <p className="text-xs font-bold uppercase tracking-widest">Aucun historique de maintenance.</p>
+                    <div className="py-40 text-center text-slate-300 space-y-6">
+                      <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                        <Wrench className="w-10 h-10 text-slate-200" />
+                      </div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.4em]">Aucun historique enregistré</p>
                     </div>
                   ) : (
-                    <div className="space-y-4 relative border-l-2 border-primary/10 ml-2">
+                    <div className="space-y-8 relative border-l-4 border-emerald-50 ml-3">
                       {vehicleHistory.map((h) => (
-                        <div key={h.id} className="relative pl-6">
-                          <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-primary border-4 border-white shadow-sm"></div>
-                          <div className="bg-white border border-outline/10 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all group">
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="font-mono text-[10px] font-black text-primary px-2 py-0.5 bg-primary/5 rounded">OR-{h.id.toString().padStart(4, '0')}</span>
-                              <span className="text-[10px] font-bold text-on-surface-variant">{new Date(h.date_creation).toLocaleDateString()}</span>
+                        <div key={h.id} className="relative pl-10">
+                          <div className="absolute -left-[14px] top-0 w-6 h-6 rounded-full bg-white border-4 border-emerald-500 shadow-xl shadow-emerald-200"></div>
+                          <div className="card-luxury p-8 hover:bg-emerald-50/20 transition-all duration-700">
+                            <div className="flex justify-between items-start mb-4">
+                              <span className="font-mono text-xs font-black text-emerald-600 px-4 py-1.5 bg-emerald-50 rounded-full border border-emerald-100 shadow-inner tracking-widest uppercase">OR-{h.id.toString().padStart(4, '0')}</span>
+                              <div className="flex items-center gap-2 text-slate-400">
+                                <Clock className="w-3 h-3" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">{new Date(h.date_creation).toLocaleDateString()}</span>
+                              </div>
                             </div>
-                            <h4 className="text-sm font-black text-on-surface mb-1 uppercase tracking-tight">{h.categorie}</h4>
-                            <p className="text-xs text-on-surface-variant line-clamp-2 italic">"{h.description}"</p>
-                            <div className="mt-4 pt-4 border-t border-outline/5 flex justify-between items-center">
-                               <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
-                                h.statut === 'TERMINE' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                            <h4 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">{h.categorie}</h4>
+                            <p className="text-sm font-medium text-slate-400 line-clamp-2 leading-relaxed italic">"{h.description}"</p>
+                            <div className="mt-8 pt-6 border-t border-emerald-50/50 flex justify-between items-center">
+                               <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-2 shadow-sm ${
+                                h.statut === 'TERMINE' ? 'bg-emerald-600 text-white shadow-emerald-200' : 'bg-blue-50 text-blue-600 border border-blue-100'
                                }`}>
+                                {h.statut === 'TERMINE' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                                 {h.statut}
                                </span>
                                {h.facture && (
                                 <div className="text-right">
-                                  <p className="text-[9px] font-black text-on-surface-variant uppercase">Facturé</p>
-                                  <p className="text-xs font-black text-primary">{Number(h.facture.total_ttc).toLocaleString()} F</p>
+                                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Facturé</p>
+                                  <p className="text-lg font-black text-slate-900 italic">{Number(h.facture.total_ttc).toLocaleString()} F</p>
                                 </div>
                                )}
                             </div>
@@ -260,9 +323,12 @@ const Vehicles: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-20 opacity-20">
-              <span className="material-symbols-outlined text-6xl mb-4">directions_car</span>
-              <p className="font-black uppercase tracking-[0.3em]">Sélectionnez un véhicule</p>
+            <div className="flex-1 flex flex-col items-center justify-center p-40 opacity-20 text-slate-400 grayscale">
+              <div className="w-24 h-24 bg-emerald-50 rounded-[2.5rem] flex items-center justify-center mb-10 shadow-inner">
+                <Car className="w-12 h-12 text-emerald-600" />
+              </div>
+              <p className="font-black uppercase tracking-[0.5em] text-2xl">Parc Automobile</p>
+              <p className="text-[10px] font-bold mt-6 tracking-[0.3em]">SÉLECTIONNEZ UN VÉHICULE DANS LA LISTE</p>
             </div>
           )}
         </div>

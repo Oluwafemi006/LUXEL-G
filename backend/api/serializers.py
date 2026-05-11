@@ -1,5 +1,9 @@
 from rest_framework import serializers
-from .models import Client, Vehicule, Reparation, Stock, VisiteTechnique, LigneTravail, LignePiece, Facture, MouvementCaisse
+from .models import (
+    Client, Vehicule, Reparation, Stock, 
+    LigneTravail, LignePiece, Facture, MouvementCaisse, Devis, 
+    MaintenancePredictive, Appointment, NotificationClient, Avis
+)
 from django.contrib.auth.models import User
 
 class LigneTravailSerializer(serializers.ModelSerializer):
@@ -24,9 +28,16 @@ class FactureSerializer(serializers.ModelSerializer):
     def get_reste_a_payer(self, obj):
         return obj.total_ttc - obj.montant_paye
 
+class DevisSerializer(serializers.ModelSerializer):
+    client_name = serializers.ReadOnlyField(source='reparation.vehicule.client.nom')
+    vehicule_plate = serializers.ReadOnlyField(source='reparation.vehicule.immatriculation')
+    
+    class Meta:
+        model = Devis
+        fields = '__all__'
+
 class MouvementCaisseSerializer(serializers.ModelSerializer):
     utilisateur_name = serializers.ReadOnlyField(source='utilisateur.username')
-    categorie_display = serializers.CharField(source='get_categorie_display', read_only=True)
     
     class Meta:
         model = MouvementCaisse
@@ -38,6 +49,7 @@ class ReparationSerializer(serializers.ModelSerializer):
     travaux = LigneTravailSerializer(many=True, read_only=True)
     pieces = LignePieceSerializer(many=True, read_only=True)
     facture = FactureSerializer(read_only=True)
+    devis = DevisSerializer(many=True, read_only=True)
     client_name = serializers.ReadOnlyField(source='vehicule.client.nom')
     client_contact = serializers.ReadOnlyField(source='vehicule.client.contact')
     email = serializers.ReadOnlyField(source='vehicule.client.email')
@@ -78,10 +90,28 @@ class StockSerializer(serializers.ModelSerializer):
         model = Stock
         fields = '__all__'
 
-class VisiteTechniqueSerializer(serializers.ModelSerializer):
+class MaintenancePredictiveSerializer(serializers.ModelSerializer):
     vehicule_plate = serializers.ReadOnlyField(source='vehicule.immatriculation')
     class Meta:
-        model = VisiteTechnique
+        model = MaintenancePredictive
+        fields = '__all__'
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    client_name = serializers.ReadOnlyField(source='client.nom')
+    vehicule_plate = serializers.ReadOnlyField(source='vehicule.immatriculation')
+    class Meta:
+        model = Appointment
+        fields = ['id', 'client', 'vehicule', 'nom_client_public', 'telephone_client_public', 'date_rdv', 'service_demande', 'notes', 'statut', 'date_creation', 'client_name', 'vehicule_plate']
+
+class NotificationClientSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NotificationClient
+        fields = '__all__'
+
+class AvisSerializer(serializers.ModelSerializer):
+    client_name = serializers.ReadOnlyField(source='client.nom')
+    class Meta:
+        model = Avis
         fields = '__all__'
 
 class UserSerializer(serializers.ModelSerializer):

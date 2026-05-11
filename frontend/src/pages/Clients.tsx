@@ -1,4 +1,22 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Search, 
+  UserPlus, 
+  Phone, 
+  Mail, 
+  MapPin, 
+  Edit, 
+  ChevronRight, 
+  History, 
+  Wrench, 
+  Car, 
+  Users,
+  CheckCircle2,
+  Clock,
+  PlusCircle,
+  MessageSquare
+} from 'lucide-react';
 import Modal from '../components/Modal';
 import ClientForm from '../components/forms/ClientForm';
 import api from '../services/api';
@@ -35,6 +53,7 @@ interface Repair {
 }
 
 const Clients: React.FC = () => {
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -112,59 +131,62 @@ const Clients: React.FC = () => {
   });
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-8 pb-10">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-1000">
         <div>
-          <h1 className="text-3xl font-black text-on-surface">Gestion Clientèle</h1>
-          <p className="text-on-surface-variant font-medium">Vue intégrée des dossiers clients et historiques.</p>
+          <h1 className="text-4xl font-black text-slate-900 italic tracking-tighter">Gestion Clientèle</h1>
+          <p className="text-slate-500 font-medium">Vue intégrée des dossiers clients et historiques.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold hover:bg-primary-container shadow-lg transition-all active:scale-95"
+          className="btn-primary-luxury flex items-center gap-2"
         >
-          <span className="material-symbols-outlined">person_add</span>
+          <UserPlus className="w-4 h-4" />
           <span>Nouveau Client</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-12 gap-6 h-[calc(100vh-200px)]">
+      <div className="grid grid-cols-12 gap-8 h-[calc(100vh-220px)] animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-300">
         {/* Liste des Clients (Colonne Gauche) */}
-        <div className="col-span-12 lg:col-span-4 bg-white rounded-2xl border border-outline/10 shadow-sm overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-outline/10 space-y-4 bg-surface-container/10">
+        <div className="col-span-12 lg:col-span-4 card-luxury overflow-hidden flex flex-col">
+          <div className="p-6 border-b border-emerald-50/50 space-y-4 bg-emerald-50/10">
             <div className="relative">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input 
                 type="text"
                 placeholder="Rechercher un client..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-white border border-outline/20 rounded-xl outline-none focus:border-primary transition-all text-sm font-medium"
+                className="w-full pl-12 pr-6 py-3 bg-white border border-emerald-100/50 rounded-2xl outline-none focus:border-emerald-500/50 transition-all duration-500 text-sm font-bold placeholder:text-slate-300 shadow-sm"
               />
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto divide-y divide-outline/5">
+          <div className="flex-1 overflow-y-auto divide-y divide-emerald-50/20 custom-scrollbar">
             {loading ? (
-              <div className="p-8 text-center animate-pulse text-primary font-bold">Chargement...</div>
+              <div className="p-12 text-center flex flex-col items-center gap-4">
+                <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
+                <p className="font-black text-emerald-600 uppercase text-[10px] tracking-widest">Initialisation...</p>
+              </div>
             ) : filteredClients.map((client) => (
               <div 
                 key={client.id} 
                 onClick={() => setSelectedClient(client)}
-                className={`p-4 cursor-pointer transition-all hover:bg-primary/5 flex items-center gap-4 ${selectedClient?.id === client.id ? 'bg-primary/10 border-l-4 border-l-primary' : ''}`}
+                className={`p-6 cursor-pointer transition-all duration-500 hover:bg-emerald-50/30 flex items-center gap-4 group ${selectedClient?.id === client.id ? 'bg-emerald-50/50 border-l-4 border-l-emerald-600 translate-x-1' : ''}`}
               >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-lg ${selectedClient?.id === client.id ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'}`}>
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-inner transition-all duration-700 ${selectedClient?.id === client.id ? 'bg-emerald-600 text-white shadow-emerald-200 rotate-3' : 'bg-slate-50 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
                   {(client.nom || "?")[0]}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-on-surface truncate">{client.nom} {client.prenoms}</p>
-                  <div className="flex items-center gap-2 text-xs text-on-surface-variant font-bold">
-                    <span className="material-symbols-outlined text-[14px]">phone</span>
+                  <p className="font-black text-slate-900 uppercase tracking-tight truncate group-hover:text-emerald-600 transition-colors duration-500">{client.nom} {client.prenoms}</p>
+                  <div className="flex items-center gap-2 text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">
+                    <Phone className="w-3 h-3 text-emerald-500" />
                     {client.contact}
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] bg-secondary/10 text-secondary px-2 py-0.5 rounded-full font-black">
+                  <span className={`text-[8px] px-2.5 py-1 rounded-full font-black tracking-widest ${selectedClient?.id === client.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
                     {client.vehicule_count} VÉH.
                   </span>
                 </div>
@@ -174,103 +196,140 @@ const Clients: React.FC = () => {
         </div>
 
         {/* Détails du Client (Colonne Droite) */}
-        <div className="col-span-12 lg:col-span-8 bg-white rounded-2xl border border-outline/10 shadow-lg overflow-hidden flex flex-col">
+        <div className="col-span-12 lg:col-span-8 card-luxury overflow-hidden flex flex-col relative">
           {selectedClient ? (
-            <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in duration-300">
+            <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in duration-700">
               {/* Entête Détails */}
-              <div className="p-6 bg-primary/[0.03] border-b border-outline/10 flex justify-between items-start">
-                <div className="flex gap-6 items-center">
-                   <div className="w-20 h-20 rounded-2xl bg-primary text-on-primary flex items-center justify-center text-3xl font-black shadow-lg shadow-primary/20">
+              <div className="p-10 bg-emerald-50/10 border-b border-emerald-50/50 flex justify-between items-start">
+                <div className="flex gap-10 items-center">
+                   <div className="w-24 h-24 rounded-[2rem] bg-emerald-600 text-white flex items-center justify-center text-4xl font-black shadow-2xl shadow-emerald-200 rotate-3">
                     {(selectedClient.nom || "?")[0]}
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-black text-on-surface">{selectedClient.nom} {selectedClient.prenoms}</h2>
-                    <p className="text-on-surface-variant font-bold flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[18px]">location_on</span>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">{selectedClient.nom} {selectedClient.prenoms}</h2>
+                      <button className="p-2.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all duration-500">
+                        <Edit className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <p className="text-slate-400 font-bold flex items-center gap-2 text-sm">
+                      <MapPin className="w-4 h-4 text-emerald-500" />
                       {selectedClient.adresse}
                     </p>
-                    <div className="mt-2 flex gap-3">
-                      <span className="flex items-center gap-1 text-xs font-black text-primary bg-primary/10 px-3 py-1 rounded-full">
-                        <span className="material-symbols-outlined text-[14px]">call</span>
+                    <div className="pt-2 flex flex-wrap gap-3">
+                      <span className="flex items-center gap-2 text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100/50 px-4 py-2 rounded-2xl shadow-sm">
+                        <Phone className="w-3 h-3" />
                         {selectedClient.contact}
                       </span>
+                      <a 
+                        href={`https://wa.me/229${selectedClient.contact.replace(/\D/g, '').startsWith('229') ? selectedClient.contact.replace(/\D/g, '').substring(3) : selectedClient.contact.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-[10px] font-black text-white bg-[#25D366] px-4 py-2 rounded-2xl hover:scale-105 hover:shadow-lg transition-all duration-500 shadow-sm"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        WHATSAPP
+                      </a>
                       {selectedClient.email && (
-                        <span className="flex items-center gap-1 text-xs font-black text-on-surface-variant bg-surface-container px-3 py-1 rounded-full">
-                          <span className="material-symbols-outlined text-[14px]">mail</span>
+                        <span className="flex items-center gap-2 text-[10px] font-black text-slate-500 bg-slate-50 border border-slate-100 px-4 py-2 rounded-2xl shadow-sm">
+                          <Mail className="w-3 h-3" />
                           {selectedClient.email}
                         </span>
                       )}
                     </div>
                   </div>
                 </div>
-                <button className="p-2 hover:bg-surface-container rounded-full transition-colors text-on-surface-variant">
-                  <span className="material-symbols-outlined">edit</span>
-                </button>
               </div>
 
               <div className="flex-1 flex overflow-hidden">
                 {/* Liste des Véhicules */}
-                <div className="w-1/3 border-r border-outline/10 overflow-y-auto p-4 space-y-4 bg-surface-container/5">
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60 ml-2">Parc Automobile</h3>
-                  {selectedClient.vehicules_list.map((v) => (
-                    <div 
-                      key={v.id}
-                      onClick={() => setSelectedVehicle(v)}
-                      className={`p-4 rounded-xl border transition-all cursor-pointer ${selectedVehicle?.id === v.id ? 'bg-white border-primary shadow-md' : 'bg-transparent border-outline/10 hover:border-primary/50'}`}
-                    >
-                      <p className="font-mono text-sm font-black text-primary">{v.immatriculation}</p>
-                      <p className="text-xs font-bold text-on-surface">{v.marque} {v.modele}</p>
-                    </div>
-                  ))}
-                  {selectedClient.vehicules_list.length === 0 && (
-                    <p className="text-center py-8 text-xs font-bold text-on-surface-variant">Aucun véhicule.</p>
-                  )}
+                <div className="w-1/3 border-r border-emerald-50/50 overflow-y-auto p-6 space-y-6 bg-emerald-50/5 custom-scrollbar">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-2">Parc Automobile</h3>
+                  <div className="space-y-4">
+                    {selectedClient.vehicules_list.map((v) => (
+                      <div 
+                        key={v.id}
+                        onClick={() => setSelectedVehicle(v)}
+                        className={`p-6 rounded-[1.5rem] border transition-all duration-700 cursor-pointer relative group ${selectedVehicle?.id === v.id ? 'bg-white border-emerald-500 shadow-xl shadow-emerald-900/5 translate-x-1' : 'bg-transparent border-emerald-50 hover:border-emerald-200'}`}
+                      >
+                        <Car className={`absolute right-4 top-4 w-5 h-5 transition-all duration-700 ${selectedVehicle?.id === v.id ? 'text-emerald-500 opacity-100 scale-110' : 'text-slate-100 opacity-0 group-hover:opacity-20'}`} />
+                        <p className="font-mono text-base font-black text-emerald-600 tracking-tighter uppercase">{v.immatriculation}</p>
+                        <p className="text-xs font-black text-slate-900 uppercase tracking-tight mt-1">{v.marque} {v.modele}</p>
+                      </div>
+                    ))}
+                    {selectedClient.vehicules_list.length === 0 && (
+                      <div className="py-20 text-center opacity-40 grayscale space-y-4">
+                        <Car className="w-12 h-12 mx-auto text-slate-200" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Aucun véhicule enregistré</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Historique des Réparations */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-primary">Historique de Maintenance</h3>
+                    <h3 className="text-lg font-black uppercase tracking-tighter text-slate-900 flex items-center gap-3">
+                      <History className="w-6 h-6 text-emerald-500" />
+                      Historique de Maintenance
+                    </h3>
                     {selectedVehicle && (
-                      <span className="text-[10px] font-black bg-primary/10 text-primary px-3 py-1 rounded-full">
-                        {selectedVehicle.immatriculation}
-                      </span>
+                      <button
+                        onClick={() => navigate('/reception', { state: { clientId: selectedClient.id, vehicleId: selectedVehicle.id, step: 'REPAIR' } })}
+                        className="flex items-center gap-2 text-[10px] font-black bg-emerald-600 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:-translate-y-0.5 active:scale-95 transition-all duration-500"
+                      >                          
+                        <PlusCircle className="w-3 h-3" />
+                        NOUVELLE RÉPARATION
+                      </button>
                     )}
                   </div>
 
                   {historyLoading ? (
-                    <div className="py-20 text-center animate-pulse text-on-surface-variant font-bold uppercase text-xs tracking-widest">Récupération de l'historique...</div>
+                    <div className="py-40 text-center flex flex-col items-center gap-4">
+                      <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
+                      <p className="font-black text-emerald-600 uppercase text-[10px] tracking-widest">Synchronisation historique...</p>
+                    </div>
                   ) : !selectedVehicle ? (
-                    <div className="py-20 text-center text-on-surface-variant opacity-40">
-                      <span className="material-symbols-outlined text-4xl block mb-2">directions_car</span>
-                      <p className="text-xs font-bold">Sélectionnez un véhicule</p>
+                    <div className="py-40 text-center text-slate-300 space-y-6">
+                      <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                        <Car className="w-10 h-10 text-slate-200" />
+                      </div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.4em]">Sélectionnez un véhicule</p>
                     </div>
                   ) : vehicleHistory.length === 0 ? (
-                    <div className="py-20 text-center text-on-surface-variant opacity-40">
-                      <p className="text-xs font-bold">Aucune intervention enregistrée.</p>
+                    <div className="py-40 text-center text-slate-300 space-y-6">
+                      <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                        <Wrench className="w-10 h-10 text-slate-200" />
+                      </div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.4em]">Aucune intervention enregistrée</p>
                     </div>
                   ) : (
-                    <div className="space-y-4 relative border-l-2 border-primary/10 ml-2">
+                    <div className="space-y-8 relative border-l-4 border-emerald-50 ml-3">
                       {vehicleHistory.map((h) => (
-                        <div key={h.id} className="relative pl-6">
-                          <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-primary border-4 border-white shadow-sm"></div>
-                          <div className="bg-white border border-outline/10 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="font-mono text-[10px] font-black text-primary px-2 py-0.5 bg-primary/5 rounded">OR-{h.id.toString().padStart(4, '0')}</span>
-                              <span className="text-[10px] font-bold text-on-surface-variant">{new Date(h.date_creation).toLocaleDateString()}</span>
+                        <div key={h.id} className="relative pl-10">
+                          <div className="absolute -left-[14px] top-0 w-6 h-6 rounded-full bg-white border-4 border-emerald-500 shadow-xl shadow-emerald-200"></div>
+                          <div className="card-luxury p-8 hover:bg-emerald-50/20 transition-all duration-700">
+                            <div className="flex justify-between items-start mb-4">
+                              <span className="font-mono text-xs font-black text-emerald-600 px-4 py-1.5 bg-emerald-50 rounded-full border border-emerald-100 shadow-inner tracking-widest uppercase">OR-{h.id.toString().padStart(4, '0')}</span>
+                              <div className="flex items-center gap-2 text-slate-400">
+                                <Clock className="w-3 h-3" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">{new Date(h.date_creation).toLocaleDateString()}</span>
+                              </div>
                             </div>
-                            <h4 className="text-sm font-black text-on-surface mb-1">{h.categorie}</h4>
-                            <p className="text-xs text-on-surface-variant line-clamp-2">{h.description}</p>
-                            <div className="mt-4 pt-4 border-t border-outline/5 flex justify-between items-center">
-                               <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
-                                h.statut === 'TERMINE' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                            <h4 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">{h.categorie}</h4>
+                            <p className="text-sm font-medium text-slate-400 line-clamp-2 leading-relaxed italic">"{h.description}"</p>
+                            <div className="mt-8 pt-6 border-t border-emerald-50/50 flex justify-between items-center">
+                               <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-2 shadow-sm ${
+                                h.statut === 'TERMINE' ? 'bg-emerald-600 text-white shadow-emerald-200' : 'bg-blue-50 text-blue-600 border border-blue-100'
                                }`}>
+                                {h.statut === 'TERMINE' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                                 {h.statut}
                                </span>
                                {h.facture && (
-                                <span className="text-xs font-black text-on-surface">
-                                  {Number(h.facture.total_ttc).toLocaleString()} F
-                                </span>
+                                <div className="text-right">
+                                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Facturé</p>
+                                  <p className="text-lg font-black text-slate-900 italic">{Number(h.facture.total_ttc).toLocaleString()} F</p>
+                                </div>
                                )}
                             </div>
                           </div>
@@ -282,9 +341,12 @@ const Clients: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-20 opacity-20">
-              <span className="material-symbols-outlined text-6xl mb-4">group</span>
-              <p className="font-black uppercase tracking-[0.3em]">Sélectionnez un dossier client</p>
+            <div className="flex-1 flex flex-col items-center justify-center p-40 opacity-20 text-slate-400 grayscale">
+              <div className="w-24 h-24 bg-emerald-50 rounded-[2.5rem] flex items-center justify-center mb-10 shadow-inner">
+                <Users className="w-12 h-12 text-emerald-600" />
+              </div>
+              <p className="font-black uppercase tracking-[0.5em] text-2xl">Dossiers Clients</p>
+              <p className="text-[10px] font-bold mt-6 tracking-[0.3em]">SÉLECTIONNEZ UN CLIENT DANS LA LISTE</p>
             </div>
           )}
         </div>

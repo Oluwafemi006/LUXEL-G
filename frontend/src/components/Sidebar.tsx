@@ -1,53 +1,72 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { 
+  LayoutDashboard, 
+  UserPlus, 
+  Users, 
+  Car, 
+  Wrench, 
+  FileText, 
+  Receipt, 
+  Wallet, 
+  Package, 
+  Calendar, 
+  Bell, 
+  LogOut 
+} from 'lucide-react';
 
 const Sidebar: React.FC = () => {
   const menuItems = [
-    { name: 'Tableau de bord', icon: 'dashboard', path: '/' },
-    { name: 'Gestion Clients', icon: 'group', path: '/clients' },
-    { name: 'Gestion Véhicules', icon: 'directions_car', path: '/vehicules' },
-    { name: 'Réparations', icon: 'build', path: '/reparations' },
-    { name: 'Facturation', icon: 'receipt_long', path: '/factures' },
-    { name: 'Gestion Caisse', icon: 'account_balance_wallet', path: '/caisse' },
-    { name: 'Gestion Stock', icon: 'inventory_2', path: '/stock' },
-    { name: 'Visites Techniques', icon: 'verified', path: '/visites' },
-    { name: 'Notifications', icon: 'notifications', path: '/notifications' },
+    { name: 'Tableau de bord', icon: LayoutDashboard, path: '/' },
+    { name: 'Réception Client', icon: UserPlus, path: '/reception' },
+    { name: 'Gestion Clients', icon: Users, path: '/clients' },
+    { name: 'Gestion Véhicules', icon: Car, path: '/vehicules' },
+    { name: 'Réparations', icon: Wrench, path: '/reparations' },
+    { name: 'Gestion Devis', icon: FileText, path: '/devis' },
+    { name: 'Facturation', icon: Receipt, path: '/factures' },
+    { name: 'Gestion Caisse', icon: Wallet, path: '/caisse' },
+    { name: 'Gestion Stock', icon: Package, path: '/stock' },
+    { name: 'Agenda & RDV', icon: Calendar, path: '/agenda' },
+    { name: 'Notifications', icon: Bell, path: '/notifications' },
   ];
 
   return (
-    <aside className="w-64 bg-surface-container h-screen flex flex-col border-r border-outline/20">
-      <div className="p-6">
-        <h1 className="text-primary font-display text-2xl font-extrabold tracking-tight">
-          LUXEL<span className="text-on-surface">-G</span>
+    <aside className="w-64 bg-white h-screen flex flex-col border-r border-emerald-100/50 shadow-2xl shadow-emerald-900/5 z-30 transition-all duration-700 ease-in-out">
+      <div className="p-8">
+        <h1 className="text-emerald-600 font-display text-3xl font-black tracking-tighter italic">
+          LUXEL<span className="text-slate-900">-G</span>
         </h1>
-        <p className="text-on-surface-variant text-xs font-medium uppercase tracking-widest mt-1">
-          Luxury Elegance
-        </p>
+        <div className="flex items-center gap-2 mt-1">
+          <div className="h-1 w-8 bg-emerald-500 rounded-full"></div>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">
+            Luxury Elegance
+          </p>
+        </div>
       </div>
 
-      <nav className="flex-1 px-4 space-y-2 py-4">
+      <nav className="flex-1 px-6 space-y-1 py-4 overflow-y-auto custom-scrollbar">
         {menuItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
+              `flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-500 ease-in-out group ${
                 isActive
-                  ? 'bg-primary text-on-primary shadow-md'
-                  : 'text-on-surface-variant hover:bg-primary/10 hover:text-primary'
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 translate-x-1'
+                  : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-600'
               }`
             }
           >
-            <span className="material-symbols-outlined">{item.icon}</span>
-            <span className="font-medium text-sm">{item.name}</span>
+            <item.icon className={`w-5 h-5 transition-transform duration-500 group-hover:scale-110 ${window.location.pathname === item.path ? 'animate-pulse' : ''}`} />
+            <span className="font-bold text-sm tracking-tight">{item.name}</span>
           </NavLink>
         ))}
       </nav>
 
-      <div className="p-4 border-t border-outline/10">
-        <button className="flex items-center gap-3 px-3 py-2.5 w-full text-on-surface-variant hover:bg-error/10 hover:text-error rounded-lg transition-colors">
-          <span className="material-symbols-outlined">logout</span>
-          <span className="font-medium text-sm">Déconnexion</span>
+      <div className="p-6 border-t border-slate-50">
+        <button className="flex items-center gap-4 px-4 py-3 w-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-2xl transition-all duration-500 ease-in-out group">
+          <LogOut className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-500" />
+          <span className="font-bold text-sm tracking-tight">Déconnexion</span>
         </button>
       </div>
     </aside>

@@ -1,6 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
+import { 
+  Search, 
+  Plus, 
+  FileText, 
+  CheckCircle2, 
+  Clock, 
+  AlertTriangle, 
+  Printer, 
+  Mail, 
+  Share2, 
+  Save, 
+  Verified, 
+  CreditCard,
+  ChevronRight,
+  Wrench,
+  Car,
+  Users
+} from 'lucide-react';
 import api from '../services/api';
+import StockSearchInput from '../components/StockSearchInput';
 
 interface LaborLine {
   id: string | number;
@@ -10,10 +29,20 @@ interface LaborLine {
 
 interface PartLine {
   id: string | number;
+  article_stock?: number | null;
   reference: string;
   description: string;
   quantite: number;
   prix_unitaire: number;
+}
+
+interface StockItem {
+  id: number;
+  nom: string;
+  sku: string;
+  quantite: number;
+  prix_unitaire: number;
+  seuil_alerte: number;
 }
 
 interface Repair {
@@ -51,7 +80,9 @@ const Invoices: React.FC = () => {
   const [viewMode, setViewMode] = useState<'LIST' | 'CREATE'>('LIST');
   const [repairs, setRepairs] = useState<Repair[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [stock, setStock] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedRepair, setSelectedRepair] = useState<Repair | null>(null);
   const [currentInvoiceId, setCurrentInvoiceId] = useState<number | null>(null);
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
@@ -91,10 +122,34 @@ const Invoices: React.FC = () => {
     }
   };
 
+  const fetchStock = async () => {
+    try {
+      const response = await api.get('stock/');
+      const data = Array.isArray(response.data) ? response.data : [];
+      setStock(data);
+    } catch (error) {
+      console.error('Erreur chargement stock:', error);
+    }
+  };
+
   useEffect(() => {
-    fetchInvoices();
-    fetchRepairs();
+    const init = async () => {
+      await Promise.all([fetchInvoices(), fetchRepairs(), fetchStock()]);
+    };
+    init();
   }, []);
+
+  // Gérer l'auto-sélection depuis la navigation
+  useEffect(() => {
+    const state = location.state as { repairId?: number };
+    if (state?.repairId && repairs.length > 0) {
+      const repair = repairs.find(r => r.id === state.repairId);
+      if (repair) {
+        setViewMode('CREATE');
+        handleSelectRepair(repair);
+      }
+    }
+  }, [repairs, location.state]);
 
   const handleViewInvoice = async (invoice: Invoice) => {
     try {
@@ -108,7 +163,7 @@ const Invoices: React.FC = () => {
       setKmsEntree(repairData.kilometrage?.toString() || '');
       
       setLaborLines(repairData.travaux.length > 0 ? repairData.travaux : [{ id: 'tmp1', description: '', montant: 0 }]);
-      setPartLines(repairData.pieces.length > 0 ? repairData.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0 }]);
+      setPartLines(repairData.pieces.length > 0 ? repairData.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
       
       setViewMode('CREATE');
     } catch (error) {
@@ -121,11 +176,9 @@ const Invoices: React.FC = () => {
   const handleSelectRepair = (repair: Repair) => {
     setSelectedRepair(repair);
     setKmsEntree(repair.kilometrage?.toString() || '');
-    // Auto-remplissage immédiat
     setLaborLines(repair.travaux.length > 0 ? repair.travaux : [{ id: 'tmp1', description: '', montant: 0 }]);
-    setPartLines(repair.pieces.length > 0 ? repair.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0 }]);
+    setPartLines(repair.pieces.length > 0 ? repair.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
     
-    // Vérifier si une facture existe déjà pour cet OR
     const existingInvoice = invoices.find(inv => inv.reparation === repair.id);
     if (existingInvoice) {
       setCurrentInvoiceId(existingInvoice.id);
@@ -140,11 +193,11 @@ const Invoices: React.FC = () => {
 
   const handleValidateDefinitive = async () => {
     if (!currentInvoiceId) return;
-    if (!window.confirm('Voulez-vous vraiment valider cette facture comme DÉFINITIVE ? Cette action est irréversible.')) return;
+    if (!window.confirm('Voulez-vous vraiment valider cette facture comme DÉFINITIVE ? Cela décomptera les pièces du stock. Cette action est irréversible.')) return;
     
     try {
       const response = await api.post(`factures/${currentInvoiceId}/valider/`);
-      alert('Facture validée avec succès !');
+      alert('Facture validée et stock mis à jour !');
       fetchInvoices();
       setCurrentInvoice(response.data);
       setIsDefinitive(true);
@@ -156,12 +209,11 @@ const Invoices: React.FC = () => {
 
   const handleRecordPayment = async () => {
     if (!currentInvoiceId || !paymentAmount || !currentInvoice) return;
-    
     const amount = parseFloat(paymentAmount);
     const resteAPayer = currentInvoice.total_ttc - currentInvoice.montant_paye;
 
     if (amount > resteAPayer) {
-      alert(`Erreur : Le montant saisi (${amount.toLocaleString()} F) dépasse le reste à payer (${resteAPayer.toLocaleString()} F).`);
+      alert(`Erreur : Le montant saisi dépasse le reste à payer (${resteAPayer.toLocaleString()} F).`);
       return;
     }
 
@@ -170,44 +222,67 @@ const Invoices: React.FC = () => {
         montant: amount,
         mode_paiement: paymentMode
       });
-      alert('Paiement enregistré et mouvement de caisse créé !');
+      alert('Paiement enregistré !');
       setIsPaymentModalOpen(false);
       setPaymentAmount('');
       fetchInvoices();
       setCurrentInvoice(response.data);
-      // Recharger les détails de la facture
       if (selectedRepair) {
         const resRepair = await api.get(`reparations/${selectedRepair.id}/`);
         setSelectedRepair(resRepair.data);
       }
     } catch (error: any) {
-      const msg = error.response?.data?.error || 'Erreur lors de l\'enregistrement du paiement.';
+      const msg = error.response?.data?.error || 'Erreur paiement.';
       alert(msg);
     }
   };
 
-  // Gérer la redirection depuis Repairs
-  useEffect(() => {
-    if (location.state && repairs.length > 0) {
-      const { repairId } = location.state as { repairId?: number };
-      if (repairId) {
-        const repair = repairs.find(r => r.id === repairId);
-        if (repair) {
-          setViewMode('CREATE');
-          handleSelectRepair(repair);
-        }
-      }
+  const handleDownloadPDF = async () => {
+    if (!currentInvoiceId) return;
+    try {
+      const response = await api.get(`factures/${currentInvoiceId}/download_pdf/`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Facture_${currentInvoice?.numero_facture || 'Brouillon'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error('Erreur PDF:', error);
+      alert('Erreur lors du téléchargement du PDF.');
     }
-  }, [location.state, repairs]);
+  };
 
-  // Calculs automatiques
+  const handleSendEmail = async () => {
+    if (!currentInvoiceId) return;
+    try {
+      await api.post(`factures/${currentInvoiceId}/envoyer_email/`);
+      alert('Facture envoyée par email avec succès !');
+    } catch (error: any) {
+      const msg = error.response?.data?.error || 'Erreur lors de l\'envoi de l\'email.';
+      alert(msg);
+    }
+  };
+
+  const handleWhatsAppShare = () => {
+    if (!selectedRepair || !currentInvoice) return;
+    
+    let phone = selectedRepair.client_contact?.replace(/\D/g, '') || '';
+    if (phone.startsWith('00229')) phone = phone.substring(2);
+    if (!phone.startsWith('229')) phone = '229' + phone;
+    
+    const pdfUrl = `http://${window.location.hostname}:8000/api/factures/${currentInvoice.id}/download_pdf/`;
+    const message = `Bonjour ${selectedRepair.client_name}, LUXEL-G vous informe que votre facture ${currentInvoice.numero_facture || ''} est disponible.\n\n💰 Montant : ${Number(currentInvoice.total_ttc).toLocaleString()} F\n📄 Télécharger votre facture : ${pdfUrl}\n\nMerci pour votre confiance.`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
   const totalLabor = useMemo(() => laborLines.reduce((sum, line) => sum + Number(line.montant), 0), [laborLines]);
   const totalParts = useMemo(() => partLines.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0), [partLines]);
   const grandTotal = totalLabor + totalParts;
 
-  // Fonctions de gestion des lignes
   const addLaborLine = () => setLaborLines([...laborLines, { id: `tmp${Date.now()}`, description: '', montant: 0 }]);
-  const addPartLine = () => setPartLines([...partLines, { id: `tmp${Date.now()}`, reference: '', description: '', quantite: 1, prix_unitaire: 0 }]);
+  const addPartLine = () => setPartLines([...partLines, { id: `tmp${Date.now()}`, reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
 
   const updateLabor = (id: string | number, field: keyof LaborLine, value: any) => {
     setLaborLines(laborLines.map(l => l.id === id ? { ...l, [field]: value } : l));
@@ -217,11 +292,23 @@ const Invoices: React.FC = () => {
     setPartLines(partLines.map(p => p.id === id ? { ...p, [field]: value } : p));
   };
 
+  const handleStockSelect = (id: string | number, stockId: string) => {
+    const item = stock.find(s => s.id.toString() === stockId);
+    if (item) {
+      setPartLines(partLines.map(p => p.id === id ? { 
+        ...p, 
+        article_stock: item.id,
+        description: item.nom,
+        reference: item.sku,
+        prix_unitaire: item.prix_unitaire
+      } : p));
+    }
+  };
+
   const handleSaveInvoice = async () => {
     if (!selectedRepair) return;
     try {
       await api.patch(`reparations/${selectedRepair.id}/`, { kilometrage: parseInt(kmsEntree) || 0 });
-
       const invoiceData = {
         reparation: selectedRepair.id,
         type: isDefinitive ? 'DEFINITIVE' : 'PROFORMA',
@@ -241,7 +328,6 @@ const Invoices: React.FC = () => {
         setCurrentInvoice(resInvoice.data);
       }
 
-      // Sauvegarde des lignes
       for (const line of laborLines) {
         if (line.description && line.montant > 0) {
           if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
@@ -253,131 +339,126 @@ const Invoices: React.FC = () => {
       }
       for (const line of partLines) {
         if (line.description && line.prix_unitaire > 0) {
+          const pData = { reference: line.reference, description: line.description, quantite: line.quantite, prix_unitaire: line.prix_unitaire, reparation: selectedRepair.id, article_stock: line.article_stock };
           if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
-            await api.post('pieces-reparation/', { 
-              reference: line.reference, 
-              description: line.description, 
-              quantite: line.quantite, 
-              prix_unitaire: line.prix_unitaire, 
-              reparation: selectedRepair.id 
-            });
+            await api.post('pieces-reparation/', pData);
           } else {
-            await api.patch(`pieces-reparation/${line.id}/`, { 
-              reference: line.reference, 
-              description: line.description, 
-              quantite: line.quantite, 
-              prix_unitaire: line.prix_unitaire 
-            });
+            await api.patch(`pieces-reparation/${line.id}/`, pData);
           }
         }
       }
-
-      alert('Enregistrement réussi !');
+      alert('Sauvegarde réussie !');
       fetchInvoices();
     } catch (error) {
       console.error('Erreur sauvegarde:', error);
-      alert('Erreur lors de la sauvegarde.');
+      alert('Erreur sauvegarde.');
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter(inv => 
+      inv.numero_facture?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      inv.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      inv.vehicule_plate?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [invoices, searchQuery]);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-8 pb-10">
       <style>
-        {`
-          @media print {
-            aside, header, .no-print, button, .tabs-invoice { display: none !important; }
-            body { background: white !important; }
-            .max-w-7xl { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
-            .grid { display: block !important; }
-            .lg\\:col-span-3 { display: none !important; }
-            .lg\\:col-span-9 { width: 100% !important; border: none !important; shadow: none !important; }
-            .p-8 { padding: 0 !important; }
-            .rounded-2xl { border-radius: 0 !important; }
-            .shadow-xl { box-shadow: none !important; }
-          }
-        `}
+        {` @media print { aside, header, .no-print, button, .tabs-invoice { display: none !important; } body { background: white !important; } .max-w-7xl { max-width: 100% !important; margin: 0 !important; padding: 0 !important; } .lg\\:col-span-3 { display: none !important; } .lg\\:col-span-9 { width: 100% !important; border: none !important; } .p-8 { padding: 0 !important; } } `}
       </style>
 
-      {/* Header avec onglets */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 no-print animate-in fade-in slide-in-from-top-4 duration-1000">
         <div>
-          <h1 className="text-3xl font-black text-on-surface">Facturation & Caisse</h1>
-          <p className="text-on-surface-variant font-medium">Gestion des encaissements et documents financiers.</p>
+          <h1 className="text-4xl font-black text-slate-900 italic tracking-tighter">Facturation & Caisse</h1>
+          <p className="text-slate-500 font-medium">Gestion des documents financiers certifiés.</p>
         </div>
-        <div className="flex bg-surface-container p-1 rounded-xl border border-outline/10 tabs-invoice">
+        <div className="flex bg-white p-1.5 rounded-[1.25rem] border border-emerald-100/50 shadow-sm tabs-invoice">
           <button 
-            onClick={() => setViewMode('LIST')}
-            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'LIST' ? 'bg-primary text-on-primary shadow-md' : 'text-on-surface-variant'}`}
-          > TOUTES LES FACTURES </button>
+            onClick={() => setViewMode('LIST')} 
+            className={`px-8 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'LIST' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-slate-400 hover:text-emerald-600'}`}
+          > 
+            LISTE 
+          </button>
           <button 
-            onClick={() => {
-              setViewMode('CREATE');
-              setSelectedRepair(null);
-              setCurrentInvoiceId(null);
-              setCurrentInvoice(null);
-              setIsDefinitive(false);
-              setKmsEntree('');
-              setLaborLines([]);
-              setPartLines([]);
-            }}
-            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'CREATE' && !currentInvoiceId ? 'bg-primary text-on-primary shadow-md' : 'text-on-surface-variant'}`}
-          > NOUVELLE FACTURE </button>
+            onClick={() => { setViewMode('CREATE'); setSelectedRepair(null); setCurrentInvoiceId(null); setCurrentInvoice(null); setIsDefinitive(false); setKmsEntree(''); setLaborLines([]); setPartLines([]); }} 
+            className={`px-8 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'CREATE' && !currentInvoiceId ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-slate-400 hover:text-emerald-600'}`}
+          > 
+            NOUVELLE 
+          </button>
         </div>
       </div>
 
       {viewMode === 'LIST' ? (
-        <div className="bg-white rounded-2xl border border-outline/10 shadow-sm overflow-hidden">
+        <div className="card-luxury overflow-hidden animate-in fade-in zoom-in-95 duration-1000">
+          <div className="p-6 border-b border-emerald-50/50 bg-emerald-50/10 flex items-center justify-between">
+            <div className="relative max-w-md w-full">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <input 
+                type="text"
+                placeholder="Rechercher par client, immatriculation ou N°..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-6 py-3 bg-white border border-emerald-100/50 rounded-2xl outline-none focus:border-emerald-500/50 transition-all duration-500 text-sm font-bold placeholder:text-slate-300 shadow-sm"
+              />
+            </div>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2 bg-emerald-100/50 px-4 py-2 rounded-xl">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">{invoices.length} Factures</span>
+              </div>
+            </div>
+          </div>
+          
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-surface-container/30 border-b border-outline/10">
-                <tr>
-                  <th className="px-6 py-4 text-xs font-black text-on-surface-variant uppercase tracking-widest">N° Facture</th>
-                  <th className="px-6 py-4 text-xs font-black text-on-surface-variant uppercase tracking-widest">État</th>
-                  <th className="px-6 py-4 text-xs font-black text-on-surface-variant uppercase tracking-widest">Véhicule / Client</th>
-                  <th className="px-6 py-4 text-xs font-black text-on-surface-variant uppercase tracking-widest text-right">Montant TTC</th>
-                  <th className="px-6 py-4 text-xs font-black text-on-surface-variant uppercase tracking-widest text-right">Reste à payer</th>
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-slate-50/50 text-[10px] uppercase tracking-[0.2em] text-slate-400 font-black border-b border-emerald-50/30">
+                  <th className="px-8 py-5">N° Facture</th>
+                  <th className="px-8 py-5">État de Paiement</th>
+                  <th className="px-8 py-5">Véhicule & Client</th>
+                  <th className="px-8 py-5 text-right">Montant TTC</th>
+                  <th className="px-8 py-5 text-right">Reste à payer</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-outline/5">
+              <tbody className="divide-y divide-emerald-50/20">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-10 text-center text-xs font-black uppercase tracking-widest text-on-surface-variant">
-                      Chargement des factures...
+                    <td colSpan={5} className="px-8 py-20 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
+                        <p className="font-black text-emerald-600 uppercase text-[10px] tracking-widest">Chargement sécurisé...</p>
+                      </div>
                     </td>
                   </tr>
-                ) : invoices.map((inv) => (
-                  <tr 
-                    key={inv.id} 
-                    onClick={() => handleViewInvoice(inv)}
-                    className="hover:bg-primary/[0.02] transition-colors cursor-pointer group"
-                  >
-                    <td className="px-6 py-4">
-                      <p className="font-mono font-black text-primary">{inv.numero_facture || 'DOC-BROUILLON'}</p>
-                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${inv.type === 'DEFINITIVE' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                        {inv.type}
-                      </span>
+                ) : filteredInvoices.map((inv) => (
+                  <tr key={inv.id} onClick={() => handleViewInvoice(inv)} className="hover:bg-emerald-50/30 transition-all duration-500 cursor-pointer group">
+                    <td className="px-8 py-6">
+                      <p className="font-mono font-black text-emerald-600 group-hover:scale-105 transition-transform duration-500 origin-left">{inv.numero_facture || 'BROUILLON'}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${inv.type === 'DEFINITIVE' ? 'bg-slate-900 text-white' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {inv.type}
+                        </span>
+                        <span className="text-[8px] text-slate-300 font-bold tracking-widest">{new Date(inv.date_creation).toLocaleDateString()}</span>
+                      </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                        inv.statut_paiement === 'SOLDE' ? 'bg-green-600 text-white' : 
-                        inv.statut_paiement === 'PARTIEL' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
-                      }`}>
+                    <td className="px-8 py-6">
+                      <span className={`px-4 py-1.5 rounded-2xl text-[9px] font-black uppercase tracking-widest flex items-center w-fit gap-2 shadow-sm ${inv.statut_paiement === 'SOLDE' ? 'bg-emerald-600 text-white shadow-emerald-200' : inv.statut_paiement === 'PARTIEL' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+                        {inv.statut_paiement === 'SOLDE' ? <CheckCircle2 className="w-3 h-3" /> : inv.statut_paiement === 'PARTIEL' ? <Clock className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
                         {inv.statut_paiement.replace('_', ' ')}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-sm text-on-surface">{inv.vehicule_plate}</p>
-                      <p className="text-xs text-on-surface-variant font-medium">{inv.client_name}</p>
+                    <td className="px-8 py-6">
+                      <p className="font-black text-sm text-slate-900 uppercase tracking-tight">{inv.vehicule_plate}</p>
+                      <p className="text-xs text-slate-400 font-bold mt-0.5">{inv.client_name}</p>
                     </td>
-                    <td className="px-6 py-4 text-right font-black text-on-surface text-sm">
-                      {Number(inv.total_ttc).toLocaleString()} F
+                    <td className="px-8 py-6 text-right">
+                      <p className="font-black text-slate-900 text-base italic">{Number(inv.total_ttc).toLocaleString()} F</p>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className={`text-sm font-black ${inv.statut_paiement === 'SOLDE' ? 'text-green-600' : 'text-red-600'}`}>
+                    <td className="px-8 py-6 text-right">
+                      <span className={`text-sm font-black italic px-3 py-1 rounded-xl ${inv.statut_paiement === 'SOLDE' ? 'text-emerald-600 bg-emerald-50/50' : 'text-rose-600 bg-rose-50/50'}`}>
                         {(inv.total_ttc - inv.montant_paye).toLocaleString()} F
                       </span>
                     </td>
@@ -388,115 +469,171 @@ const Invoices: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12 lg:col-span-3 space-y-4 no-print">
-            <div className="bg-white rounded-2xl border border-outline/10 shadow-sm overflow-hidden flex flex-col max-h-[700px]">
-              <div className="p-4 border-b border-outline/10 bg-surface-container/10">
-                <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-on-surface-variant">OR en attente</h3>
+        <div className="grid grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
+          {/* Liste OR à gauche */}
+          <div className="col-span-12 lg:col-span-3 space-y-6 no-print">
+            <div className="card-luxury overflow-hidden flex flex-col max-h-[750px]">
+              <div className="p-6 border-b border-emerald-50/50 bg-emerald-50/20">
+                <h3 className="font-black text-[10px] uppercase tracking-[0.3em] text-emerald-800">Ordres de Réparation</h3>
               </div>
-              <div className="overflow-y-auto">
+              <div className="overflow-y-auto custom-scrollbar divide-y divide-emerald-50/30">
                 {repairs.map(r => (
                   <div 
-                    key={r.id}
-                    onClick={() => handleSelectRepair(r)}
-                    className={`p-4 border-b border-outline/5 cursor-pointer transition-all ${selectedRepair?.id === r.id ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-surface-container/20'}`}
+                    key={r.id} 
+                    onClick={() => handleSelectRepair(r)} 
+                    className={`p-6 cursor-pointer transition-all duration-500 flex flex-col gap-1 ${selectedRepair?.id === r.id ? 'bg-emerald-600 text-white shadow-inner scale-[0.98] rounded-xl mx-2 my-2' : 'hover:bg-emerald-50/50'}`}
                   >
-                    <p className="font-mono text-xs font-black text-primary">OR-{r.id.toString().padStart(4, '0')}</p>
-                    <p className="text-sm font-bold text-on-surface">{r.vehicule_plate}</p>
-                    <p className="text-[10px] font-bold text-on-surface-variant truncate">{r.client_name}</p>
+                    <div className="flex justify-between items-center">
+                      <p className={`font-mono text-[10px] font-black ${selectedRepair?.id === r.id ? 'text-emerald-100' : 'text-emerald-600'}`}>OR-{r.id.toString().padStart(4, '0')}</p>
+                      {selectedRepair?.id === r.id && <ChevronRight className="w-4 h-4 text-white" />}
+                    </div>
+                    <p className={`text-sm font-black uppercase tracking-tight ${selectedRepair?.id === r.id ? 'text-white' : 'text-slate-900'}`}>{r.vehicule_plate}</p>
+                    <p className={`text-[10px] font-bold ${selectedRepair?.id === r.id ? 'text-emerald-200' : 'text-slate-400'} truncate`}>{r.client_name}</p>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="col-span-12 lg:col-span-9 bg-white rounded-2xl border border-outline/10 shadow-xl overflow-hidden flex flex-col">
+          {/* Facture à droite */}
+          <div className="col-span-12 lg:col-span-9 card-luxury p-12 space-y-10 flex flex-col relative">
             {selectedRepair ? (
-              <div className="p-8 space-y-8 animate-in fade-in duration-300">
+              <div className="animate-in fade-in duration-700 space-y-10">
+                {/* Sélecteur Type */}
                 <div className="flex justify-end no-print">
-                   <div className="flex bg-surface-container p-1 rounded-lg border border-outline/10">
-                    <button 
-                      onClick={() => setIsDefinitive(false)}
-                      disabled={currentInvoice?.type === 'DEFINITIVE'}
-                      className={`px-4 py-1.5 rounded-md text-[10px] font-black transition-all ${!isDefinitive ? 'bg-white text-primary shadow-sm' : 'text-on-surface-variant disabled:opacity-50'}`}
-                    > PROFORMA </button>
-                    <button 
-                      onClick={() => setIsDefinitive(true)}
-                      disabled={currentInvoice?.type === 'DEFINITIVE'}
-                      className={`px-4 py-1.5 rounded-md text-[10px] font-black transition-all ${isDefinitive ? 'bg-white text-primary shadow-sm' : 'text-on-surface-variant disabled:opacity-50'}`}
-                    > DÉFINITIVE </button>
+                   <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200/50">
+                    <button onClick={() => setIsDefinitive(false)} disabled={currentInvoice?.type === 'DEFINITIVE'} className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all duration-500 ${!isDefinitive ? 'bg-white text-emerald-600 shadow-md shadow-emerald-900/5' : 'text-slate-400 disabled:opacity-50'}`}> PROFORMA </button>
+                    <button onClick={() => setIsDefinitive(true)} disabled={currentInvoice?.type === 'DEFINITIVE'} className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all duration-500 ${isDefinitive ? 'bg-white text-slate-900 shadow-md shadow-slate-900/5' : 'text-slate-400 disabled:opacity-50'}`}> DÉFINITIVE </button>
                   </div>
                 </div>
 
-                <div className="flex justify-between items-start pb-8 border-b-2 border-primary/10">
-                  <div className="space-y-1">
-                    <h2 className="text-4xl font-black text-primary italic tracking-tighter">LUXEL-G</h2>
-                    <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.3em]">Luxury Elegance Garage</p>
-                  </div>
-                  <div className="text-right space-y-1">
-                    <h2 className="text-2xl font-black text-on-surface uppercase tracking-tight">{isDefinitive ? 'Facture Définitive' : 'Facture Proforma'}</h2>
-                    <p className="font-mono text-sm font-bold text-primary bg-primary/5 px-3 py-1 rounded-full inline-block">
-                      {currentInvoice?.numero_facture || `TEMP-OR-${selectedRepair.id}`}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-8 bg-surface-container/10 p-6 rounded-xl border border-outline/5 shadow-inner">
+                {/* Header Facture */}
+                <div className="flex justify-between items-start pb-10 border-b-4 border-emerald-500/10">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-on-surface-variant opacity-60">Client</label>
-                    <p className="text-sm font-bold text-on-surface">{selectedRepair.client_name}</p>
-                    <p className="text-xs text-on-surface-variant font-bold">{selectedRepair.client_contact}</p>
+                    <h2 className="text-5xl font-black text-emerald-600 italic tracking-tighter">LUXEL<span className="text-slate-900">-G</span></h2>
+                    <div className="flex items-center gap-2">
+                      <div className="h-1 w-10 bg-emerald-50 rounded-full"></div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Luxury Elegance Garage</p>
+                    </div>
                   </div>
-                  <div className="space-y-2 border-x border-outline/10 px-8 text-center">
-                    <label className="text-[10px] font-black uppercase text-on-surface-variant opacity-60">Véhicule</label>
-                    <p className="text-sm font-black text-primary font-mono">{selectedRepair.vehicule_plate}</p>
-                    <p className="text-xs font-bold">{kmsEntree} KM</p>
+                  <div className="text-right space-y-3">
+                    <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">{isDefinitive ? 'Facture Définitive' : 'Facture Proforma'}</h2>
+                    <div className="font-mono text-sm font-black text-emerald-600 bg-emerald-50 px-6 py-2 rounded-full inline-block border border-emerald-100 shadow-inner">
+                      {currentInvoice?.numero_facture || `TEMP-OR-${selectedRepair.id}`}
+                    </div>
                   </div>
-                  <div className="space-y-2 text-right">
-                    <label className="text-[10px] font-black uppercase text-on-surface-variant opacity-60">Statut Règlement</label>
-                    <p className={`text-xs font-black uppercase ${currentInvoice?.statut_paiement === 'SOLDE' ? 'text-green-600' : 'text-red-600'}`}>
-                      {currentInvoice?.statut_paiement?.replace('_', ' ') || 'NON CRÉÉE'}
+                </div>
+
+                {/* Infos Client & Véhicule */}
+                <div className="grid grid-cols-3 gap-10 bg-slate-50/50 p-8 rounded-[2rem] border border-emerald-100/30 shadow-inner relative overflow-hidden">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase text-emerald-600 tracking-widest opacity-70 flex items-center gap-2">
+                      <Users className="w-3 h-3" /> Client
+                    </label>
+                    <div>
+                      <p className="text-lg font-black text-slate-900 uppercase">{selectedRepair.client_name}</p>
+                      <p className="text-xs font-bold text-slate-500 mt-1">{selectedRepair.client_contact}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3 border-x border-emerald-100/50 px-10 text-center">
+                    <label className="text-[10px] font-black uppercase text-emerald-600 tracking-widest opacity-70 flex items-center justify-center gap-2">
+                      <Car className="w-3 h-3" /> Véhicule
+                    </label>
+                    <div>
+                      <p className="text-xl font-black text-emerald-600 font-mono">{selectedRepair.vehicule_plate}</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase mt-1 tracking-widest">{kmsEntree} KM AU COMPTEUR</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3 text-right">
+                    <label className="text-[10px] font-black uppercase text-emerald-600 tracking-widest opacity-70 flex items-center justify-end gap-2">
+                      <CreditCard className="w-3 h-3" /> Règlement
+                    </label>
+                    <p className={`text-sm font-black uppercase italic ${currentInvoice?.statut_paiement === 'SOLDE' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {currentInvoice?.statut_paiement?.replace('_', ' ') || 'NON ENREGISTRÉ'}
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-6">
-                  {/* Travaux */}
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center border-b border-outline/10 pb-2">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-primary">I. Travaux & Main d'œuvre</h3>
-                      {!isDefinitive && <button onClick={addLaborLine} className="text-[9px] font-black bg-primary text-on-primary px-2 py-1 rounded shadow-sm no-print">AJOUTER</button>}
+                {/* Tableaux Lignes */}
+                <div className="space-y-10">
+                  {/* Main d'œuvre */}
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center border-b-2 border-emerald-100/50 pb-3">
+                      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700 flex items-center gap-2">
+                        <Wrench className="w-4 h-4" /> I. Travaux & Main d'œuvre
+                      </h3>
+                      {!isDefinitive && (
+                        <button onClick={addLaborLine} className="bg-emerald-600 text-white p-2 rounded-xl shadow-lg shadow-emerald-200 hover:scale-110 transition-all no-print">
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                    {laborLines.map(line => (
-                      <div key={line.id} className="flex gap-4 items-center">
-                        <input disabled={isDefinitive} value={line.description} onChange={(e) => updateLabor(line.id, 'description', e.target.value)} className="flex-1 bg-transparent border-b border-outline/5 py-1 text-sm font-medium outline-none focus:border-primary disabled:opacity-60" placeholder="Description..."/>
-                        <input disabled={isDefinitive} type="number" value={line.montant || ''} onChange={(e) => updateLabor(line.id, 'montant', parseInt(e.target.value) || 0)} className="w-24 text-right bg-transparent border-b border-outline/5 py-1 text-sm font-black outline-none focus:border-primary disabled:opacity-60" placeholder="0"/>
-                      </div>
-                    ))}
+                    <div className="space-y-4">
+                      {laborLines.map(line => (
+                        <div key={line.id} className="flex gap-6 items-center group">
+                          <input disabled={isDefinitive} value={line.description} onChange={(e) => updateLabor(line.id, 'description', e.target.value)} className="flex-1 bg-white border border-emerald-50 rounded-2xl px-6 py-3 text-sm font-bold outline-none focus:border-emerald-500/50 transition-all duration-500 disabled:opacity-60 shadow-sm" placeholder="Description des travaux..."/>
+                          <div className="relative">
+                            <input disabled={isDefinitive} type="number" value={line.montant || ''} onChange={(e) => updateLabor(line.id, 'montant', parseInt(e.target.value) || 0)} className="w-40 text-right bg-emerald-50/50 border border-emerald-100/30 rounded-2xl px-6 py-3 text-sm font-black outline-none focus:border-emerald-500/50 transition-all duration-500 disabled:opacity-60" placeholder="0"/>
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-emerald-400">F</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Pièces */}
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center border-b border-outline/10 pb-2">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-primary">II. Pièces & Fournitures</h3>
-                      {!isDefinitive && <button onClick={addPartLine} className="text-[9px] font-black bg-primary text-on-primary px-2 py-1 rounded shadow-sm no-print">AJOUTER</button>}
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center border-b-2 border-emerald-100/50 pb-3">
+                      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700 flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> II. Pièces & Fournitures
+                      </h3>
+                      {!isDefinitive && (
+                        <button onClick={addPartLine} className="bg-emerald-600 text-white p-2 rounded-xl shadow-lg shadow-emerald-200 hover:scale-110 transition-all no-print">
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full text-left">
                       <thead>
-                        <tr className="text-[9px] font-black text-on-surface-variant uppercase">
-                          <th className="py-2">Description</th>
-                          <th className="py-2 text-center w-12">Qté</th>
-                          <th className="py-2 text-right w-24">P.U</th>
-                          <th className="py-2 text-right w-24">Total</th>
+                        <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-emerald-50/30">
+                          <th className="py-4 px-4">Désignation</th>
+                          <th className="py-4 text-center w-24">Quantité</th>
+                          <th className="py-4 text-right w-32">P. Unitaire</th>
+                          <th className="py-4 text-right w-32">Total</th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-emerald-50/20">
                         {partLines.map(line => (
-                          <tr key={line.id} className="border-b border-outline/5">
-                            <td className="py-2"><input disabled={isDefinitive} value={line.description} onChange={(e) => updatePart(line.id, 'description', e.target.value)} className="w-full bg-transparent outline-none font-medium disabled:opacity-60" placeholder="Nom pièce..."/></td>
-                            <td className="py-2"><input disabled={isDefinitive} type="number" value={line.quantite} onChange={(e) => updatePart(line.id, 'quantite', parseInt(e.target.value) || 0)} className="w-full bg-transparent outline-none text-center font-black disabled:opacity-60"/></td>
-                            <td className="py-2"><input disabled={isDefinitive} type="number" value={line.prix_unitaire || ''} onChange={(e) => updatePart(line.id, 'prix_unitaire', parseInt(e.target.value) || 0)} className="w-full bg-transparent outline-none text-right font-black disabled:opacity-60" placeholder="0"/></td>
-                            <td className="py-2 text-right font-black text-primary">{(line.quantite * line.prix_unitaire).toLocaleString()}</td>
+                          <tr key={line.id} className="group">
+                            <td className="py-4 px-4">
+                               <div className="flex flex-col gap-2">
+                                <input disabled={isDefinitive} value={line.description} onChange={(e) => updatePart(line.id, 'description', e.target.value)} className="w-full bg-transparent outline-none font-black text-sm text-slate-900 uppercase disabled:opacity-60" placeholder="Nom de la pièce..."/>
+                                {!isDefinitive && (
+                                  <StockSearchInput 
+                                    stock={stock} 
+                                    onSelect={(item) => handleStockSelect(line.id, item.id.toString())} 
+                                    className="no-print mt-1"
+                                  />
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-4">
+                              <div className="flex flex-col items-center">
+                                <input disabled={isDefinitive} type="number" value={line.quantite} onChange={(e) => updatePart(line.id, 'quantite', parseInt(e.target.value) || 0)} className="w-16 bg-slate-100/50 rounded-xl py-1 text-center font-black text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-60"/>
+                                {line.article_stock && stock.find(s => s.id === line.article_stock) && (
+                                  <p className={`text-[8px] font-black uppercase mt-1 ${line.quantite > (stock.find(s => s.id === line.article_stock)?.quantite || 0) ? 'text-rose-600' : 'text-emerald-600'}`}> Stock: {stock.find(s => s.id === line.article_stock)?.quantite} </p>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-4 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <input disabled={isDefinitive} type="number" value={line.prix_unitaire || ''} onChange={(e) => updatePart(line.id, 'prix_unitaire', parseInt(e.target.value) || 0)} className="w-24 bg-transparent outline-none text-right font-bold text-sm disabled:opacity-60" placeholder="0"/>
+                                <span className="text-[10px] font-black text-slate-300">F</span>
+                              </div>
+                            </td>
+                            <td className="py-4 text-right">
+                              <span className="font-black text-emerald-600 italic text-sm">{(line.quantite * line.prix_unitaire).toLocaleString()} F</span>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -504,85 +641,95 @@ const Invoices: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="pt-8 flex flex-col md:flex-row justify-between items-end gap-6 border-t-2 border-outline/10">
-                  <div className="flex gap-3 no-print">
+                {/* Actions et Total */}
+                <div className="pt-10 flex flex-col md:flex-row justify-between items-end gap-8 border-t-4 border-emerald-500/10 mt-10">
+                  <div className="flex flex-wrap gap-4 no-print">
                     {currentInvoiceId && isDefinitive && currentInvoice && currentInvoice.statut_paiement !== 'SOLDE' && (
-                      <button 
-                        onClick={() => openPaymentModal(currentInvoice)}
-                        className="bg-green-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase shadow-lg shadow-green-100 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
-                      >
-                        <span className="material-symbols-outlined text-sm">payments</span>
-                        Encaisser
+                      <button onClick={() => openPaymentModal(currentInvoice)} className="bg-emerald-600 text-white px-8 py-4 rounded-[1.25rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center gap-3">
+                        <CreditCard className="w-4 h-4" /> Encaisser
                       </button>
                     )}
                     {currentInvoiceId && !isDefinitive && (
-                      <button 
-                        onClick={handleValidateDefinitive}
-                        className="bg-primary text-on-primary px-6 py-3 rounded-xl font-black text-xs uppercase shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
-                      >
-                        <span className="material-symbols-outlined text-sm">verified</span>
-                        Valider Définitive
+                      <button onClick={handleValidateDefinitive} className="bg-slate-900 text-white px-8 py-4 rounded-[1.25rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-emerald-600 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center gap-3">
+                        <Verified className="w-4 h-4" /> Valider Définitive
                       </button>
                     )}
-                    <button 
-                      onClick={handleSaveInvoice}
-                      disabled={isDefinitive}
-                      className="bg-surface-container text-on-surface px-6 py-3 rounded-xl font-black text-xs uppercase border border-outline/10 hover:bg-outline/5 transition-all flex items-center gap-2 disabled:opacity-50"
-                    >
-                      <span className="material-symbols-outlined text-sm">save</span>
-                      {currentInvoiceId ? 'Mettre à jour' : 'Enregistrer'}
+                    <button onClick={handleSaveInvoice} disabled={isDefinitive} className="bg-white text-slate-600 px-8 py-4 rounded-[1.25rem] font-black text-xs uppercase tracking-widest border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all duration-500 flex items-center gap-3 disabled:opacity-40">
+                      <Save className="w-4 h-4" /> {currentInvoiceId ? 'Mettre à jour' : 'Enregistrer'}
                     </button>
-                    <button 
-                      onClick={handlePrint}
-                      className="bg-white text-on-surface px-6 py-3 rounded-xl font-black text-xs uppercase border border-outline/10 hover:bg-surface-container transition-all flex items-center gap-2"
-                    >
-                      <span className="material-symbols-outlined text-sm">print</span>
-                      Imprimer
-                    </button>
+                    
+                    {currentInvoiceId && (
+                      <div className="flex gap-2">
+                        <button onClick={handleDownloadPDF} title="PDF" className="p-4 bg-blue-50 text-blue-600 rounded-[1.25rem] border border-blue-100 hover:bg-blue-600 hover:text-white transition-all duration-500 shadow-sm">
+                          <Printer className="w-5 h-5" />
+                        </button>
+                        <button onClick={handleWhatsAppShare} title="WhatsApp" className="p-4 bg-emerald-50 text-emerald-600 rounded-[1.25rem] border border-emerald-100 hover:bg-[#25D366] hover:text-white transition-all duration-500 shadow-sm">
+                          <Share2 className="w-5 h-5" />
+                        </button>
+                        <button onClick={handleSendEmail} title="Email" className="p-4 bg-slate-50 text-slate-600 rounded-[1.25rem] border border-slate-200 hover:bg-slate-900 hover:text-white transition-all duration-500 shadow-sm">
+                          <Mail className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="w-full md:w-80 space-y-3 bg-primary/5 p-6 rounded-2xl border border-primary/10">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-on-surface-variant uppercase">Total HT</span>
-                      <span className="text-on-surface">{grandTotal.toLocaleString()} F</span>
+                  <div className="w-full md:w-96 bg-slate-900 text-white p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+                    <div className="relative z-10">
+                      <div className="flex justify-between items-center mb-6">
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Total Hors Taxes</span>
+                        <span className="text-lg font-bold">{(grandTotal).toLocaleString()} F</span>
+                      </div>
+                      <div className="flex justify-between items-center mb-6 opacity-40">
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em]">TVA (0%)</span>
+                        <span className="text-lg font-bold">0 F</span>
+                      </div>
+                      <div className="pt-6 border-t border-slate-800">
+                        <div className="flex justify-between items-end">
+                          <div>
+                            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.3em] block mb-2">Net à Payer</span>
+                            <p className="text-4xl font-black italic tracking-tighter text-white">{(grandTotal - (currentInvoice?.montant_paye || 0)).toLocaleString()} F</p>
+                          </div>
+                          <Verified className="w-12 h-12 text-slate-800 group-hover:text-emerald-500/20 transition-all duration-1000" />
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-on-surface-variant uppercase">Déjà payé</span>
-                      <span className="text-green-600">{(currentInvoice?.montant_paye || 0).toLocaleString()} F</span>
-                    </div>
-                    <div className="flex justify-between items-center pt-4 border-t-2 border-primary/20">
-                      <span className="text-sm font-black text-primary uppercase tracking-widest">NET À PAYER</span>
-                      <span className="text-2xl font-black text-primary">{(grandTotal - (currentInvoice?.montant_paye || 0)).toLocaleString()} F</span>
-                    </div>
+                    <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-20 opacity-20 text-on-surface-variant">
-                <span className="material-symbols-outlined text-6xl mb-4">receipt_long</span>
-                <p className="font-black uppercase tracking-[0.3em]">Établir un document financier</p>
-                <p className="text-xs font-bold mt-2">Sélectionnez un ordre de réparation à gauche.</p>
+              <div className="flex-1 flex flex-col items-center justify-center p-40 opacity-20 text-slate-400">
+                <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mb-8 shadow-inner">
+                  <FileText className="w-10 h-10 text-emerald-600" />
+                </div>
+                <p className="font-black uppercase tracking-[0.4em] text-xl">Facturation</p>
+                <p className="text-xs font-bold mt-4 tracking-widest">SÉLECTIONNEZ UN ORDRE POUR GÉNÉRER UN DOCUMENT</p>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Modal de Paiement */}
+      {/* Modal Paiement */}
       {isPaymentModalOpen && currentInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in duration-300">
-            <div className="p-8 space-y-6">
-              <div className="text-center">
-                <h2 className="text-2xl font-black text-on-surface">Encaissement</h2>
-                <p className="text-xs font-bold text-on-surface-variant mt-1">
-                  Reste à payer : <span className="text-primary">{(currentInvoice.total_ttc - currentInvoice.montant_paye).toLocaleString()} F</span>
-                </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-4 animate-in fade-in duration-500">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl border border-emerald-100/50 animate-in zoom-in duration-700 overflow-hidden">
+            <div className="p-10 space-y-8">
+              <div className="text-center space-y-2">
+                <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                  <CreditCard className="w-8 h-8 text-emerald-600" />
+                </div>
+                <h2 className="text-3xl font-black text-slate-900 italic tracking-tighter uppercase">Encaissement</h2>
+                <div className="flex items-center justify-center gap-2 mt-4 bg-rose-50 px-4 py-2 rounded-full border border-rose-100">
+                  <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Reste à payer :</span>
+                  <span className="text-sm font-black text-rose-600 italic">{(currentInvoice.total_ttc - currentInvoice.montant_paye).toLocaleString()} F</span>
+                </div>
               </div>
-              <div className="space-y-4">
+
+              <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-on-surface-variant">Mode de Paiement</label>
-                  <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className="w-full bg-surface-container/50 border border-outline/20 rounded-xl px-4 py-3 outline-none focus:border-primary font-bold text-sm">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Moyen de Paiement</label>
+                  <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className="w-full bg-slate-50 border border-emerald-100/30 rounded-2xl px-6 py-4 outline-none focus:border-emerald-500/50 font-bold text-sm shadow-inner transition-all duration-500 appearance-none">
                     <option value="ESPECE">Espèce</option>
                     <option value="MOMOPAY">MomoPay</option>
                     <option value="VIREMENT">Virement Bancaire</option>
@@ -590,12 +737,27 @@ const Invoices: React.FC = () => {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-on-surface-variant">Montant versé (FCFA)</label>
-                  <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full bg-surface-container/50 border border-outline/20 rounded-xl px-4 py-3 outline-none focus:border-primary font-black text-xl text-primary" placeholder="0" autoFocus />
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Montant versé (FCFA)</label>
+                  <div className="relative">
+                    <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full bg-emerald-50/50 border border-emerald-200/50 rounded-2xl px-8 py-5 outline-none focus:border-emerald-500 font-black text-3xl text-emerald-600 shadow-inner" placeholder="0" autoFocus />
+                    <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-emerald-200">F</span>
+                  </div>
                 </div>
-                <div className="flex gap-3 pt-4">
-                  <button type="button" onClick={() => setIsPaymentModalOpen(false)} className="flex-1 px-6 py-3 rounded-xl font-bold border border-outline/20 hover:bg-surface-container transition-all">Annuler</button>
-                  <button onClick={handleRecordPayment} className="flex-1 px-6 py-3 rounded-xl font-black bg-green-600 text-white shadow-lg hover:bg-green-700 transition-all">Valider</button>
+                
+                <div className="flex gap-4 pt-6">
+                  <button 
+                    type="button" 
+                    onClick={() => setIsPaymentModalOpen(false)}
+                    className="flex-1 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 border border-slate-100 hover:bg-slate-50 transition-all duration-500"
+                  >
+                    Annuler
+                  </button>
+                  <button 
+                    onClick={handleRecordPayment}
+                    className="flex-1 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-emerald-600 text-white shadow-xl shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-1 transition-all duration-700 active:scale-95"
+                  >
+                    Confirmer
+                  </button>
                 </div>
               </div>
             </div>
