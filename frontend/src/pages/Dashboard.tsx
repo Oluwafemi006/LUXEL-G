@@ -6,7 +6,6 @@ import {
   Wrench,
   AlertTriangle,
   TrendingUp,
-  TrendingDown,
   PlusCircle,
   FileText,
   Wallet,
@@ -15,7 +14,8 @@ import {
   Clock,
   CheckCircle2,
   Package,
-  History
+  History,
+  Bell
 } from 'lucide-react';
 import {
   AreaChart,
@@ -46,7 +46,13 @@ interface FinanceStats {
   solde: number;
 }
 
-const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6'];
+interface StaffNotification {
+  id: number;
+  type: string;
+  message: string;
+  date_creation: string;
+  lu: boolean;
+}
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -63,6 +69,7 @@ const Dashboard: React.FC = () => {
     solde: 0
   });
   const [maintenanceAlerts, setMaintenanceAlerts] = useState<MaintenanceAlert[]>([]);
+  const [staffNotifications, setStaffNotifications] = useState<StaffNotification[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [stockPieData, setStockPieData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,12 +78,13 @@ const Dashboard: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [s, m, f, c, st] = await Promise.all([
+        const [s, m, f, c, st, sn] = await Promise.all([
           api.get('stats/'),
           api.get('maintenance-predictive/alertes/'),
           api.get('caisse/synthese/'),
           api.get('caisse/'),
-          api.get('stock/')
+          api.get('stock/'),
+          api.get('notifications-staff/')
         ]);
         
         setStats({
@@ -88,6 +96,7 @@ const Dashboard: React.FC = () => {
 
         setMaintenanceAlerts(m.data);
         setFinance(f.data);
+        setStaffNotifications(sn.data.slice(0, 5));
 
         // Process Chart Data (Last 6 days)
         const movements = Array.isArray(c.data) ? c.data : [];
@@ -224,8 +233,8 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[300px] w-full" style={{ minHeight: '300px' }}>
+              <ResponsiveContainer width="100%" height="100%" minHeight={300}>
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorRec" x1="0" y1="0" x2="0" y2="1">
@@ -341,6 +350,31 @@ const Dashboard: React.FC = () => {
             <div className="absolute -left-20 -bottom-20 w-40 h-40 bg-blue-500/5 rounded-full blur-[80px] group-hover:bg-blue-500/10 transition-all duration-1000" />
           </div>
 
+          {/* Staff Notifications Card */}
+          <div className="card-luxury overflow-hidden">
+            <div className="px-8 py-6 border-b border-emerald-50/50 flex items-center justify-between bg-emerald-50/10">
+              <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                <Bell className="w-4 h-4 text-emerald-600" />
+                Alertes Système
+              </h2>
+            </div>
+            <div className="divide-y divide-emerald-50/30">
+              {staffNotifications.length === 0 ? (
+                <p className="p-8 text-center text-[10px] font-black uppercase text-slate-300 italic">Aucune alerte</p>
+              ) : staffNotifications.map(n => (
+                <div key={`n-${n.id}`} className="p-6 hover:bg-emerald-50/20 transition-all group">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${n.type === 'NOUVEAU_RDV' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
+                      {n.type.replace('_', ' ')}
+                    </span>
+                    <span className="text-[8px] font-bold text-slate-300 uppercase italic">{new Date(n.date_creation).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  </div>
+                  <p className="text-[11px] font-bold text-slate-500 leading-relaxed uppercase tracking-tight">"{n.message}"</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Stock Distribution Chart */}
           <div className="card-luxury p-10">
             <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-8 flex items-center gap-3">
@@ -348,8 +382,8 @@ const Dashboard: React.FC = () => {
               État du Stock
             </h2>
             
-            <div className="h-[200px] w-full" style={{ minHeight: 0, minWidth: 0 }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[200px] w-full" style={{ minHeight: '200px' }}>
+              <ResponsiveContainer width="100%" height="100%" minHeight={200}>
                 <PieChart>
                   <Pie
                     data={stockPieData}

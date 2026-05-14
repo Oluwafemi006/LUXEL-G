@@ -2,6 +2,17 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+class UserProfile(models.Model):
+    ROLE_CHOICES = [
+        ('DIRECTEUR', 'Directeur'),
+        ('SECRETAIRE', 'Secrétaire'),
+    ]
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='SECRETAIRE')
+
+    def __str__(self):
+        return f"{self.user.username} - {self.role}"
+
 class Client(models.Model):
     nom = models.CharField(max_length=100)
     prenoms = models.CharField(max_length=200)
@@ -9,6 +20,7 @@ class Client(models.Model):
     contact_conducteur = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     adresse = models.TextField()
+    photo = models.ImageField(upload_to='clients_photos/', blank=True, null=True)
     date_creation = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -108,6 +120,11 @@ class Facture(models.Model):
     
     date_creation = models.DateTimeField(auto_now_add=True)
     date_validation = models.DateTimeField(blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if self.total_ttc <= 0:
+            self.statut_paiement = 'SOLDE'
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.type} - {self.numero_facture or 'Sans N°'}"
@@ -225,6 +242,21 @@ class NotificationClient(models.Model):
 
     def __str__(self):
         return f"Notif {self.client.nom} - {self.type}"
+
+class NotificationStaff(models.Model):
+    TYPE_CHOICES = [
+        ('NOUVEAU_RDV', 'Nouveau Rendez-vous'),
+        ('NOUVEL_AVIS', 'Nouvel Avis Client'),
+        ('STOCK_BAS', 'Alerte Stock Bas'),
+        ('PAIEMENT_RECU', 'Paiement Reçu'),
+    ]
+    type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    message = models.TextField()
+    lu = models.BooleanField(default=False)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Staff Notif - {self.type} - {self.date_creation}"
 
 class Avis(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='avis')

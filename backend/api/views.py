@@ -1,6 +1,7 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.utils import timezone
 from django.db import models
 from django.db.models.functions import TruncMonth
@@ -12,14 +13,19 @@ from django.contrib.auth.models import User
 from django.core.mail import EmailMessage
 
 from .utils import generate_document_pdf
-from .models import Client, Vehicule, Reparation, Stock, Facture, LigneTravail, LignePiece, MouvementCaisse, Devis, MaintenancePredictive, Appointment, NotificationClient, Avis
+from .models import Client, Vehicule, Reparation, Stock, Facture, LigneTravail, LignePiece, MouvementCaisse, Devis, MaintenancePredictive, Appointment, NotificationClient, Avis, NotificationStaff
 from .serializers import (
     ClientSerializer, VehiculeSerializer, ReparationSerializer, 
     StockSerializer, UserSerializer, MiniVehiculeSerializer,
     FactureSerializer, LigneTravailSerializer, LignePieceSerializer,
     MouvementCaisseSerializer, DevisSerializer, MaintenancePredictiveSerializer,
-    AppointmentSerializer, NotificationClientSerializer, AvisSerializer
+    AppointmentSerializer, NotificationClientSerializer, AvisSerializer,
+    NotificationStaffSerializer
 )
+
+class IsDirecteur(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and hasattr(request.user, 'profile') and request.user.profile.role == 'DIRECTEUR'
 
 class ClientViewSet(viewsets.ModelViewSet):
     queryset = Client.objects.all().order_by('-date_creation')
@@ -28,9 +34,17 @@ class ClientViewSet(viewsets.ModelViewSet):
 class AppointmentViewSet(viewsets.ModelViewSet):
     queryset = Appointment.objects.all().order_by('-date_rdv')
     serializer_class = AppointmentSerializer
+    permission_classes = [permissions.AllowAny]
 
     def perform_create(self, serializer):
         appointment = serializer.save()
+        
+        # Notification Staff
+        NotificationStaff.objects.create(
+            type='NOUVEAU_RDV',
+            message=f"Nouveau rendez-vous pris par {appointment.nom_client_public or appointment.client} pour le {appointment.date_rdv.strftime('%d/%m/%Y %H:%M')}."
+        )
+
         # Créer une notification pour le client (si lié) ou logguer la demande
         if appointment.client:
             NotificationClient.objects.create(
@@ -46,6 +60,11 @@ class NotificationClientViewSet(viewsets.ModelViewSet):
 class AvisViewSet(viewsets.ModelViewSet):
     queryset = Avis.objects.all().order_by('-date_creation')
     serializer_class = AvisSerializer
+
+    def get_permissions(self):
+        if self.action in ['public_list', 'create', 'submit_avis']:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
 
     @action(detail=False, methods=['get'])
     def public_list(self, request):
@@ -143,12 +162,36 @@ class FactureViewSet(viewsets.ModelViewSet):
     def enregistrer_paiement(self, request, pk=None):
         facture = self.get_object()
         montant = Decimal(str(request.data.get('montant', 0)))
+        
+        # Cas spécial pour les factures à 0 (services gratuits ou erreurs)
+        if facture.total_ttc <= 0:
+            facture.statut_paiement = 'SOLDE'
+            facture.save()
+            return Response(FactureSerializer(facture).data)
+
         if montant <= 0 or montant > (facture.total_ttc - facture.montant_paye):
             return Response({'error': 'Montant invalide'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Règle des 75% pour accepter le paiement (Avance pour travaux)
+        total_apres_paiement = facture.montant_paye + montant
+        seuil_75_pourcent = facture.total_ttc * Decimal('0.75')
+        
+        if total_apres_paiement < seuil_75_pourcent:
+            return Response({
+                'error': f'Le paiement doit couvrir au minimum 75% du montant total ({seuil_75_pourcent:,.0f} FCFA) pour être accepté.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         facture.montant_paye += montant
         facture.mode_paiement = request.data.get('mode_paiement')
         facture.statut_paiement = 'SOLDE' if facture.montant_paye >= facture.total_ttc else 'PARTIEL'
         facture.save()
+        
+        # Si le paiement atteint au moins 75%, on peut entamer les réparations
+        reparation = facture.reparation
+        if reparation.statut == 'EN_ATTENTE':
+            reparation.statut = 'EN_COURS'
+            reparation.save()
+
         MouvementCaisse.objects.create(
             type_mouvement='RECETTE', 
             categorie='RECETTE_CLIENT', 
@@ -157,7 +200,30 @@ class FactureViewSet(viewsets.ModelViewSet):
             facture=facture,
             date_mouvement=timezone.now().date()
         )
+
+        # Notification Staff
+        NotificationStaff.objects.create(
+            type='PAIEMENT_RECU',
+            message=f"Paiement de {montant:,.0f} F reçu pour la facture {facture.numero_facture}."
+        )
+
         return Response(FactureSerializer(facture).data)
+
+    @action(detail=True, methods=['post'])
+    def relancer_paiement(self, request, pk=None):
+        facture = self.get_object()
+        client = facture.reparation.vehicule.client
+        reste = facture.total_ttc - facture.montant_paye
+        
+        message = f"Rappel : Un solde de {reste:,.0f} F est en attente de paiement pour votre facture {facture.numero_facture or 'en cours'}. Merci de régulariser."
+        
+        NotificationClient.objects.create(
+            client=client,
+            type='FACTURE_ENVOYEE',
+            message=message
+        )
+        
+        return Response({'message': f'Relance envoyée à {client.nom}.'})
 
     @action(detail=True, methods=['get'])
     def download_pdf(self, request, pk=None):
@@ -242,6 +308,9 @@ class DevisViewSet(viewsets.ModelViewSet):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class ClientSpaceViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+    parser_classes = [MultiPartParser, FormParser]
+
     @action(detail=False, methods=['get'])
     def data(self, request):
         phone = request.query_params.get('phone')
@@ -266,6 +335,17 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         reparations = Reparation.objects.filter(vehicule__client=client).order_by('-date_creation')
         reparations_data = ReparationSerializer(reparations, many=True).data
         
+        # Récupérer les factures (pour solde impayé et téléchargement)
+        factures = Facture.objects.filter(reparation__vehicule__client=client).order_by('-date_creation')
+        factures_data = FactureSerializer(factures, many=True).data
+        
+        # Calcul du solde impayé total
+        solde_impaye = sum((f.total_ttc - f.montant_paye for f in factures if f.type == 'DEFINITIVE'), Decimal('0'))
+
+        # Récupérer les RDV
+        rdvs = Appointment.objects.filter(client=client).order_by('-date_rdv')
+        rdvs_data = AppointmentSerializer(rdvs, many=True).data
+
         # Récupérer les notifications
         notifications = NotificationClient.objects.filter(client=client).order_by('-date_envoi')
         notifications_data = NotificationClientSerializer(notifications, many=True).data
@@ -282,6 +362,9 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             'client': ClientSerializer(client).data,
             'vehicules': vehicules_data,
             'reparations': reparations_data,
+            'factures': factures_data,
+            'rdvs': rdvs_data,
+            'solde_impaye': solde_impaye,
             'notifications': notifications_data,
             'alertes': alertes_data,
             'avis': avis_data
@@ -307,7 +390,12 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         
         serializer = AvisSerializer(data=data)
         if serializer.is_valid():
-            serializer.save()
+            avis = serializer.save()
+            # Notifier le staff
+            NotificationStaff.objects.create(
+                type='NOUVEL_AVIS',
+                message=f"Nouvel avis de {client.nom} ({avis.note}/5) : \"{avis.commentaire[:50]}...\""
+            )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -317,6 +405,46 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         if serializer.is_valid():
             client = serializer.save()
             return Response(ClientSerializer(client).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'], url_path='download-invoice')
+    def download_invoice_pdf(self, request):
+        phone = request.query_params.get('phone')
+        invoice_id = request.query_params.get('invoice_id')
+        if not phone or not invoice_id:
+            return Response({'error': 'Numéro et ID facture requis'}, status=status.HTTP_400_BAD_REQUEST)
+
+        clean_phone = phone.replace(' ', '').replace('+', '')
+        if clean_phone.startswith('229'): clean_phone = clean_phone[3:]
+
+        # Vérifier que la facture appartient bien au client via son numéro
+        facture = Facture.objects.filter(id=invoice_id, reparation__vehicule__client__contact__icontains=clean_phone).first()
+        if not facture:
+            return Response({'error': 'Facture non trouvée ou accès non autorisé'}, status=status.HTTP_404_NOT_FOUND)
+
+        pdf = generate_document_pdf(facture, doc_type="FACTURE")
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="Facture_{facture.numero_facture or "Proforma"}.pdf"'
+        return response
+
+    @action(detail=False, methods=['post'], url_path='update')
+    def update_profile(self, request):
+        phone = request.data.get('phone')
+        if not phone:
+            return Response({'error': 'Numéro de téléphone requis pour mise à jour.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        clean_phone = phone.replace(' ', '').replace('+', '')
+        if clean_phone.startswith('229'):
+            clean_phone = clean_phone[3:]
+
+        client = Client.objects.filter(contact__icontains=clean_phone).first()
+        if not client:
+            return Response({'error': 'Client non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ClientSerializer(client, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(ClientSerializer(client).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class StockViewSet(viewsets.ModelViewSet):
@@ -362,6 +490,10 @@ class MaintenancePredictiveViewSet(viewsets.ModelViewSet):
         alertes = self.queryset.filter(date_prochaine_prevue__lte=timezone.now() + timezone.timedelta(days=15), actif=True)
         return Response(MaintenancePredictiveSerializer(alertes, many=True).data)
 
+class NotificationStaffViewSet(viewsets.ModelViewSet):
+    queryset = NotificationStaff.objects.all().order_by('-date_creation')
+    serializer_class = NotificationStaffSerializer
+
 class LigneTravailViewSet(viewsets.ModelViewSet):
     queryset = LigneTravail.objects.all()
     serializer_class = LigneTravailSerializer
@@ -370,11 +502,23 @@ class LignePieceViewSet(viewsets.ModelViewSet):
     queryset = LignePiece.objects.all()
     serializer_class = LignePieceSerializer
 
-class UserViewSet(viewsets.ReadOnlyModelViewSet):
+class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
+    def get_permissions(self):
+        if self.action == 'me':
+            return [permissions.IsAuthenticated()]
+        return [IsDirecteur()]
+
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
+
 class StatsViewSet(viewsets.ViewSet):
+    permission_classes = [IsDirecteur]
+
     def list(self, request):
         # 1. Évolution du Revenu (6 derniers mois)
         six_months_ago = timezone.now() - timezone.timedelta(days=180)

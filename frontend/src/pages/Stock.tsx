@@ -10,7 +10,6 @@ import {
   Tag, 
   Info, 
   Layers, 
-  ChevronRight,
   ShieldCheck,
   TrendingDown,
   Warehouse

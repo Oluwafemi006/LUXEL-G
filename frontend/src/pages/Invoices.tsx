@@ -97,7 +97,12 @@ const Invoices: React.FC = () => {
   const [partLines, setPartLines] = useState<PartLine[]>([]);
 
   const openPaymentModal = (invoice: Invoice) => {
-    setPaymentAmount((invoice.total_ttc - invoice.montant_paye).toString());
+    // Règle des 75% : si premier paiement, proposer 75%
+    if (invoice.montant_paye === 0) {
+      setPaymentAmount((invoice.total_ttc * 0.75).toString());
+    } else {
+      setPaymentAmount((invoice.total_ttc - invoice.montant_paye).toString());
+    }
     setIsPaymentModalOpen(true);
   };
 
@@ -173,6 +178,21 @@ const Invoices: React.FC = () => {
     }
   };
 
+  const totalUnpaid = useMemo(() => {
+    return invoices
+      .filter(inv => inv.type === 'DEFINITIVE')
+      .reduce((acc, inv) => acc + (inv.total_ttc - inv.montant_paye), 0);
+  }, [invoices]);
+
+  const handleReminder = async (invoiceId: number) => {
+    try {
+      await api.post(`factures/${invoiceId}/relancer_paiement/`);
+      alert('Relance envoyée avec succès au client.');
+    } catch (error) {
+      alert('Erreur lors de l\'envoi de la relance.');
+    }
+  };
+
   const handleSelectRepair = (repair: Repair) => {
     setSelectedRepair(repair);
     setKmsEntree(repair.kilometrage?.toString() || '');
@@ -212,6 +232,15 @@ const Invoices: React.FC = () => {
     const amount = parseFloat(paymentAmount);
     const resteAPayer = currentInvoice.total_ttc - currentInvoice.montant_paye;
 
+    // Validation 75% côté client
+    const totalApresPaiement = currentInvoice.montant_paye + amount;
+    const seuil75 = currentInvoice.total_ttc * 0.75;
+    
+    if (totalApresPaiement < seuil75) {
+      alert(`Règle Garage : Un paiement minimal de 75% (${seuil75.toLocaleString()} F) est requis pour entamer les travaux.`);
+      return;
+    }
+
     if (amount > resteAPayer) {
       alert(`Erreur : Le montant saisi dépasse le reste à payer (${resteAPayer.toLocaleString()} F).`);
       return;
@@ -236,8 +265,23 @@ const Invoices: React.FC = () => {
       alert(msg);
     }
   };
+const downloadPDF = async (invoice: Invoice) => {
+  try {
+    const response = await api.get(`factures/${invoice.id}/download_pdf/`, { responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Facture_${invoice.numero_facture || 'Brouillon'}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } catch (error) {
+    console.error('Erreur PDF:', error);
+    alert('Erreur lors du téléchargement du PDF.');
+  }
+};
 
-  const handleDownloadPDF = async () => {
+const handleDownloadPDF = async () => {
     if (!currentInvoiceId) return;
     try {
       const response = await api.get(`factures/${currentInvoiceId}/download_pdf/`, { responseType: 'blob' });
@@ -375,19 +419,31 @@ const Invoices: React.FC = () => {
           <h1 className="text-4xl font-black text-slate-900 italic tracking-tighter">Facturation & Caisse</h1>
           <p className="text-slate-500 font-medium">Gestion des documents financiers certifiés.</p>
         </div>
-        <div className="flex bg-white p-1.5 rounded-[1.25rem] border border-emerald-100/50 shadow-sm tabs-invoice">
-          <button 
-            onClick={() => setViewMode('LIST')} 
-            className={`px-8 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'LIST' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-slate-400 hover:text-emerald-600'}`}
-          > 
-            LISTE 
-          </button>
-          <button 
-            onClick={() => { setViewMode('CREATE'); setSelectedRepair(null); setCurrentInvoiceId(null); setCurrentInvoice(null); setIsDefinitive(false); setKmsEntree(''); setLaborLines([]); setPartLines([]); }} 
-            className={`px-8 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'CREATE' && !currentInvoiceId ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-slate-400 hover:text-emerald-600'}`}
-          > 
-            NOUVELLE 
-          </button>
+        <div className="flex items-center gap-6">
+          {totalUnpaid > 0 && (
+            <div className="bg-rose-50 border border-rose-100 px-6 py-2.5 rounded-2xl hidden lg:flex items-center gap-4 animate-pulse-slow">
+              <AlertTriangle className="w-5 h-5 text-rose-600" />
+              <div>
+                <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest">Total Impayés</p>
+                <p className="text-lg font-black text-rose-600 italic leading-tight">{totalUnpaid.toLocaleString()} F</p>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex bg-white p-1.5 rounded-[1.25rem] border border-emerald-100/50 shadow-sm tabs-invoice">
+            <button 
+              onClick={() => setViewMode('LIST')} 
+              className={`px-8 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'LIST' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-slate-400 hover:text-emerald-600'}`}
+            > 
+              LISTE 
+            </button>
+            <button 
+              onClick={() => { setViewMode('CREATE'); setSelectedRepair(null); setCurrentInvoiceId(null); setCurrentInvoice(null); setIsDefinitive(false); setKmsEntree(''); setLaborLines([]); setPartLines([]); }} 
+              className={`px-8 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'CREATE' && !currentInvoiceId ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-slate-400 hover:text-emerald-600'}`}
+            > 
+              NOUVELLE 
+            </button>
+          </div>
         </div>
       </div>
 
@@ -421,6 +477,7 @@ const Invoices: React.FC = () => {
                   <th className="px-8 py-5">Véhicule & Client</th>
                   <th className="px-8 py-5 text-right">Montant TTC</th>
                   <th className="px-8 py-5 text-right">Reste à payer</th>
+                  <th className="px-8 py-5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-emerald-50/20">
@@ -461,6 +518,19 @@ const Invoices: React.FC = () => {
                       <span className={`text-sm font-black italic px-3 py-1 rounded-xl ${inv.statut_paiement === 'SOLDE' ? 'text-emerald-600 bg-emerald-50/50' : 'text-rose-600 bg-rose-50/50'}`}>
                         {(inv.total_ttc - inv.montant_paye).toLocaleString()} F
                       </span>
+                    </td>
+                    <td className="px-8 py-6 text-right space-x-2" onClick={(e) => e.stopPropagation()}>
+                      {inv.statut_paiement !== 'SOLDE' && inv.type === 'DEFINITIVE' && (
+                        <button 
+                          onClick={() => handleReminder(inv.id)}
+                          className="p-2.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-all"
+                          title="Relancer le paiement"
+                        >
+                          <Mail className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button onClick={() => downloadPDF(inv)} className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" title="Télécharger PDF"><Printer className="w-4 h-4" /></button>
+                      <button onClick={() => openPaymentModal(inv)} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Enregistrer paiement"><CreditCard className="w-4 h-4" /></button>
                     </td>
                   </tr>
                 ))}
@@ -720,6 +790,18 @@ const Invoices: React.FC = () => {
                   <CreditCard className="w-8 h-8 text-emerald-600" />
                 </div>
                 <h2 className="text-3xl font-black text-slate-900 italic tracking-tighter uppercase">Encaissement</h2>
+                
+                {currentInvoice.montant_paye === 0 && (
+                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl mb-4">
+                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center justify-center gap-2">
+                      <AlertTriangle className="w-3 h-3" /> Avance Requise (75%)
+                    </p>
+                    <p className="text-xs font-bold text-amber-600 mt-1">
+                      Un versement minimum de {(currentInvoice.total_ttc * 0.75).toLocaleString()} F est nécessaire pour accepter le paiement et démarrer les réparations.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-center gap-2 mt-4 bg-rose-50 px-4 py-2 rounded-full border border-rose-100">
                   <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Reste à payer :</span>
                   <span className="text-sm font-black text-rose-600 italic">{(currentInvoice.total_ttc - currentInvoice.montant_paye).toLocaleString()} F</span>

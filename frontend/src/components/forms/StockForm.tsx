@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, Tag, Layers, Warehouse, AlertTriangle, X, CheckCircle2 } from 'lucide-react';
+import { Package, Tag, Layers, Warehouse, X, CheckCircle2 } from 'lucide-react';
 
 interface StockFormProps {
   onSubmit: (data: any) => void;

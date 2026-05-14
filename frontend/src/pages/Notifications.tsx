@@ -11,8 +11,7 @@ import {
   AlertTriangle,
   Clock,
   TrendingDown,
-  Layers,
-  ChevronRight
+  Layers
 } from 'lucide-react';
 import api from '../services/api';
 

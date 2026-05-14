@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
-  User, 
   Car, 
   Wrench, 
   CheckCircle2, 
   XCircle, 
   Clock, 
-  ChevronRight,
   MoreHorizontal,
   Mail,
   Smartphone,

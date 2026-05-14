@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Package, Tag } from 'lucide-react';
+import { Search, Package } from 'lucide-react';
 
 interface StockItem {
   id: number;

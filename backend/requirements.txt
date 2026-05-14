@@ -7,3 +7,5 @@ openpyxl==3.1.5
 pillow==12.2.0
 reportlab==4.5.0
 sqlparse==0.5.5
+django-jazzmin==3.0.4
+djangorestframework_simplejwt==5.5.1

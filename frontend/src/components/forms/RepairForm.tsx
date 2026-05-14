@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Car, Wrench, Gauge, Droplets, AlertTriangle, User, X, CheckCircle2 } from 'lucide-react';
+import { Car, Wrench, Gauge, Droplets, User, X, CheckCircle2 } from 'lucide-react';
 import api from '../../services/api';
 
 interface Vehicle {

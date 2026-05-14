@@ -17,14 +17,18 @@
   --font-display: "Manrope", ui-sans-serif, system-ui;
 
   /* Transitions Slow Motion Custom */
-  --transition-slow: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-medium: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: all 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-medium: all 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
   body {
-    @apply bg-[#f0f9f4] text-slate-900 font-body antialiased;
-    transition: background-color 0.8s ease-in-out;
+    @apply bg-[#f0f9f4] text-slate-900 font-body antialiased selection:bg-emerald-200 selection:text-emerald-900;
+    transition: background-color 1.2s ease-in-out;
   }
   
   h1, h2, h3, h4 {
@@ -33,7 +37,7 @@
 
   /* Animation de transition de page ultra-douce */
   .page-transition-wrapper {
-    animation: pageEnter 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: pageEnter 1.5s cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform, opacity, filter;
   }
 }
@@ -41,7 +45,7 @@
 @keyframes pageEnter {
   0% {
     opacity: 0;
-    transform: translateY(10px) scale(0.99);
+    transform: translateY(20px) scale(0.98);
     filter: blur(10px);
   }
   100% {
@@ -57,22 +61,22 @@
   }
 
   .card-luxury {
-    @apply bg-white rounded-[2rem] border border-emerald-100/50 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 transition-all duration-700 ease-in-out hover:-translate-y-1;
+    @apply bg-white rounded-[2rem] border border-emerald-100/50 shadow-sm hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-1000 ease-in-out hover:-translate-y-2;
   }
 
   .btn-primary-luxury {
-    @apply bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 hover:shadow-emerald-300 transition-all duration-500 active:scale-95;
+    @apply bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 hover:shadow-emerald-300 transition-all duration-700 active:scale-95;
   }
 
   .slow-fade-in {
-    animation: fadeIn 1.2s ease-in-out;
+    animation: fadeIn 1.5s ease-in-out;
   }
 }
 
 @keyframes slideUpFade {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(30px);
   }
   to {
     opacity: 1;
@@ -85,13 +89,43 @@
   to { opacity: 1; }
 }
 
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.3; transform: scale(1.1); }
+  50% { opacity: 0.5; transform: scale(1.15); }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 8s ease-in-out infinite;
+}
+
 /* Scrollbar personnalisée en vert */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
 }
 ::-webkit-scrollbar-track {
   @apply bg-emerald-50;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-emerald-200 rounded-full hover:bg-emerald-400 transition-colors;
+  @apply bg-emerald-200 rounded-full hover:bg-emerald-400 transition-colors duration-700;
+}
+
+/* Utilities for slow motion transitions */
+.transition-slow {
+  transition: var(--transition-slow);
+}
+
+.transition-medium {
+  transition: var(--transition-medium);
+}
+
+.hover-lift {
+  @apply transition-all duration-700 hover:-translate-y-2 hover:shadow-xl;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

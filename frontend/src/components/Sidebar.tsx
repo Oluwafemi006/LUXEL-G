@@ -1,5 +1,6 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, 
   UserPlus, 
@@ -16,8 +17,16 @@ import {
 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
+  
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   const menuItems = [
-    { name: 'Tableau de bord', icon: LayoutDashboard, path: '/' },
+    { name: 'Tableau de bord', icon: LayoutDashboard, path: '/', role: 'DIRECTEUR' },
     { name: 'Réception Client', icon: UserPlus, path: '/reception' },
     { name: 'Gestion Clients', icon: Users, path: '/clients' },
     { name: 'Gestion Véhicules', icon: Car, path: '/vehicules' },
@@ -28,7 +37,10 @@ const Sidebar: React.FC = () => {
     { name: 'Gestion Stock', icon: Package, path: '/stock' },
     { name: 'Agenda & RDV', icon: Calendar, path: '/agenda' },
     { name: 'Notifications', icon: Bell, path: '/notifications' },
+    { name: 'Utilisateurs', icon: Users, path: '/utilisateurs', role: 'DIRECTEUR' },
   ];
+
+  const filteredItems = menuItems.filter(item => !item.role || item.role === user?.role);
 
   return (
     <aside className="w-64 bg-white h-screen flex flex-col border-r border-emerald-100/50 shadow-2xl shadow-emerald-900/5 z-30 transition-all duration-700 ease-in-out">
@@ -45,7 +57,7 @@ const Sidebar: React.FC = () => {
       </div>
 
       <nav className="flex-1 px-6 space-y-1 py-4 overflow-y-auto custom-scrollbar">
-        {menuItems.map((item) => (
+        {filteredItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
@@ -64,7 +76,10 @@ const Sidebar: React.FC = () => {
       </nav>
 
       <div className="p-6 border-t border-slate-50">
-        <button className="flex items-center gap-4 px-4 py-3 w-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-2xl transition-all duration-500 ease-in-out group">
+        <button 
+          onClick={handleLogout}
+          className="flex items-center gap-4 px-4 py-3 w-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-2xl transition-all duration-500 ease-in-out group"
+        >
           <LogOut className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-500" />
           <span className="font-bold text-sm tracking-tight">Déconnexion</span>
         </button>

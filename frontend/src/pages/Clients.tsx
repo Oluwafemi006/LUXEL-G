@@ -7,7 +7,6 @@ import {
   Mail, 
   MapPin, 
   Edit, 
-  ChevronRight, 
   History, 
   Wrench, 
   Car, 

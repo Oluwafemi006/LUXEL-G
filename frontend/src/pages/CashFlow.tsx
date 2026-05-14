@@ -3,7 +3,6 @@ import {
   Search, 
   ArrowDownCircle, 
   ArrowUpCircle, 
-  PlusCircle, 
   MinusCircle, 
   Wallet, 
   Receipt, 
@@ -12,8 +11,6 @@ import {
   ArrowRightCircle, 
   History,
   TrendingUp,
-  AlertTriangle,
-  ChevronRight,
   Info
 } from 'lucide-react';
 import api from '../services/api';

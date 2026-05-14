@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Reception from './pages/Reception';
@@ -11,15 +11,43 @@ import CashFlow from './pages/CashFlow';
 import Stock from './pages/Stock';
 import Notifications from './pages/Notifications';
 import Appointments from './pages/Appointments';
+import Users from './pages/Users';
 import PublicLayout from './components/PublicLayout';
 import PublicPortal from './pages/PublicPortal';
 import ClientSpace from './pages/ClientSpace';
+import Login from './pages/Login';
+import { AuthProvider, useAuth } from './context/AuthContext';
+
+const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
+    </div>
+  );
+
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+};
+
+const RoleRoute = ({ children, role }: { children: React.ReactNode, role: 'DIRECTEUR' | 'SECRETAIRE' }) => {
+  const { user } = useAuth();
+
+  if (user?.role !== role) {
+    return <Navigate to="/reception" />; // Rediriger les secrétaires vers la réception par défaut
+  }
+
+  return <>{children}</>;
+};
 
 function App() {
   return (
-    <BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
       <Routes>
-        {/* Portail Public */}
+        {/* Routes Publiques */}
+        <Route path="/login" element={<Login />} />
+
         <Route path="/reservation" element={<PublicLayout />}>
           <Route index element={<PublicPortal />} />
         </Route>
@@ -27,10 +55,9 @@ function App() {
           <Route index element={<ClientSpace />} />
         </Route>
 
-        {/* Interface Interne */}
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<Dashboard />} />
-...
+        {/* Interface Interne Protégée */}
+        <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
+          <Route index element={<RoleRoute role="DIRECTEUR"><Dashboard /></RoleRoute>} />
           <Route path="reception" element={<Reception />} />
           <Route path="clients" element={<Clients />} />
           <Route path="vehicules" element={<Vehicles />} />
@@ -41,9 +68,11 @@ function App() {
           <Route path="stock" element={<Stock />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="agenda" element={<Appointments />} />
+          <Route path="utilisateurs" element={<RoleRoute role="DIRECTEUR"><Users /></RoleRoute>} />
         </Route>
       </Routes>
-    </BrowserRouter>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 
