@@ -24,7 +24,7 @@ import {
   Bell,
   Info
 } from 'lucide-react';
-import api from '../services/api';
+import api, { resolveMediaUrl } from '../services/api';
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -474,7 +474,7 @@ const ClientSpace: React.FC = () => {
           <div className="relative group">
             <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-2xl sm:text-3xl font-bebas shadow-xl overflow-hidden border-2 border-white transition-all duration-500">
               {clientData.client.photo ? (
-                <img src={`http://localhost:8000${clientData.client.photo}`} alt="Profil" className="w-full h-full object-cover" />
+                <img src={resolveMediaUrl(clientData.client.photo)} alt="Profil" className="w-full h-full object-cover" />
               ) : (
                 clientData.client.nom[0]
               )}
@@ -774,7 +774,7 @@ const ClientSpace: React.FC = () => {
                           {selectedPhoto ? (
                              <img src={URL.createObjectURL(selectedPhoto)} alt="New" className="w-full h-full object-cover" />
                           ) : clientData.client.photo ? (
-                             <img src={`http://localhost:8000${clientData.client.photo}`} alt="Profil" className="w-full h-full object-cover" />
+                             <img src={resolveMediaUrl(clientData.client.photo)} alt="Profil" className="w-full h-full object-cover" />
                           ) : (
                              <User className="w-10 h-10 text-emerald-200" />
                           )}
