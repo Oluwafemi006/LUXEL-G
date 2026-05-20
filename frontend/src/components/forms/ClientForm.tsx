@@ -4,9 +4,10 @@ import { User, Phone, Mail, MapPin, X, CheckCircle2 } from 'lucide-react';
 interface ClientFormProps {
   onSubmit: (data: Record<string, any>) => void;
   onCancel: () => void;
+  initialData?: any;
 }
 
-const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel }) => {
+const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel, initialData }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
@@ -24,6 +25,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel }) => {
             <input 
               name="nom"
               required
+              defaultValue={initialData?.nom || ''}
               className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
               placeholder="Ex: BONI"
             />
@@ -36,6 +38,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel }) => {
             <input 
               name="prenoms"
               required
+              defaultValue={initialData?.prenoms || ''}
               className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
               placeholder="Ex: Eddy"
             />
@@ -51,6 +54,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel }) => {
             <input 
               name="contact"
               required
+              defaultValue={initialData?.contact || ''}
               className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
               placeholder="+229 01 00 00 00 00"
             />
@@ -62,6 +66,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel }) => {
             <Smartphone className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
             <input 
               name="contact_conducteur"
+              defaultValue={initialData?.contact_conducteur || ''}
               className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
               placeholder="Numéro mobile"
             />
@@ -76,6 +81,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel }) => {
           <input 
             name="email"
             type="email"
+            defaultValue={initialData?.email || ''}
             className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
             placeholder="client@luxury-garage.com"
           />
@@ -89,6 +95,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel }) => {
           <textarea 
             name="adresse"
             rows={2}
+            defaultValue={initialData?.adresse || ''}
             className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all resize-none"
             placeholder="Localisation complète pour enlèvement/livraison"
           ></textarea>
@@ -99,17 +106,17 @@ const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel }) => {
         <button 
           type="button"
           onClick={onCancel}
-          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-[1.5rem] border border-slate-100 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all duration-500"
+          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-xl border border-slate-100 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all duration-500"
         >
           <X className="w-4 h-4" />
           Annuler
         </button>
         <button 
           type="submit"
-          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-[1.5rem] bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest shadow-2xl hover:bg-emerald-600 transition-all duration-700 active:scale-95"
+          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-xl bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest shadow-2xl hover:bg-emerald-600 transition-all duration-700 active:scale-95"
         >
           <CheckCircle2 className="w-4 h-4" />
-          Valider le Dossier
+          {initialData ? 'Enregistrer les modifications' : 'Valider le Dossier'}
         </button>
       </div>
     </form>

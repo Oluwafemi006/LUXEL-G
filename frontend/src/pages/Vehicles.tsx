@@ -48,6 +48,7 @@ const Vehicles: React.FC = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [vehicleHistory, setVehicleHistory] = useState<Repair[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -55,19 +56,25 @@ const Vehicles: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchVehicles = async () => {
+  const fetchVehicles = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await api.get('vehicules/');
       const data = Array.isArray(response.data) ? response.data : [];
       setVehicles(data);
-      if (data.length > 0 && !selectedVehicle) {
-        setSelectedVehicle(data[0]);
-      }
+      
+      setSelectedVehicle(prev => {
+        if (!prev && data.length > 0) return data[0];
+        if (prev) {
+          const updated = data.find(v => v.id === prev.id);
+          return updated || prev;
+        }
+        return prev;
+      });
     } catch (error) {
       console.error('Erreur chargement véhicules:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -94,11 +101,16 @@ const Vehicles: React.FC = () => {
 
   const handleAddVehicle = async (data: any) => {
     try {
-      await api.post('vehicules/', data);
+      if (editingVehicle) {
+        await api.patch(`vehicules/${editingVehicle.id}/`, data);
+      } else {
+        await api.post('vehicules/', data);
+      }
       setIsModalOpen(false);
-      fetchVehicles();
+      setEditingVehicle(null);
+      fetchVehicles(true);
     } catch (error) {
-      alert('Erreur lors de l\'ajout du véhicule.');
+      alert('Erreur lors de la création/modification du véhicule.');
     }
   };
 
@@ -179,7 +191,7 @@ const Vehicles: React.FC = () => {
               {/* Entête Fiche Technique */}
               <div className="p-10 bg-emerald-50/10 border-b border-emerald-50/50 flex justify-between items-start">
                 <div className="flex gap-10 items-center">
-                   <div className="w-24 h-24 rounded-[2.5rem] bg-slate-900 text-white flex flex-col items-center justify-center shadow-2xl rotate-3 group transition-transform duration-700 hover:rotate-0">
+                   <div className="w-24 h-24 rounded-xl bg-slate-900 text-white flex flex-col items-center justify-center shadow-2xl rotate-3 group transition-transform duration-700 hover:rotate-0">
                     <Car className="w-10 h-10 mb-1" />
                     <span className="text-[8px] font-black tracking-[0.4em] text-emerald-400">LUXEL-G</span>
                   </div>
@@ -205,20 +217,27 @@ const Vehicles: React.FC = () => {
                 </div>
                 <div className="flex gap-3">
                    <button 
-                    onClick={() => navigate('/reception', { state: { vehicleId: selectedVehicle.id } })}
+                    onClick={() => navigate('/staff/reception', { state: { vehicleId: selectedVehicle.id } })}
                     className="p-3.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-2xl transition-all shadow-xl shadow-emerald-100 hover:-translate-y-1"
                     title="Ouvrir une Réception"
                   >
                     <PlusCircle className="w-5 h-5" />
                   </button>
                    <button 
-                    onClick={() => navigate('/factures', { state: { vehicleId: selectedVehicle.id } })}
+                    onClick={() => navigate('/staff/factures', { state: { vehicleId: selectedVehicle.id } })}
                     className="p-3.5 bg-white text-slate-900 border border-slate-100 hover:bg-slate-50 rounded-2xl transition-all shadow-xl shadow-slate-900/5 hover:-translate-y-1"
                     title="Voir Factures"
                   >
                     <Receipt className="w-5 h-5" />
                   </button>
-                  <button className="p-3.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all duration-500">
+                  <button 
+                    onClick={() => {
+                      setEditingVehicle(selectedVehicle);
+                      setIsModalOpen(true);
+                    }}
+                    className="p-3.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all duration-500"
+                    title="Modifier Véhicule"
+                  >
                     <Edit className="w-5 h-5" />
                   </button>
                 </div>
@@ -252,7 +271,7 @@ const Vehicles: React.FC = () => {
                       </div>
                    </div>
 
-                   <div className="p-6 rounded-[2rem] bg-slate-900 text-white space-y-4 shadow-xl">
+                   <div className="p-6 rounded-xl bg-slate-900 text-white space-y-4 shadow-xl">
                       <div className="flex items-center gap-2 text-emerald-400">
                         <Info className="w-4 h-4" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Statut Administratif</span>
@@ -324,7 +343,7 @@ const Vehicles: React.FC = () => {
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-40 opacity-20 text-slate-400 grayscale">
-              <div className="w-24 h-24 bg-emerald-50 rounded-[2.5rem] flex items-center justify-center mb-10 shadow-inner">
+              <div className="w-24 h-24 bg-emerald-50 rounded-xl flex items-center justify-center mb-10 shadow-inner">
                 <Car className="w-12 h-12 text-emerald-600" />
               </div>
               <p className="font-black uppercase tracking-[0.5em] text-2xl">Parc Automobile</p>
@@ -336,12 +355,19 @@ const Vehicles: React.FC = () => {
 
       <Modal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        title="Ajouter un véhicule"
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingVehicle(null);
+        }} 
+        title={editingVehicle ? "Modifier le véhicule" : "Ajouter un véhicule"}
       >
         <VehicleForm 
           onSubmit={handleAddVehicle} 
-          onCancel={() => setIsModalOpen(false)} 
+          onCancel={() => {
+            setIsModalOpen(false);
+            setEditingVehicle(null);
+          }}
+          initialData={editingVehicle}
         />
       </Modal>
     </div>

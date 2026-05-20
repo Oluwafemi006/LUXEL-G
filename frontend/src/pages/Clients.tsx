@@ -55,6 +55,7 @@ const Clients: React.FC = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [vehicleHistory, setVehicleHistory] = useState<Repair[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -63,19 +64,25 @@ const Clients: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchClients = async () => {
+  const fetchClients = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await api.get('clients/');
       const data = Array.isArray(response.data) ? response.data : [];
       setClients(data);
-      if (data.length > 0 && !selectedClient) {
-        setSelectedClient(data[0]);
-      }
+      
+      setSelectedClient(prev => {
+        if (!prev && data.length > 0) return data[0];
+        if (prev) {
+          const updated = data.find(c => c.id === prev.id);
+          return updated || prev;
+        }
+        return prev;
+      });
     } catch (error) {
       console.error('Erreur chargement clients:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -111,12 +118,17 @@ const Clients: React.FC = () => {
 
   const handleAddClient = async (data: any) => {
     try {
-      await api.post('clients/', data);
+      if (editingClient) {
+        await api.patch(`clients/${editingClient.id}/`, data);
+      } else {
+        await api.post('clients/', data);
+      }
       setIsModalOpen(false);
-      fetchClients();
+      setEditingClient(null);
+      fetchClients(true);
     } catch (error) {
-      console.error('Erreur lors de l\'ajout du client:', error);
-      alert('Une erreur est survenue lors de l\'ajout du client.');
+      console.error('Erreur lors de la modification/ajout du client:', error);
+      alert('Une erreur est survenue lors de la sauvegarde du client.');
     }
   };
 
@@ -201,13 +213,20 @@ const Clients: React.FC = () => {
               {/* Entête Détails */}
               <div className="p-10 bg-emerald-50/10 border-b border-emerald-50/50 flex justify-between items-start">
                 <div className="flex gap-10 items-center">
-                   <div className="w-24 h-24 rounded-[2rem] bg-emerald-600 text-white flex items-center justify-center text-4xl font-black shadow-2xl shadow-emerald-200 rotate-3">
+                   <div className="w-24 h-24 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-4xl font-black shadow-2xl shadow-emerald-200 rotate-3">
                     {(selectedClient.nom || "?")[0]}
                   </div>
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">{selectedClient.nom} {selectedClient.prenoms}</h2>
-                      <button className="p-2.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all duration-500">
+                      <button 
+                        onClick={() => {
+                          setEditingClient(selectedClient);
+                          setIsModalOpen(true);
+                        }}
+                        className="p-2.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all duration-500"
+                        title="Modifier Client"
+                      >
                         <Edit className="w-5 h-5" />
                       </button>
                     </div>
@@ -249,7 +268,7 @@ const Clients: React.FC = () => {
                       <div 
                         key={v.id}
                         onClick={() => setSelectedVehicle(v)}
-                        className={`p-6 rounded-[1.5rem] border transition-all duration-700 cursor-pointer relative group ${selectedVehicle?.id === v.id ? 'bg-white border-emerald-500 shadow-xl shadow-emerald-900/5 translate-x-1' : 'bg-transparent border-emerald-50 hover:border-emerald-200'}`}
+                        className={`p-6 rounded-xl border transition-all duration-700 cursor-pointer relative group ${selectedVehicle?.id === v.id ? 'bg-white border-emerald-500 shadow-xl shadow-emerald-900/5 translate-x-1' : 'bg-transparent border-emerald-50 hover:border-emerald-200'}`}
                       >
                         <Car className={`absolute right-4 top-4 w-5 h-5 transition-all duration-700 ${selectedVehicle?.id === v.id ? 'text-emerald-500 opacity-100 scale-110' : 'text-slate-100 opacity-0 group-hover:opacity-20'}`} />
                         <p className="font-mono text-base font-black text-emerald-600 tracking-tighter uppercase">{v.immatriculation}</p>
@@ -274,7 +293,7 @@ const Clients: React.FC = () => {
                     </h3>
                     {selectedVehicle && (
                       <button
-                        onClick={() => navigate('/reception', { state: { clientId: selectedClient.id, vehicleId: selectedVehicle.id, step: 'REPAIR' } })}
+                        onClick={() => navigate('/staff/reception', { state: { clientId: selectedClient.id, vehicleId: selectedVehicle.id, step: 'REPAIR' } })}
                         className="flex items-center gap-2 text-[10px] font-black bg-emerald-600 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:-translate-y-0.5 active:scale-95 transition-all duration-500"
                       >                          
                         <PlusCircle className="w-3 h-3" />
@@ -341,7 +360,7 @@ const Clients: React.FC = () => {
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-40 opacity-20 text-slate-400 grayscale">
-              <div className="w-24 h-24 bg-emerald-50 rounded-[2.5rem] flex items-center justify-center mb-10 shadow-inner">
+              <div className="w-24 h-24 bg-emerald-50 rounded-xl flex items-center justify-center mb-10 shadow-inner">
                 <Users className="w-12 h-12 text-emerald-600" />
               </div>
               <p className="font-black uppercase tracking-[0.5em] text-2xl">Dossiers Clients</p>
@@ -353,12 +372,19 @@ const Clients: React.FC = () => {
 
       <Modal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        title="Ajouter un nouveau client"
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingClient(null);
+        }} 
+        title={editingClient ? "Modifier le dossier client" : "Ajouter un nouveau client"}
       >
         <ClientForm 
           onSubmit={handleAddClient} 
-          onCancel={() => setIsModalOpen(false)} 
+          onCancel={() => {
+            setIsModalOpen(false);
+            setEditingClient(null);
+          }} 
+          initialData={editingClient}
         />
       </Modal>
     </div>

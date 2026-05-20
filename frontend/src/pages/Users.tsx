@@ -36,15 +36,15 @@ const Users: React.FC = () => {
     password: ''
   });
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await api.get('users/');
       setUsers(response.data);
     } catch (error) {
       console.error('Erreur chargement utilisateurs:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -90,7 +90,7 @@ const Users: React.FC = () => {
         await api.post('users/', formData);
       }
       setIsModalOpen(false);
-      fetchUsers();
+      fetchUsers(true);
     } catch (error) {
       console.error('Erreur sauvegarde utilisateur:', error);
       alert('Erreur lors de la sauvegarde de l\'utilisateur.');
@@ -101,7 +101,7 @@ const Users: React.FC = () => {
     if (window.confirm('Voulez-vous vraiment supprimer cet utilisateur ?')) {
       try {
         await api.delete(`users/${id}/`);
-        fetchUsers();
+        fetchUsers(true);
       } catch (error) {
         console.error('Erreur suppression:', error);
       }

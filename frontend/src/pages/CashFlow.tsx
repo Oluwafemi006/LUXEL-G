@@ -50,9 +50,9 @@ const CashFlow: React.FC = () => {
     date_mouvement: new Date().toISOString().split('T')[0]
   });
 
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [resMouv, resSyn] = await Promise.all([
         api.get('caisse/'),
         api.get('caisse/synthese/')
@@ -60,13 +60,19 @@ const CashFlow: React.FC = () => {
       const data = Array.isArray(resMouv.data) ? resMouv.data : [];
       setMouvements(data);
       setSynthese(resSyn.data);
-      if (data.length > 0 && !selectedMouvement) {
-        setSelectedMouvement(data[0]);
-      }
+      
+      setSelectedMouvement(prev => {
+        if (!prev && data.length > 0) return data[0];
+        if (prev) {
+          const updated = data.find(m => m.id === prev.id);
+          return updated || prev;
+        }
+        return prev;
+      });
     } catch (error) {
       console.error('Erreur chargement caisse:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -84,7 +90,7 @@ const CashFlow: React.FC = () => {
       });
       setIsModalOpen(false);
       setNewExpense({ ...newExpense, montant: '', description: '' });
-      fetchData();
+      fetchData(true);
     } catch (error) {
       alert('Erreur lors de l\'enregistrement de la dépense.');
     }
@@ -106,7 +112,7 @@ const CashFlow: React.FC = () => {
         </div>
         
         <div className="flex gap-6 items-center">
-           <div className="flex bg-white border border-emerald-100/50 p-1.5 rounded-[1.5rem] shadow-sm">
+           <div className="flex bg-white border border-emerald-100/50 p-1.5 rounded-xl shadow-sm">
               <div className="px-6 py-2 text-center border-r border-emerald-50">
                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Solde Net</p>
                  <p className="text-sm font-black text-emerald-600">{synthese.solde.toLocaleString()} F</p>
@@ -118,7 +124,7 @@ const CashFlow: React.FC = () => {
            </div>
            <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-slate-900 text-white px-6 py-4 rounded-[1.25rem] font-black text-xs uppercase tracking-widest shadow-xl hover:bg-rose-600 transition-all duration-700 hover:-translate-y-1 active:scale-95"
+            className="flex items-center gap-2 bg-slate-900 text-white px-6 py-4 rounded-lg font-black text-xs uppercase tracking-widest shadow-xl hover:bg-rose-600 transition-all duration-700 hover:-translate-y-1 active:scale-95"
           >
             <MinusCircle className="w-4 h-4" />
             <span>Sortie Caisse</span>
@@ -183,7 +189,7 @@ const CashFlow: React.FC = () => {
               {/* Entête Transaction */}
               <div className="p-10 bg-emerald-50/10 border-b border-emerald-50/50 flex justify-between items-start">
                 <div className="flex gap-10 items-center">
-                   <div className={`w-24 h-24 rounded-[2.5rem] flex flex-col items-center justify-center shadow-2xl rotate-3 transition-transform duration-700 hover:rotate-0 ${selectedMouvement.type_mouvement === 'RECETTE' ? 'bg-emerald-600 text-white shadow-emerald-200' : 'bg-rose-600 text-white shadow-rose-200'}`}>
+                   <div className={`w-24 h-24 rounded-xl flex flex-col items-center justify-center shadow-2xl rotate-3 transition-transform duration-700 hover:rotate-0 ${selectedMouvement.type_mouvement === 'RECETTE' ? 'bg-emerald-600 text-white shadow-emerald-200' : 'bg-rose-600 text-white shadow-rose-200'}`}>
                     <Wallet className="w-10 h-10 mb-1" />
                     <span className="text-[8px] font-black tracking-[0.3em] uppercase">{selectedMouvement.type_mouvement}</span>
                   </div>
@@ -216,7 +222,7 @@ const CashFlow: React.FC = () => {
               <div className="flex-1 p-10 space-y-10 overflow-y-auto custom-scrollbar bg-emerald-50/5">
                  <div>
                    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-6 ml-2">Description & Justificatif</h3>
-                   <div className="p-8 bg-white rounded-[2.5rem] border border-emerald-100/30 shadow-inner relative overflow-hidden group">
+                   <div className="p-8 bg-white rounded-xl border border-emerald-100/30 shadow-inner relative overflow-hidden group">
                       <p className="text-lg font-medium leading-relaxed text-slate-600 italic relative z-10">
                         "{selectedMouvement.description || "Aucune justification détaillée enregistrée."}"
                       </p>
@@ -227,7 +233,7 @@ const CashFlow: React.FC = () => {
                  {selectedMouvement.numero_facture && (
                    <div className="card-luxury p-8 bg-slate-900 text-white flex items-center justify-between group overflow-hidden relative">
                       <div className="flex items-center gap-6 relative z-10">
-                         <div className="w-16 h-16 rounded-[1.25rem] bg-emerald-500/20 backdrop-blur-md flex items-center justify-center border border-emerald-500/30 shadow-2xl">
+                         <div className="w-16 h-16 rounded-lg bg-emerald-500/20 backdrop-blur-md flex items-center justify-center border border-emerald-500/30 shadow-2xl">
                             <Receipt className="w-8 h-8 text-emerald-400" />
                          </div>
                          <div>
@@ -267,7 +273,7 @@ const CashFlow: React.FC = () => {
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-40 opacity-20 text-slate-400 grayscale">
-              <div className="w-24 h-24 bg-emerald-50 rounded-[2.5rem] flex items-center justify-center mb-10 shadow-inner">
+              <div className="w-24 h-24 bg-emerald-50 rounded-xl flex items-center justify-center mb-10 shadow-inner">
                 <Wallet className="w-12 h-12 text-emerald-600" />
               </div>
               <p className="font-black uppercase tracking-[0.5em] text-2xl">Module Caisse</p>
@@ -280,7 +286,7 @@ const CashFlow: React.FC = () => {
       {/* Modal Nouvelle Dépense */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-4 animate-in fade-in duration-500">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl border border-emerald-100/50 animate-in zoom-in duration-700 overflow-hidden">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-emerald-100/50 animate-in zoom-in duration-700 overflow-hidden">
             <div className="p-10 space-y-10">
               <div className="text-center space-y-3">
                 <div className="w-20 h-20 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">

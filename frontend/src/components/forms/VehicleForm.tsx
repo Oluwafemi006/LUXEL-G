@@ -12,17 +12,20 @@ interface VehicleFormProps {
   onSubmit: (data: any) => void;
   onCancel: () => void;
   initialClientId?: number;
+  initialData?: any;
 }
 
-const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, onCancel, initialClientId }) => {
+const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, onCancel, initialClientId, initialData }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | number>('');
 
   useEffect(() => {
-    if (initialClientId) {
+    if (initialData && initialData.client) {
+      setSelectedClientId(initialData.client);
+    } else if (initialClientId) {
       setSelectedClientId(initialClientId);
     }
-  }, [initialClientId]);
+  }, [initialClientId, initialData]);
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -58,6 +61,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, onCancel, initialCl
             <input 
               name="immatriculation"
               required
+              defaultValue={initialData?.immatriculation || ''}
               className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-mono font-black text-lg text-slate-900 shadow-inner transition-all uppercase tracking-widest"
               placeholder="XX-0000-XX"
             />
@@ -92,6 +96,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, onCancel, initialCl
             <input 
               name="marque"
               required
+              defaultValue={initialData?.marque || ''}
               className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
               placeholder="Ex: Mercedes-Benz, BMW, Toyota"
             />
@@ -104,6 +109,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, onCancel, initialCl
             <input 
               name="modele"
               required
+              defaultValue={initialData?.modele || ''}
               className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
               placeholder="Ex: Classe G, X5, Land Cruiser"
             />
@@ -119,6 +125,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, onCancel, initialCl
             <input 
               name="annee"
               type="number"
+              defaultValue={initialData?.annee || ''}
               className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
               placeholder="Ex: 2024"
             />
@@ -130,6 +137,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, onCancel, initialCl
             <Settings className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
             <input 
               name="couleur"
+              defaultValue={initialData?.couleur || ''}
               className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
               placeholder="Ex: Noir Obsidienne, Blanc Arctique"
             />
@@ -143,6 +151,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, onCancel, initialCl
           <ShieldCheck className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
           <input 
             name="vin"
+            defaultValue={initialData?.vin || ''}
             className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-mono font-black text-slate-900 shadow-inner transition-all uppercase tracking-wider"
             placeholder="Numéro de châssis constructeur"
           />
@@ -153,17 +162,17 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, onCancel, initialCl
         <button 
           type="button"
           onClick={onCancel}
-          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-[1.5rem] border border-slate-100 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all duration-500"
+          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-xl border border-slate-100 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all duration-500"
         >
           <X className="w-4 h-4" />
           Annuler
         </button>
         <button 
           type="submit"
-          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-[1.5rem] bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest shadow-2xl hover:bg-emerald-600 transition-all duration-700 active:scale-95"
+          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-xl bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest shadow-2xl hover:bg-emerald-600 transition-all duration-700 active:scale-95"
         >
           <CheckCircle2 className="w-4 h-4" />
-          Enregistrer le Véhicule
+          {initialData ? 'Enregistrer les modifications' : 'Enregistrer le Véhicule'}
         </button>
       </div>
     </form>

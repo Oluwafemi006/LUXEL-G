@@ -97,15 +97,15 @@ const Reception: React.FC = () => {
     }
   }, [clients, location.state]);
 
-  const fetchClients = async () => {
+  const fetchClients = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await api.get('clients/');
       setClients(response.data);
     } catch (error) {
       console.error('Erreur chargement clients:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -135,6 +135,7 @@ const Reception: React.FC = () => {
       setSelectedClient(newClient);
       setIsCreatingNew(false);
       setCurrentStep('VEHICLE');
+      fetchClients(true);
     } catch (error) {
       alert('Erreur lors de la création du client.');
     }
@@ -161,9 +162,9 @@ const Reception: React.FC = () => {
       const newRepair = response.data;
       
       if (window.confirm('Réception terminée ! Voulez-vous établir le DEVIS maintenant ?')) {
-        navigate('/devis', { state: { repairId: newRepair.id } });
+        navigate('/staff/devis', { state: { repairId: newRepair.id } });
       } else {
-        navigate('/reparations');
+        navigate('/staff/reparations');
       }
     } catch (error) {
       alert('Erreur lors de la création de l\'OR.');
@@ -201,7 +202,7 @@ const Reception: React.FC = () => {
           
           return (
             <div key={s.id} className="flex flex-col items-center gap-4 relative z-10">
-              <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-700 ${
+              <div className={`w-16 h-16 rounded-xl flex items-center justify-center transition-all duration-700 ${
                 isActive ? 'bg-emerald-600 text-white scale-110 shadow-2xl shadow-emerald-200 rotate-3' : 
                 (isDone ? 'bg-slate-900 text-emerald-400' : 'bg-white border border-emerald-50 text-slate-300 shadow-sm')
               }`}>
@@ -226,7 +227,7 @@ const Reception: React.FC = () => {
               </div>
               <button 
                 onClick={() => setIsCreatingNew(!isCreatingNew)}
-                className={`flex items-center gap-3 px-8 py-4 rounded-[1.25rem] text-[10px] font-black uppercase tracking-widest transition-all duration-500 shadow-xl ${isCreatingNew ? 'bg-slate-100 text-slate-500' : 'bg-emerald-600 text-white shadow-emerald-200 hover:-translate-y-1 active:scale-95'}`}
+                className={`flex items-center gap-3 px-8 py-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-500 shadow-xl ${isCreatingNew ? 'bg-slate-100 text-slate-500' : 'bg-emerald-600 text-white shadow-emerald-200 hover:-translate-y-1 active:scale-95'}`}
               >
                 {isCreatingNew ? <ChevronLeft className="w-4 h-4" /> : <PlusCircle className="w-4 h-4" />}
                 {isCreatingNew ? 'Retour Recherche' : 'Créer nouveau client'}
@@ -255,7 +256,7 @@ const Reception: React.FC = () => {
                     <div 
                       key={c.id} 
                       onClick={() => handleClientSelect(c)}
-                      className="p-6 rounded-[2rem] border border-emerald-100/30 bg-white hover:bg-emerald-50/30 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-900/5 cursor-pointer transition-all duration-700 flex items-center gap-6 group"
+                      className="p-6 rounded-xl border border-emerald-100/30 bg-white hover:bg-emerald-50/30 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-900/5 cursor-pointer transition-all duration-700 flex items-center gap-6 group"
                     >
                       <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 font-black text-2xl group-hover:bg-emerald-600 group-hover:text-white group-hover:rotate-3 shadow-inner transition-all duration-700 uppercase">
                         {c.nom[0]}
@@ -299,7 +300,7 @@ const Reception: React.FC = () => {
                 > Retour </button>
                 <button 
                   onClick={() => setIsCreatingNew(!isCreatingNew)}
-                  className={`flex items-center gap-3 px-8 py-4 rounded-[1.25rem] text-[10px] font-black uppercase tracking-widest transition-all duration-500 shadow-xl ${isCreatingNew ? 'bg-slate-100 text-slate-500' : 'bg-emerald-600 text-white shadow-emerald-200 hover:-translate-y-1 active:scale-95'}`}
+                  className={`flex items-center gap-3 px-8 py-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-500 shadow-xl ${isCreatingNew ? 'bg-slate-100 text-slate-500' : 'bg-emerald-600 text-white shadow-emerald-200 hover:-translate-y-1 active:scale-95'}`}
                 >
                   {isCreatingNew ? <Search className="w-4 h-4" /> : <PlusCircle className="w-4 h-4" />}
                   {isCreatingNew ? 'Choisir Existant' : 'Nouvel enregistrement'}
@@ -371,7 +372,7 @@ const Reception: React.FC = () => {
               > Retour </button>
             </div>
 
-            <div className="bg-emerald-50/5 p-8 rounded-[2.5rem] border border-emerald-100/30 shadow-inner relative overflow-hidden animate-in zoom-in-95 duration-700">
+            <div className="bg-emerald-50/5 p-8 rounded-xl border border-emerald-100/30 shadow-inner relative overflow-hidden animate-in zoom-in-95 duration-700">
                <RepairForm 
                 onSubmit={handleCreateRepair} 
                 onCancel={() => setCurrentStep('VEHICLE')} 

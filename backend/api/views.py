@@ -1,7 +1,9 @@
+import random
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 from django.db import models
 from django.db.models.functions import TruncMonth
@@ -11,9 +13,10 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from decimal import Decimal
 from django.contrib.auth.models import User
 from django.core.mail import EmailMessage
+from django.db import transaction
 
 from .utils import generate_document_pdf
-from .models import Client, Vehicule, Reparation, Stock, Facture, LigneTravail, LignePiece, MouvementCaisse, Devis, MaintenancePredictive, Appointment, NotificationClient, Avis, NotificationStaff
+from .models import Client, Vehicule, Reparation, Stock, Facture, LigneTravail, LignePiece, MouvementCaisse, Devis, MaintenancePredictive, Appointment, NotificationClient, Avis, NotificationStaff, MouvementStock
 from .serializers import (
     ClientSerializer, VehiculeSerializer, ReparationSerializer, 
     StockSerializer, UserSerializer, MiniVehiculeSerializer,
@@ -25,7 +28,69 @@ from .serializers import (
 
 class IsDirecteur(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.user.is_authenticated and hasattr(request.user, 'profile') and request.user.profile.role == 'DIRECTEUR'
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        return hasattr(request.user, 'profile') and request.user.profile.role == 'DIRECTEUR'
+
+class IsStaffMember(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        return hasattr(request.user, 'profile') and request.user.profile.role in ['DIRECTEUR', 'SECRETAIRE']
+
+from rest_framework.views import APIView
+
+class GlobalSearchView(APIView):
+    """
+    GET /api/search/?q=<terme>
+    Retourne jusqu'à 5 clients, 5 véhicules et 5 réparations correspondant au terme.
+    """
+    permission_classes = [IsStaffMember]
+
+    def get(self, request):
+        q = request.query_params.get('q', '').strip()
+        if len(q) < 2:
+            return Response({'clients': [], 'vehicules': [], 'reparations': []})
+
+        clients = Client.objects.filter(
+            models.Q(nom__icontains=q) |
+            models.Q(prenoms__icontains=q) |
+            models.Q(contact__icontains=q)
+        )[:5]
+
+        vehicules = Vehicule.objects.filter(
+            models.Q(immatriculation__icontains=q) |
+            models.Q(marque__icontains=q) |
+            models.Q(modele__icontains=q)
+        ).select_related('client')[:5]
+
+        reparations = Reparation.objects.filter(
+            models.Q(vehicule__immatriculation__icontains=q) |
+            models.Q(description__icontains=q) |
+            models.Q(categorie__icontains=q)
+        ).select_related('vehicule__client')[:5]
+
+        return Response({
+            'clients': [
+                {'id': c.id, 'nom': c.nom, 'prenoms': c.prenoms, 'contact': c.contact}
+                for c in clients
+            ],
+            'vehicules': [
+                {'id': v.id, 'immatriculation': v.immatriculation, 'marque': v.marque,
+                 'modele': v.modele, 'client_nom': f"{v.client.nom} {v.client.prenoms}"}
+                for v in vehicules
+            ],
+            'reparations': [
+                {'id': r.id, 'description': r.description[:60], 'statut': r.statut,
+                 'immatriculation': r.vehicule.immatriculation,
+                 'client_nom': f"{r.vehicule.client.nom} {r.vehicule.client.prenoms}"}
+                for r in reparations
+            ],
+        })
 
 class ClientViewSet(viewsets.ModelViewSet):
     queryset = Client.objects.all().order_by('-date_creation')
@@ -87,15 +152,52 @@ class ReparationViewSet(viewsets.ModelViewSet):
     queryset = Reparation.objects.all().order_by('-date_creation')
     serializer_class = ReparationSerializer
 
+    def partial_update(self, request, *args, **kwargs):
+        """Force partial=True pour les requêtes PATCH (statut, progression...)."""
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
     def perform_update(self, serializer):
         reparation = serializer.save()
         # Si la réparation passe à TERMINE, on notifie le client
         if reparation.statut == 'TERMINE':
-            NotificationClient.objects.create(
-                client=reparation.vehicule.client,
-                type='REPARATION_TERMINEE',
-                message=f"Votre véhicule {reparation.vehicule.immatriculation} est prêt ! Vous pouvez passer le récupérer au garage LUXEL-G."
-            )
+            client = reparation.vehicule.client
+            immat = reparation.vehicule.immatriculation
+            marque = reparation.vehicule.marque
+            modele = reparation.vehicule.modele
+
+            # 1. Notification en base de données (espace client)
+            try:
+                NotificationClient.objects.create(
+                    client=client,
+                    type='REPARATION_TERMINEE',
+                    message=f"Votre véhicule {immat} est prêt ! Vous pouvez passer le récupérer au garage LUXEL-G à Parakou."
+                )
+            except Exception as e:
+                print(f"[WARNING] Impossible de créer la notification en base : {e}")
+
+            # 2. Email immédiat au client
+            if client.email:
+                try:
+                    subject = f"✅ Votre véhicule {immat} est prêt — LUXEL-G"
+                    body = (
+                        f"Bonjour {client.prenoms} {client.nom},\n\n"
+                        f"Nous avons le plaisir de vous informer que votre véhicule "
+                        f"{marque} {modele} ({immat}) a été pris en charge et est désormais prêt à être récupéré.\n\n"
+                        f"📍 Adresse : Garage LUXEL-G, Okedama, Parakou, Bénin\n"
+                        f"📞 Contact : +229 01 92 62 98 60\n\n"
+                        f"Merci de votre confiance.\n\n"
+                        f"Cordialement,\n"
+                        f"L'équipe LUXEL-G — Luxury Élégance Garage"
+                    )
+                    email = EmailMessage(subject, body, to=[client.email])
+                    email.send()
+                    print(f"[INFO] Email de notification envoyé à {client.email} pour {immat}.")
+                except Exception as e:
+                    print(f"[WARNING] Échec de l'envoi de l'email de notification : {e}")
+            else:
+                print(f"[INFO] Pas d'email pour le client {client.nom} — notification email ignorée.")
+
 
     def perform_create(self, serializer):
         reparation = serializer.save()
@@ -131,31 +233,57 @@ class FactureViewSet(viewsets.ModelViewSet):
         facture = self.get_object()
         if facture.type == 'DEFINITIVE':
             return Response({'error': 'Facture déjà validée'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Génération robuste du numéro de facture
-        year = timezone.now().year
-        last_invoice = Facture.objects.filter(numero_facture__startswith=f"FAC-{year}").order_by('-numero_facture').first()
-        
-        if last_invoice and last_invoice.numero_facture:
-            try:
-                last_num = int(last_invoice.numero_facture.split('-')[-1])
-                count = last_num + 1
-            except (ValueError, IndexError):
+
+        # ── Vérification préalable : stock suffisant pour toutes les pièces ──
+        for piece in facture.reparation.pieces.select_related('article_stock').all():
+            if piece.article_stock and piece.article_stock.quantite < piece.quantite:
+                return Response(
+                    {'error': f"Stock insuffisant pour '{piece.article_stock.nom}' : "
+                               f"{piece.article_stock.quantite} disponible(s), {piece.quantite} requise(s)."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        with transaction.atomic():
+            # Génération sécurisée du numéro de facture (verrou en écriture)
+            year = timezone.now().year
+            last_invoice = (
+                Facture.objects
+                .filter(numero_facture__startswith=f"FAC-{year}")
+                .select_for_update()
+                .order_by('-numero_facture')
+                .first()
+            )
+
+            if last_invoice and last_invoice.numero_facture:
+                try:
+                    last_num = int(last_invoice.numero_facture.split('-')[-1])
+                    count = last_num + 1
+                except (ValueError, IndexError):
+                    count = Facture.objects.filter(type='DEFINITIVE').count() + 1
+            else:
                 count = Facture.objects.filter(type='DEFINITIVE').count() + 1
-        else:
-            count = Facture.objects.filter(type='DEFINITIVE').count() + 1
-            
-        facture.numero_facture = f"FAC-{year}-{count:04d}"
-        facture.type = 'DEFINITIVE'
-        facture.date_validation = timezone.now()
-        facture.save()
-        
-        for piece in facture.reparation.pieces.all():
-            if piece.article_stock:
-                stock_item = piece.article_stock
-                stock_item.quantite = max(0, stock_item.quantite - piece.quantite)
-                stock_item.save()
-        
+
+            facture.numero_facture = f"FAC-{year}-{count:04d}"
+            facture.type = 'DEFINITIVE'
+            facture.date_validation = timezone.now()
+            facture.save()
+
+            for piece in facture.reparation.pieces.select_related('article_stock').all():
+                if piece.article_stock:
+                    stock_item = piece.article_stock
+                    qty_to_deduct = piece.quantite
+
+                    stock_item.quantite = max(0, stock_item.quantite - qty_to_deduct)
+                    stock_item.save()
+
+                    MouvementStock.objects.create(
+                        article=stock_item,
+                        type_mouvement='SORTIE',
+                        quantite=qty_to_deduct,
+                        description=f"Sortie auto pour Facture {facture.numero_facture} (Réparation OR-{facture.reparation.id})",
+                        utilisateur=request.user if request.user.is_authenticated else None
+                    )
+
         return Response(FactureSerializer(facture).data)
 
     @action(detail=True, methods=['post'])
@@ -198,7 +326,8 @@ class FactureViewSet(viewsets.ModelViewSet):
             montant=montant, 
             description=f"Paiement {facture.numero_facture}", 
             facture=facture,
-            date_mouvement=timezone.now().date()
+            date_mouvement=timezone.now().date(),
+            utilisateur=request.user if request.user.is_authenticated else None
         )
 
         # Notification Staff
@@ -308,53 +437,127 @@ class DevisViewSet(viewsets.ModelViewSet):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class ClientSpaceViewSet(viewsets.ViewSet):
-    permission_classes = [permissions.AllowAny]
-    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
-    @action(detail=False, methods=['get'])
-    def data(self, request):
-        phone = request.query_params.get('phone')
+    def get_permissions(self):
+        if self.action in ['request_otp', 'verify_otp', 'register']:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
+
+    @action(detail=False, methods=['post'])
+    def request_otp(self, request):
+        phone = request.data.get('phone')
         if not phone:
             return Response({'error': 'Numéro de téléphone requis'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Nettoyer le numéro pour la recherche
         clean_phone = phone.replace(' ', '').replace('+', '')
-        if clean_phone.startswith('229'):
-            clean_phone = clean_phone[3:]
+        if clean_phone.startswith('229'): clean_phone = clean_phone[3:]
         
-        # Rechercher le client (on cherche la correspondance partielle ou totale)
+        client = Client.objects.filter(contact__icontains=clean_phone).first()
+        if not client:
+            return Response({'error': 'Client non trouvé. Veuillez contacter le garage.'}, status=status.HTTP_404_NOT_FOUND)
+            
+        if not client.email:
+             return Response({'error': 'Aucune adresse email associée à votre compte. Veuillez contacter le garage pour mettre à jour vos informations.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        print(f"\n=== [DEV] CODE DE CONNEXION OTP POUR {client.prenoms} {client.nom} ({phone}) : {code} ===\n")
+        from .models import ClientOTP
+        ClientOTP.objects.create(client=client, code=code)
+        
+        try:
+            subject = f"Votre code de connexion LUXEL-G : {code}"
+            body = f"Bonjour {client.nom} {client.prenoms},\n\nVotre code de connexion pour l'espace client est : {code}\n\nCe code est valide pendant 10 minutes.\n\nCordialement,\nL'équipe LUXEL-G"
+            email = EmailMessage(subject, body, to=[client.email])
+            email.send()
+            return Response({'message': 'Code envoyé par email.'})
+        except Exception as e:
+            print(f"\n[WARNING] Échec de l'envoi de l'e-mail : {str(e)}\n")
+            return Response({
+                'message': 'Code généré ! (L\'envoi de l\'e-mail a échoué, veuillez récupérer le code dans la console du serveur Django).'
+            }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'])
+    def verify_otp(self, request):
+        phone = request.data.get('phone')
+        code = request.data.get('code')
+        
+        if not phone or not code:
+            return Response({'error': 'Numéro et code requis'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        clean_phone = phone.replace(' ', '').replace('+', '')
+        if clean_phone.startswith('229'): clean_phone = clean_phone[3:]
+        
         client = Client.objects.filter(contact__icontains=clean_phone).first()
         if not client:
             return Response({'error': 'Client non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+            
+        from .models import ClientOTP
+        otp = ClientOTP.objects.filter(client=client, code=code, is_used=False).order_by('-created_at').first()
         
-        # Récupérer les véhicules
+        if not otp or not otp.is_valid():
+            return Response({'error': 'Code invalide ou expiré'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        otp.is_used = True
+        otp.save()
+        
+        if not client.user:
+            username = f"client_{clean_phone}"
+            user, created = User.objects.get_or_create(username=username, defaults={'email': client.email})
+            client.user = user
+            client.save()
+        
+        refresh = RefreshToken.for_user(client.user)
+        return Response({
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            'client_id': client.id
+        })
+
+    @action(detail=False, methods=['get'])
+    def data(self, request):
+        try:
+            client = request.user.client_profile
+        except AttributeError:
+            return Response({'error': 'Profil client non trouvé pour cet utilisateur'}, status=status.HTTP_404_NOT_FOUND)
+        
         vehicules = Vehicule.objects.filter(client=client)
         vehicules_data = MiniVehiculeSerializer(vehicules, many=True).data
         
-        # Récupérer les réparations
-        reparations = Reparation.objects.filter(vehicule__client=client).order_by('-date_creation')
+        reparations = (
+            Reparation.objects
+            .filter(vehicule__client=client)
+            .select_related('vehicule', 'vehicule__client', 'technicien')
+            .prefetch_related('travaux', 'pieces', 'devis')
+            .order_by('-date_creation')
+        )
         reparations_data = ReparationSerializer(reparations, many=True).data
         
-        # Récupérer les factures (pour solde impayé et téléchargement)
-        factures = Facture.objects.filter(reparation__vehicule__client=client).order_by('-date_creation')
+        factures = (
+            Facture.objects
+            .filter(reparation__vehicule__client=client)
+            .select_related('reparation__vehicule__client')
+            .order_by('-date_creation')
+        )
         factures_data = FactureSerializer(factures, many=True).data
         
-        # Calcul du solde impayé total
-        solde_impaye = sum((f.total_ttc - f.montant_paye for f in factures if f.type == 'DEFINITIVE'), Decimal('0'))
+        # Calcul du solde impayé en base de données (plus performant)
+        from django.db.models import Sum, F, ExpressionWrapper, DecimalField
+        solde_result = factures.filter(type='DEFINITIVE').aggregate(
+            solde=Sum(ExpressionWrapper(F('total_ttc') - F('montant_paye'), output_field=DecimalField()))
+        )
+        solde_impaye = solde_result['solde'] or Decimal('0')
 
-        # Récupérer les RDV
         rdvs = Appointment.objects.filter(client=client).order_by('-date_rdv')
         rdvs_data = AppointmentSerializer(rdvs, many=True).data
 
-        # Récupérer les notifications
         notifications = NotificationClient.objects.filter(client=client).order_by('-date_envoi')
         notifications_data = NotificationClientSerializer(notifications, many=True).data
         
-        # Alertes de maintenance
         alertes = MaintenancePredictive.objects.filter(vehicule__client=client, actif=True)
         alertes_data = MaintenancePredictiveSerializer(alertes, many=True).data
         
-        # Avis déjà donnés
         avis = Avis.objects.filter(client=client).order_by('-date_creation')
         avis_data = AvisSerializer(avis, many=True).data
 
@@ -372,14 +575,10 @@ class ClientSpaceViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'])
     def submit_avis(self, request):
-        phone = request.data.get('phone')
-        # Nettoyer le numéro
-        clean_phone = phone.replace(' ', '').replace('+', '')
-        if clean_phone.startswith('229'): clean_phone = clean_phone[3:]
-        
-        client = Client.objects.filter(contact__icontains=clean_phone).first()
-        if not client:
-            return Response({'error': 'Client non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            client = request.user.client_profile
+        except AttributeError:
+            return Response({'error': 'Profil client non trouvé'}, status=status.HTTP_404_NOT_FOUND)
         
         data = {
             'client': client.id,
@@ -391,7 +590,6 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         serializer = AvisSerializer(data=data)
         if serializer.is_valid():
             avis = serializer.save()
-            # Notifier le staff
             NotificationStaff.objects.create(
                 type='NOUVEL_AVIS',
                 message=f"Nouvel avis de {client.nom} ({avis.note}/5) : \"{avis.commentaire[:50]}...\""
@@ -401,26 +599,54 @@ class ClientSpaceViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'])
     def register(self, request):
-        serializer = ClientSerializer(data=request.data)
+        data = request.data.copy()
+        # Normalisation du numéro de téléphone
+        phone = data.get('contact', '')
+        clean_phone = phone.replace(' ', '').replace('+', '')
+        if clean_phone.startswith('229'): clean_phone = clean_phone[3:]
+        data['contact'] = clean_phone
+        
+        serializer = ClientSerializer(data=data)
         if serializer.is_valid():
             client = serializer.save()
             return Response(ClientSerializer(client).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=['post'], url_path='book-appointment')
+    def book_appointment(self, request):
+        try:
+            client = request.user.client_profile
+        except AttributeError:
+            return Response({'error': 'Profil client non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+            
+        data = request.data.copy()
+        data['client'] = client.id
+        
+        serializer = AppointmentSerializer(data=data)
+        if serializer.is_valid():
+            appointment = serializer.save()
+            # Notification Staff
+            NotificationStaff.objects.create(
+                type='NOUVEAU_RDV',
+                message=f"Nouveau rendez-vous pris par {client.nom} {client.prenoms} pour le {appointment.date_rdv.strftime('%d/%m/%Y %H:%M')}."
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=False, methods=['get'], url_path='download-invoice')
     def download_invoice_pdf(self, request):
-        phone = request.query_params.get('phone')
+        try:
+            client = request.user.client_profile
+        except AttributeError:
+            return Response({'error': 'Accès non autorisé'}, status=status.HTTP_403_FORBIDDEN)
+
         invoice_id = request.query_params.get('invoice_id')
-        if not phone or not invoice_id:
-            return Response({'error': 'Numéro et ID facture requis'}, status=status.HTTP_400_BAD_REQUEST)
+        if not invoice_id:
+            return Response({'error': 'ID facture requis'}, status=status.HTTP_400_BAD_REQUEST)
 
-        clean_phone = phone.replace(' ', '').replace('+', '')
-        if clean_phone.startswith('229'): clean_phone = clean_phone[3:]
-
-        # Vérifier que la facture appartient bien au client via son numéro
-        facture = Facture.objects.filter(id=invoice_id, reparation__vehicule__client__contact__icontains=clean_phone).first()
+        facture = Facture.objects.filter(id=invoice_id, reparation__vehicule__client=client).first()
         if not facture:
-            return Response({'error': 'Facture non trouvée ou accès non autorisé'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Facture non trouvée'}, status=status.HTTP_404_NOT_FOUND)
 
         pdf = generate_document_pdf(facture, doc_type="FACTURE")
         response = HttpResponse(pdf, content_type='application/pdf')
@@ -429,17 +655,10 @@ class ClientSpaceViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'], url_path='update')
     def update_profile(self, request):
-        phone = request.data.get('phone')
-        if not phone:
-            return Response({'error': 'Numéro de téléphone requis pour mise à jour.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        clean_phone = phone.replace(' ', '').replace('+', '')
-        if clean_phone.startswith('229'):
-            clean_phone = clean_phone[3:]
-
-        client = Client.objects.filter(contact__icontains=clean_phone).first()
-        if not client:
-            return Response({'error': 'Client non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            client = request.user.client_profile
+        except AttributeError:
+            return Response({'error': 'Profil client non trouvé'}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = ClientSerializer(client, data=request.data, partial=True)
         if serializer.is_valid():
@@ -457,14 +676,81 @@ class StockViewSet(viewsets.ModelViewSet):
         qty = int(request.data.get('quantite', 0))
         item.quantite += qty
         item.save()
+        
+        # Créer le mouvement de stock
+        MouvementStock.objects.create(
+            article=item,
+            type_mouvement='ENTREE',
+            quantite=qty,
+            description=request.data.get('description', 'Approvisionnement manuel'),
+            utilisateur=request.user if request.user.is_authenticated else None
+        )
+        
         MouvementCaisse.objects.create(
             type_mouvement='DEPENSE', 
             categorie='ACHAT_PIECES', 
             montant=Decimal(str(request.data.get('prix_achat_total', 0))), 
             description=f"Achat {qty} x {item.nom}",
-            date_mouvement=timezone.now().date()
+            date_mouvement=timezone.now().date(),
+            utilisateur=request.user if request.user.is_authenticated else None
         )
         return Response(StockSerializer(item).data)
+
+    @action(detail=True, methods=['post'])
+    def ajuster_inventaire(self, request, pk=None):
+        item = self.get_object()
+        nouveau_physique = int(request.data.get('quantite_physique', item.quantite))
+        theorique = item.stock_theorique
+        ecart = nouveau_physique - theorique
+        
+        item.quantite = nouveau_physique
+        item.save()
+        
+        MouvementStock.objects.create(
+            article=item,
+            type_mouvement='AJUSTEMENT',
+            quantite=ecart,
+            description=f"Ajustement Inventaire (Physique: {nouveau_physique}, Écart: {ecart})",
+            utilisateur=request.user if request.user.is_authenticated else None
+        )
+        
+        return Response(StockSerializer(item).data)
+
+    @action(detail=False, methods=['get'])
+    def export_excel(self, request):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Gestion Stock"
+        
+        # En-têtes identiques au fichier Luxury
+        headers = ['Date', 'Réf', 'Désignation', 'Stock Initial', 'Entrées', 'Sorties', 'Stock Théorique', 'Stock Physique', 'Écart']
+        ws.append(headers)
+        
+        # Style
+        header_fill = PatternFill(start_color="10b981", end_color="10b981", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+
+        for item in self.get_queryset():
+            ws.append([
+                timezone.now().strftime('%d/%m/%Y'),
+                item.sku,
+                item.nom,
+                item.stock_initial,
+                item.entrees_total,
+                item.sorties_total,
+                item.stock_theorique,
+                item.quantite,
+                item.ecart
+            ])
+            
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="inventaire_luxury_g.xlsx"'
+        wb.save(response)
+        return response
 
 class MouvementCaisseViewSet(viewsets.ModelViewSet):
     queryset = MouvementCaisse.objects.all().order_by('-date_creation')

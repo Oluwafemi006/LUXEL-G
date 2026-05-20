@@ -22,7 +22,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xl animate-in fade-in duration-700">
       <div 
-        className="bg-white rounded-[3rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.2)] w-full max-w-3xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-8 duration-700 border border-emerald-100/50"
+        className="bg-white rounded-xl shadow-[0_50px_100px_-20px_rgba(0,0,0,0.2)] w-full max-w-3xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-8 duration-700 border border-emerald-100/50"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-10 py-8 border-b border-emerald-50/50 flex items-center justify-between bg-emerald-50/10">

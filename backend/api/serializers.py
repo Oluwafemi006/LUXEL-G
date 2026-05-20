@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (
-    Client, Vehicule, Reparation, Stock, 
+    Client, Vehicule, Reparation, Stock, MouvementStock,
     LigneTravail, LignePiece, Facture, MouvementCaisse, Devis, 
     MaintenancePredictive, Appointment, NotificationClient, Avis, UserProfile,
     NotificationStaff
@@ -87,7 +87,19 @@ class ClientSerializer(serializers.ModelSerializer):
     def get_vehicule_count(self, obj):
         return obj.vehicules.count()
 
+class MouvementStockSerializer(serializers.ModelSerializer):
+    utilisateur_name = serializers.ReadOnlyField(source='utilisateur.username')
+    class Meta:
+        model = MouvementStock
+        fields = '__all__'
+
 class StockSerializer(serializers.ModelSerializer):
+    entrees_total = serializers.ReadOnlyField()
+    sorties_total = serializers.ReadOnlyField()
+    stock_theorique = serializers.ReadOnlyField()
+    ecart = serializers.ReadOnlyField()
+    mouvements = MouvementStockSerializer(many=True, read_only=True)
+    
     class Meta:
         model = Stock
         fields = '__all__'
@@ -128,6 +140,15 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'password']
         extra_kwargs = {'password': {'write_only': True, 'required': False}}
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if not ret.get('role'):
+            if instance.is_superuser:
+                ret['role'] = 'DIRECTEUR'
+            else:
+                ret['role'] = 'SECRETAIRE'
+        return ret
 
     def create(self, validated_data):
         profile_data = validated_data.pop('profile', {'role': 'SECRETAIRE'})

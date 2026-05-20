@@ -1,131 +1,182 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
 @theme {
-  /* Palette Vert Clair Uni & Sophistiqué */
-  --color-primary: #10b981;
+  /* ── Palette principale (interface staff) ── */
+  --color-primary:      #10b981;
   --color-primary-soft: #ecfdf5;
   --color-primary-dark: #065f46;
-  
-  --color-background: #f8fafc;
-  --color-surface: #ffffff;
-  
-  /* Accentuation Vert Clair */
-  --color-accent-green: #22c55e;
-  --color-accent-light: #f0fdf4;
+  --color-background:   #f4f7f6;
+  --color-surface:      #ffffff;
 
-  --font-body: "Inter", ui-sans-serif, system-ui;
-  --font-display: "Manrope", ui-sans-serif, system-ui;
+  /* ── Palette publique (portail client) ── */
+  --color-green:   #1F5C35;
+  --color-green2:  #2E7D4E;
+  --color-green3:  #EBF4EF;
+  --color-green4:  #7ECB9A;
+  --color-bg:      #F7F8F5;
+  --color-bg2:     #FFFFFF;
+  --color-bg3:     #EFF3EE;
+  --color-text:    #111C16;
+  --color-text2:   #3D5244;
+  --color-muted:   #6B7C70;
+  --color-border:  #D8E5DC;
 
-  /* Transitions Slow Motion Custom */
-  --transition-slow: all 1.2s cubic-bezier(0.22, 1, 0.36, 1);
-  --transition-medium: all 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  /* ── Typographie ── */
+  --font-bebas:   "Bebas Neue", sans-serif;
+  --font-oswald:  "Oswald", sans-serif;
+  --font-outfit:  "Outfit", sans-serif;
+  --font-inter:   "Inter", sans-serif;
+  --font-body:    "Inter", sans-serif;
+  --font-display: "Outfit", sans-serif;
+
+  /* ── Transitions ── */
+  --transition-slow:   all 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-medium: all 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* ────────────────────────────────────────────────
+   BASE
+──────────────────────────────────────────────── */
 @layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
   html {
     scroll-behavior: smooth;
+    font-size: 17px; /* Accessibilité seniors */
   }
-  
+
   body {
-    @apply bg-[#f0f9f4] text-slate-900 font-body antialiased selection:bg-emerald-200 selection:text-emerald-900;
-    transition: background-color 1.2s ease-in-out;
-  }
-  
-  h1, h2, h3, h4 {
-    @apply font-display tracking-tight;
+    font-family: "Inter", sans-serif;
+    font-weight: 400;
+    background-color: #f4f7f6;
+    color: #111C16;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    padding: 0;
+    line-height: 1.7;
   }
 
-  /* Animation de transition de page ultra-douce */
-  .page-transition-wrapper {
-    animation: pageEnter 1.5s cubic-bezier(0.22, 1, 0.36, 1);
-    will-change: transform, opacity, filter;
+  h1, h2, h3, h4, h5 {
+    font-family: "Outfit", sans-serif;
+    letter-spacing: 0.02em;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  ::selection {
+    background-color: #a7f3d0;
+    color: #065f46;
   }
 }
 
-@keyframes pageEnter {
-  0% {
-    opacity: 0;
-    transform: translateY(20px) scale(0.98);
-    filter: blur(10px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0);
-  }
-}
-
+/* ────────────────────────────────────────────────
+   COMPOSANTS GLOBAUX (interface staff)
+──────────────────────────────────────────────── */
 @layer components {
-  .page-container {
-    @apply max-w-7xl mx-auto px-4 py-8;
-  }
-
   .card-luxury {
-    @apply bg-white rounded-[2rem] border border-emerald-100/50 shadow-sm hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-1000 ease-in-out hover:-translate-y-2;
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid rgba(16, 185, 129, 0.12);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: box-shadow 0.5s ease, transform 0.5s ease;
+  }
+  .card-luxury:hover {
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.08);
   }
 
   .btn-primary-luxury {
-    @apply bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 hover:shadow-emerald-300 transition-all duration-700 active:scale-95;
+    font-family: "Outfit", sans-serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    background: #10b981;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.65rem 1.5rem;
+    cursor: pointer;
+    transition: background 0.4s ease, transform 0.2s ease;
+  }
+  .btn-primary-luxury:hover { background: #059669; transform: translateY(-1px); }
+  .btn-primary-luxury:active { transform: scale(0.97); }
+
+  .navbar-fixed {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(16, 185, 129, 0.15);
+    box-shadow: 0 1px 8px rgba(0,0,0,0.06);
   }
 
-  .slow-fade-in {
-    animation: fadeIn 1.5s ease-in-out;
+  .sidebar-fixed {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100vh;
+    width: 256px;
+    z-index: 50;
+    overflow-y: auto;
   }
 }
 
-@keyframes slideUpFade {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
+/* ────────────────────────────────────────────────
+   ANIMATIONS
+──────────────────────────────────────────────── */
+@keyframes pageEnter {
+  0%   { opacity: 0; transform: translateY(16px); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0);    filter: blur(0);   }
+}
+.page-transition-wrapper {
+  animation: pageEnter 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeUp  { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse-slow { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
+
+.slow-fade-in       { animation: fadeIn 0.8s ease-in-out; }
+.animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
+
+/* ────────────────────────────────────────────────
+   SCROLLBAR
+──────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 4px; }
+::-webkit-scrollbar-track  { background: #F7F8F5; }
+::-webkit-scrollbar-thumb  { background: #D8E5DC; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #1F5C35; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.custom-scrollbar::-webkit-scrollbar       { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #d1fae5; border-radius: 9999px; }
+
+/* ────────────────────────────────────────────────
+   UTILITAIRES
+──────────────────────────────────────────────── */
+.transition-slow   { transition: var(--transition-slow); }
+.transition-medium { transition: var(--transition-medium); }
+
+.hover-lift { transition: transform 0.5s ease, box-shadow 0.5s ease; }
+.hover-lift:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(31, 92, 53, 0.1); }
+
+.font-bebas  { font-family: "Bebas Neue", sans-serif; }
+.font-oswald { font-family: "Oswald", sans-serif; }
+.font-outfit { font-family: "Outfit", sans-serif; }
+.font-inter  { font-family: "Inter", sans-serif; }
+
+/* ────────────────────────────────────────────────
+   ACCESSIBILITÉ — REDUCE MOTION
+──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes pulse-slow {
-  0%, 100% { opacity: 0.3; transform: scale(1.1); }
-  50% { opacity: 0.5; transform: scale(1.15); }
-}
-
-.animate-pulse-slow {
-  animation: pulse-slow 8s ease-in-out infinite;
-}
-
-/* Scrollbar personnalisée en vert */
-::-webkit-scrollbar {
-  width: 10px;
-}
-::-webkit-scrollbar-track {
-  @apply bg-emerald-50;
-}
-::-webkit-scrollbar-thumb {
-  @apply bg-emerald-200 rounded-full hover:bg-emerald-400 transition-colors duration-700;
-}
-
-/* Utilities for slow motion transitions */
-.transition-slow {
-  transition: var(--transition-slow);
-}
-
-.transition-medium {
-  transition: var(--transition-medium);
-}
-
-.hover-lift {
-  @apply transition-all duration-700 hover:-translate-y-2 hover:shadow-xl;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
 }

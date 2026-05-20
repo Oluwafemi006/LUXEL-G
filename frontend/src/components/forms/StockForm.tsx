@@ -114,14 +114,14 @@ const StockForm: React.FC<StockFormProps> = ({ onSubmit, onCancel }) => {
         <button 
           type="button"
           onClick={onCancel}
-          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-[1.5rem] border border-slate-100 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all duration-500"
+          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-xl border border-slate-100 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all duration-500"
         >
           <X className="w-4 h-4" />
           Annuler
         </button>
         <button 
           type="submit"
-          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-[1.5rem] bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest shadow-2xl hover:bg-emerald-600 transition-all duration-700 active:scale-95"
+          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-xl bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest shadow-2xl hover:bg-emerald-600 transition-all duration-700 active:scale-95"
         >
           <CheckCircle2 className="w-4 h-4" />
           Intégrer à l'Inventaire

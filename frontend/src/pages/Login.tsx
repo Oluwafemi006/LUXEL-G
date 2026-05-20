@@ -20,7 +20,7 @@ const Login: React.FC = () => {
     try {
       const response = await api.post('token/', { username, password });
       login(response.data.access, response.data.refresh);
-      navigate('/');
+      navigate('/staff');
     } catch (err: any) {
       setError('Identifiants invalides. Veuillez réessayer.');
       console.error(err);
@@ -32,10 +32,10 @@ const Login: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-emerald-50 via-slate-50 to-slate-100">
       <div className="w-full max-w-md animate-in fade-in zoom-in duration-1000">
-        <div className="bg-white rounded-[3rem] shadow-2xl shadow-emerald-900/10 border border-emerald-100/50 p-12 space-y-10 relative overflow-hidden">
+        <div className="bg-white rounded-xl shadow-2xl shadow-emerald-900/10 border border-emerald-100/50 p-12 space-y-10 relative overflow-hidden">
           {/* Logo & Header */}
           <div className="text-center space-y-3 relative z-10">
-            <div className="w-20 h-20 bg-emerald-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-200 group hover:rotate-12 transition-all duration-700">
+            <div className="w-20 h-20 bg-emerald-600 rounded-xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-200 group hover:rotate-12 transition-all duration-700">
               <ShieldCheck className="w-10 h-10 text-white" />
             </div>
             <h1 className="text-4xl font-black text-slate-900 italic tracking-tighter uppercase">LUXEL<span className="text-emerald-600">-G</span></h1>
@@ -89,7 +89,7 @@ const Login: React.FC = () => {
             <button 
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-600 text-white py-6 rounded-[1.5rem] font-black text-xs uppercase tracking-[0.3em] shadow-xl shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center justify-center gap-3 disabled:opacity-50"
+              className="w-full bg-emerald-600 text-white py-6 rounded-xl font-black text-xs uppercase tracking-[0.3em] shadow-xl shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center justify-center gap-3 disabled:opacity-50"
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>

@@ -18,18 +18,21 @@ interface RepairFormProps {
   onSubmit: (data: any) => void;
   onCancel: () => void;
   initialVehicleId?: number;
+  initialData?: any;
 }
 
-const RepairForm: React.FC<RepairFormProps> = ({ onSubmit, onCancel, initialVehicleId }) => {
+const RepairForm: React.FC<RepairFormProps> = ({ onSubmit, onCancel, initialVehicleId, initialData }) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | number>('');
 
   useEffect(() => {
-    if (initialVehicleId) {
+    if (initialData && initialData.vehicule) {
+      setSelectedVehicleId(initialData.vehicule);
+    } else if (initialVehicleId) {
       setSelectedVehicleId(initialVehicleId);
     }
-  }, [initialVehicleId]);
+  }, [initialVehicleId, initialData]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -89,6 +92,7 @@ const RepairForm: React.FC<RepairFormProps> = ({ onSubmit, onCancel, initialVehi
               name="categorie"
               list="categories-panne"
               required
+              defaultValue={initialData?.categorie || ''}
               placeholder="Saisir la nature technique..."
               className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
             />
@@ -112,7 +116,8 @@ const RepairForm: React.FC<RepairFormProps> = ({ onSubmit, onCancel, initialVehi
             name="description"
             required
             rows={3}
-            className="w-full p-8 rounded-[2rem] bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-medium text-slate-600 italic shadow-inner transition-all resize-none leading-relaxed"
+            defaultValue={initialData?.description || ''}
+            className="w-full p-8 rounded-xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-medium text-slate-600 italic shadow-inner transition-all resize-none leading-relaxed"
             placeholder="Décrivez les anomalies constatées ou les travaux spécifiques demandés par le propriétaire..."
           ></textarea>
         </div>
@@ -127,6 +132,7 @@ const RepairForm: React.FC<RepairFormProps> = ({ onSubmit, onCancel, initialVehi
               type="number"
               name="kilometrage"
               required
+              defaultValue={initialData?.kilometrage || ''}
               className="w-full pl-16 pr-20 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-black text-slate-900 shadow-inner transition-all"
               placeholder="0"
             />
@@ -139,6 +145,7 @@ const RepairForm: React.FC<RepairFormProps> = ({ onSubmit, onCancel, initialVehi
             <Droplets className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
             <select 
               name="niveau_carburant"
+              defaultValue={initialData?.niveau_carburant || '1/4'}
               className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all appearance-none"
             >
               <option value="Vide">Réserve / Vide</option>
@@ -157,7 +164,7 @@ const RepairForm: React.FC<RepairFormProps> = ({ onSubmit, onCancel, initialVehi
           <div className="flex gap-4 p-2 bg-slate-50 rounded-2xl border border-emerald-50 shadow-inner">
             {['BASSE', 'NORMALE', 'URGENTE'].map((p) => (
               <label key={p} className="flex-1 cursor-pointer">
-                <input type="radio" name="priorite" value={p} className="peer hidden" defaultChecked={p === 'NORMALE'} />
+                <input type="radio" name="priorite" value={p} className="peer hidden" defaultChecked={initialData ? initialData.priorite === p : p === 'NORMALE'} />
                 <div className={`text-center py-3 rounded-xl text-[10px] font-black tracking-widest transition-all duration-500 ${
                   p === 'URGENTE' ? 'peer-checked:bg-rose-600 peer-checked:text-white' : 
                   p === 'NORMALE' ? 'peer-checked:bg-emerald-600 peer-checked:text-white' : 
@@ -175,6 +182,7 @@ const RepairForm: React.FC<RepairFormProps> = ({ onSubmit, onCancel, initialVehi
             <User className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
             <select 
               name="technicien"
+              defaultValue={initialData?.technicien || ''}
               className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all appearance-none"
             >
               <option value="">Sélectionner un technicien</option>
@@ -190,17 +198,17 @@ const RepairForm: React.FC<RepairFormProps> = ({ onSubmit, onCancel, initialVehi
         <button 
           type="button"
           onClick={onCancel}
-          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-[1.5rem] border border-slate-100 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all duration-500"
+          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-xl border border-slate-100 text-slate-400 font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all duration-500"
         >
           <X className="w-4 h-4" />
           Annuler
         </button>
         <button 
           type="submit"
-          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-[1.5rem] bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest shadow-2xl hover:bg-emerald-600 transition-all duration-700 active:scale-95"
+          className="flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-xl bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest shadow-2xl hover:bg-emerald-600 transition-all duration-700 active:scale-95"
         >
           <CheckCircle2 className="w-4 h-4" />
-          Ouvrir l'Ordre de Réparation
+          {initialData ? "Enregistrer les modifications" : "Ouvrir l'Ordre de Réparation"}
         </button>
       </div>
     </form>

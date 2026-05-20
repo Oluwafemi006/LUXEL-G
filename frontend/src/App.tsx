@@ -34,7 +34,7 @@ const RoleRoute = ({ children, role }: { children: React.ReactNode, role: 'DIREC
   const { user } = useAuth();
 
   if (user?.role !== role) {
-    return <Navigate to="/reception" />; // Rediriger les secrétaires vers la réception par défaut
+    return <Navigate to="/staff/reception" />; // Rediriger les secrétaires vers la réception par défaut
   }
 
   return <>{children}</>;
@@ -45,18 +45,17 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
       <Routes>
-        {/* Routes Publiques */}
+        {/* Routes Publiques (Landing Page & Espace Client) */}
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<PublicPortal />} />
+          <Route path="/espace-client" element={<ClientSpace />} />
+        </Route>
+
+        {/* Login Staff */}
         <Route path="/login" element={<Login />} />
 
-        <Route path="/reservation" element={<PublicLayout />}>
-          <Route index element={<PublicPortal />} />
-        </Route>
-        <Route path="/espace-client" element={<PublicLayout />}>
-          <Route index element={<ClientSpace />} />
-        </Route>
-
-        {/* Interface Interne Protégée */}
-        <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
+        {/* Interface Interne Protégée (/staff) */}
+        <Route path="/staff" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
           <Route index element={<RoleRoute role="DIRECTEUR"><Dashboard /></RoleRoute>} />
           <Route path="reception" element={<Reception />} />
           <Route path="clients" element={<Clients />} />
@@ -70,6 +69,9 @@ function App() {
           <Route path="agenda" element={<Appointments />} />
           <Route path="utilisateurs" element={<RoleRoute role="DIRECTEUR"><Users /></RoleRoute>} />
         </Route>
+
+        {/* Redirections par défaut */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </BrowserRouter>
     </AuthProvider>

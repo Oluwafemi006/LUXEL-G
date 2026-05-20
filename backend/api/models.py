@@ -14,6 +14,7 @@ class UserProfile(models.Model):
         return f"{self.user.username} - {self.role}"
 
 class Client(models.Model):
+    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='client_profile')
     nom = models.CharField(max_length=100)
     prenoms = models.CharField(max_length=200)
     contact = models.CharField(max_length=20)
@@ -27,7 +28,7 @@ class Client(models.Model):
         return f"{self.nom} {self.prenoms}"
 
 class Vehicule(models.Model):
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='vehicules')
+    client = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='vehicules')
     immatriculation = models.CharField(max_length=20, unique=True)
     marque = models.CharField(max_length=50)
     modele = models.CharField(max_length=100)
@@ -51,7 +52,7 @@ class Reparation(models.Model):
         ('NORMALE', 'Normale'),
         ('URGENTE', 'Urgente'),
     ]
-    vehicule = models.ForeignKey(Vehicule, on_delete=models.CASCADE, related_name='reparations')
+    vehicule = models.ForeignKey(Vehicule, on_delete=models.PROTECT, related_name='reparations')
     categorie = models.CharField(max_length=100)
     description = models.TextField()
     priorite = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='NORMALE')
@@ -70,7 +71,7 @@ class Reparation(models.Model):
         return f"OR-{self.id} | {self.vehicule.immatriculation}"
 
 class LigneTravail(models.Model):
-    reparation = models.ForeignKey(Reparation, on_delete=models.CASCADE, related_name='travaux')
+    reparation = models.ForeignKey(Reparation, on_delete=models.PROTECT, related_name='travaux')
     description = models.CharField(max_length=255)
     montant = models.DecimalField(max_digits=12, decimal_places=2)
 
@@ -78,7 +79,7 @@ class LigneTravail(models.Model):
         return f"{self.description} - {self.montant} FCFA"
 
 class LignePiece(models.Model):
-    reparation = models.ForeignKey(Reparation, on_delete=models.CASCADE, related_name='pieces')
+    reparation = models.ForeignKey(Reparation, on_delete=models.PROTECT, related_name='pieces')
     article_stock = models.ForeignKey('Stock', on_delete=models.SET_NULL, null=True, blank=True)
     reference = models.CharField(max_length=100, blank=True, null=True)
     description = models.CharField(max_length=255)
@@ -106,7 +107,7 @@ class Facture(models.Model):
         ('CHEQUE', 'Chèque'),
         ('AUTRE', 'Autre'),
     ]
-    reparation = models.OneToOneField(Reparation, on_delete=models.CASCADE, related_name='facture')
+    reparation = models.OneToOneField(Reparation, on_delete=models.PROTECT, related_name='facture')
     numero_facture = models.CharField(max_length=20, unique=True, blank=True, null=True)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='PROFORMA')
     total_ht = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -137,7 +138,7 @@ class Devis(models.Model):
         ('REFUSE', 'Refusé'),
         ('FACTURE', 'Facturé'),
     ]
-    reparation = models.ForeignKey(Reparation, on_delete=models.CASCADE, related_name='devis')
+    reparation = models.ForeignKey(Reparation, on_delete=models.PROTECT, related_name='devis')
     numero_devis = models.CharField(max_length=20, unique=True, blank=True, null=True)
     date_creation = models.DateTimeField(auto_now_add=True)
     date_validite = models.DateField(blank=True, null=True)
@@ -157,7 +158,7 @@ class MouvementCaisse(models.Model):
         ('RECETTE', 'Recette'),
         ('DEPENSE', 'Dépense'),
     ]
-    date_mouvement = models.DateField(default=models.functions.Now())
+    date_mouvement = models.DateField(default=timezone.now)
     type_mouvement = models.CharField(max_length=10, choices=TYPE_MOUVEMENT_CHOICES)
     categorie = models.CharField(max_length=100) # Changé en CharField libre
     montant = models.DecimalField(max_digits=12, decimal_places=2)
@@ -174,14 +175,47 @@ class Stock(models.Model):
     nom = models.CharField(max_length=200)
     sku = models.CharField(max_length=50, unique=True)
     categorie = models.CharField(max_length=100)
-    quantite = models.IntegerField(default=0)
+    quantite = models.IntegerField(default=0) # Stock Physique Actuel
+    stock_initial = models.IntegerField(default=0) # Au début de la période/mois
     seuil_alerte = models.IntegerField(default=10)
     prix_achat = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2)
     emplacement = models.CharField(max_length=50, blank=True, null=True)
 
+    @property
+    def entrees_total(self):
+        return self.mouvements.filter(type_mouvement='ENTREE').aggregate(models.Sum('quantite'))['quantite__sum'] or 0
+
+    @property
+    def sorties_total(self):
+        return self.mouvements.filter(type_mouvement='SORTIE').aggregate(models.Sum('quantite'))['quantite__sum'] or 0
+
+    @property
+    def stock_theorique(self):
+        return self.stock_initial + self.entrees_total - self.sorties_total
+
+    @property
+    def ecart(self):
+        return self.quantite - self.stock_theorique
+
     def __str__(self):
         return self.nom
+
+class MouvementStock(models.Model):
+    TYPE_MOUVEMENT = [
+        ('ENTREE', 'Entrée (Achat/Retour)'),
+        ('SORTIE', 'Sortie (Réparation/Vente)'),
+        ('AJUSTEMENT', 'Ajustement Inventaire'),
+    ]
+    article = models.ForeignKey(Stock, on_delete=models.CASCADE, related_name='mouvements')
+    type_mouvement = models.CharField(max_length=20, choices=TYPE_MOUVEMENT)
+    quantite = models.IntegerField()
+    description = models.CharField(max_length=255, blank=True, null=True)
+    date_mouvement = models.DateTimeField(auto_now_add=True)
+    utilisateur = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.type_mouvement} - {self.article.nom} ({self.quantite})"
 
 class MaintenancePredictive(models.Model):
     TYPE_MAINTENANCE = [
@@ -268,3 +302,16 @@ class Avis(models.Model):
 
     def __str__(self):
         return f"Avis {self.client.nom} - {self.note}/5"
+
+class ClientOTP(models.Model):
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='otps')
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+
+    def is_valid(self):
+        # Valide pendant 10 minutes
+        return not self.is_used and (timezone.now() - self.created_at).total_seconds() < 600
+
+    def __str__(self):
+        return f"OTP {self.client.nom} - {self.code}"

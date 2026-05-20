@@ -119,7 +119,7 @@ const Notifications: React.FC = () => {
             </div>
           ) : alerts.length === 0 ? (
             <div className="p-40 text-center flex flex-col items-center justify-center opacity-20 grayscale space-y-8">
-              <div className="w-24 h-24 bg-emerald-50 rounded-[2.5rem] flex items-center justify-center shadow-inner">
+              <div className="w-24 h-24 bg-emerald-50 rounded-xl flex items-center justify-center shadow-inner">
                  <BellOff className="w-12 h-12 text-emerald-600" />
               </div>
               <p className="font-black uppercase tracking-[0.5em] text-2xl">Statut Nominal</p>
@@ -134,7 +134,7 @@ const Notifications: React.FC = () => {
                   className="p-10 hover:bg-emerald-50/30 transition-all duration-700 group cursor-pointer border-l-8 border-l-transparent hover:border-l-emerald-600 relative overflow-hidden"
                 >
                   <div className="flex items-start gap-10 relative z-10">
-                    <div className={`shrink-0 p-5 rounded-[1.5rem] shadow-2xl transition-all duration-700 group-hover:rotate-3 group-hover:scale-110 ${
+                    <div className={`shrink-0 p-5 rounded-xl shadow-2xl transition-all duration-700 group-hover:rotate-3 group-hover:scale-110 ${
                       alert.priority === 'HAUTE' ? 'bg-rose-600 text-white shadow-rose-200' : 
                       alert.priority === 'MOYENNE' ? 'bg-orange-500 text-white shadow-orange-200' : 'bg-slate-900 text-emerald-400 shadow-slate-200'
                     }`}>
@@ -179,7 +179,7 @@ const Notifications: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-500">
           <div className="card-luxury p-10 bg-slate-900 text-white flex items-start gap-8 group overflow-hidden relative">
-             <div className="w-16 h-16 rounded-[1.25rem] bg-emerald-500/20 backdrop-blur-md flex items-center justify-center border border-emerald-500/30 relative z-10">
+             <div className="w-16 h-16 rounded-lg bg-emerald-500/20 backdrop-blur-md flex items-center justify-center border border-emerald-500/30 relative z-10">
                 <ShieldCheck className="w-8 h-8 text-emerald-400" />
              </div>
              <div className="relative z-10 flex-1 space-y-2">
@@ -192,7 +192,7 @@ const Notifications: React.FC = () => {
           </div>
 
           <div className="card-luxury p-10 flex items-start gap-8 group overflow-hidden relative">
-             <div className="w-16 h-16 rounded-[1.25rem] bg-rose-50 flex items-center justify-center border border-rose-100 relative z-10">
+             <div className="w-16 h-16 rounded-lg bg-rose-50 flex items-center justify-center border border-rose-100 relative z-10">
                 <AlertTriangle className="w-8 h-8 text-rose-600" />
              </div>
              <div className="relative z-10 flex-1 space-y-2">

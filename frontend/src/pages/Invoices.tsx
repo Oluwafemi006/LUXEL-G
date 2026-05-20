@@ -115,15 +115,15 @@ const Invoices: React.FC = () => {
     }
   };
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await api.get('factures/');
       setInvoices(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Erreur chargement factures:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -218,7 +218,7 @@ const Invoices: React.FC = () => {
     try {
       const response = await api.post(`factures/${currentInvoiceId}/valider/`);
       alert('Facture validée et stock mis à jour !');
-      fetchInvoices();
+      fetchInvoices(true);
       setCurrentInvoice(response.data);
       setIsDefinitive(true);
     } catch (error) {
@@ -254,7 +254,7 @@ const Invoices: React.FC = () => {
       alert('Paiement enregistré !');
       setIsPaymentModalOpen(false);
       setPaymentAmount('');
-      fetchInvoices();
+      fetchInvoices(true);
       setCurrentInvoice(response.data);
       if (selectedRepair) {
         const resRepair = await api.get(`reparations/${selectedRepair.id}/`);
@@ -392,7 +392,7 @@ const handleDownloadPDF = async () => {
         }
       }
       alert('Sauvegarde réussie !');
-      fetchInvoices();
+      fetchInvoices(true);
     } catch (error) {
       console.error('Erreur sauvegarde:', error);
       alert('Erreur sauvegarde.');
@@ -430,7 +430,7 @@ const handleDownloadPDF = async () => {
             </div>
           )}
           
-          <div className="flex bg-white p-1.5 rounded-[1.25rem] border border-emerald-100/50 shadow-sm tabs-invoice">
+          <div className="flex bg-white p-1.5 rounded-lg border border-emerald-100/50 shadow-sm tabs-invoice">
             <button 
               onClick={() => setViewMode('LIST')} 
               className={`px-8 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'LIST' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-slate-400 hover:text-emerald-600'}`}
@@ -595,7 +595,7 @@ const handleDownloadPDF = async () => {
                 </div>
 
                 {/* Infos Client & Véhicule */}
-                <div className="grid grid-cols-3 gap-10 bg-slate-50/50 p-8 rounded-[2rem] border border-emerald-100/30 shadow-inner relative overflow-hidden">
+                <div className="grid grid-cols-3 gap-10 bg-slate-50/50 p-8 rounded-xl border border-emerald-100/30 shadow-inner relative overflow-hidden">
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase text-emerald-600 tracking-widest opacity-70 flex items-center gap-2">
                       <Users className="w-3 h-3" /> Client
@@ -715,35 +715,35 @@ const handleDownloadPDF = async () => {
                 <div className="pt-10 flex flex-col md:flex-row justify-between items-end gap-8 border-t-4 border-emerald-500/10 mt-10">
                   <div className="flex flex-wrap gap-4 no-print">
                     {currentInvoiceId && isDefinitive && currentInvoice && currentInvoice.statut_paiement !== 'SOLDE' && (
-                      <button onClick={() => openPaymentModal(currentInvoice)} className="bg-emerald-600 text-white px-8 py-4 rounded-[1.25rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center gap-3">
+                      <button onClick={() => openPaymentModal(currentInvoice)} className="bg-emerald-600 text-white px-8 py-4 rounded-lg font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center gap-3">
                         <CreditCard className="w-4 h-4" /> Encaisser
                       </button>
                     )}
                     {currentInvoiceId && !isDefinitive && (
-                      <button onClick={handleValidateDefinitive} className="bg-slate-900 text-white px-8 py-4 rounded-[1.25rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-emerald-600 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center gap-3">
+                      <button onClick={handleValidateDefinitive} className="bg-slate-900 text-white px-8 py-4 rounded-lg font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-emerald-600 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center gap-3">
                         <Verified className="w-4 h-4" /> Valider Définitive
                       </button>
                     )}
-                    <button onClick={handleSaveInvoice} disabled={isDefinitive} className="bg-white text-slate-600 px-8 py-4 rounded-[1.25rem] font-black text-xs uppercase tracking-widest border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all duration-500 flex items-center gap-3 disabled:opacity-40">
+                    <button onClick={handleSaveInvoice} disabled={isDefinitive} className="bg-white text-slate-600 px-8 py-4 rounded-lg font-black text-xs uppercase tracking-widest border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all duration-500 flex items-center gap-3 disabled:opacity-40">
                       <Save className="w-4 h-4" /> {currentInvoiceId ? 'Mettre à jour' : 'Enregistrer'}
                     </button>
                     
                     {currentInvoiceId && (
                       <div className="flex gap-2">
-                        <button onClick={handleDownloadPDF} title="PDF" className="p-4 bg-blue-50 text-blue-600 rounded-[1.25rem] border border-blue-100 hover:bg-blue-600 hover:text-white transition-all duration-500 shadow-sm">
+                        <button onClick={handleDownloadPDF} title="PDF" className="p-4 bg-blue-50 text-blue-600 rounded-lg border border-blue-100 hover:bg-blue-600 hover:text-white transition-all duration-500 shadow-sm">
                           <Printer className="w-5 h-5" />
                         </button>
-                        <button onClick={handleWhatsAppShare} title="WhatsApp" className="p-4 bg-emerald-50 text-emerald-600 rounded-[1.25rem] border border-emerald-100 hover:bg-[#25D366] hover:text-white transition-all duration-500 shadow-sm">
+                        <button onClick={handleWhatsAppShare} title="WhatsApp" className="p-4 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 hover:bg-[#25D366] hover:text-white transition-all duration-500 shadow-sm">
                           <Share2 className="w-5 h-5" />
                         </button>
-                        <button onClick={handleSendEmail} title="Email" className="p-4 bg-slate-50 text-slate-600 rounded-[1.25rem] border border-slate-200 hover:bg-slate-900 hover:text-white transition-all duration-500 shadow-sm">
+                        <button onClick={handleSendEmail} title="Email" className="p-4 bg-slate-50 text-slate-600 rounded-lg border border-slate-200 hover:bg-slate-900 hover:text-white transition-all duration-500 shadow-sm">
                           <Mail className="w-5 h-5" />
                         </button>
                       </div>
                     )}
                   </div>
 
-                  <div className="w-full md:w-96 bg-slate-900 text-white p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+                  <div className="w-full md:w-96 bg-slate-900 text-white p-10 rounded-xl shadow-2xl relative overflow-hidden group">
                     <div className="relative z-10">
                       <div className="flex justify-between items-center mb-6">
                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Total Hors Taxes</span>
@@ -783,7 +783,7 @@ const handleDownloadPDF = async () => {
       {/* Modal Paiement */}
       {isPaymentModalOpen && currentInvoice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-4 animate-in fade-in duration-500">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl border border-emerald-100/50 animate-in zoom-in duration-700 overflow-hidden">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-emerald-100/50 animate-in zoom-in duration-700 overflow-hidden">
             <div className="p-10 space-y-8">
               <div className="text-center space-y-2">
                 <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">

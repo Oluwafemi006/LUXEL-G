@@ -105,15 +105,15 @@ const Quotes: React.FC = () => {
     }
   };
 
-  const fetchQuotes = async () => {
+  const fetchQuotes = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await api.get('devis/');
       setQuotes(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Erreur chargement devis:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -234,7 +234,7 @@ const Quotes: React.FC = () => {
       const response = await api.post(`devis/${currentQuoteId}/transformer_en_facture/`);
       const newInvoice = response.data;
       alert('Devis transformé en facture avec succès !');
-      navigate('/factures', { state: { repairId: newInvoice.reparation } });
+      navigate('/staff/factures', { state: { repairId: newInvoice.reparation } });
     } catch (error) {
       console.error('Erreur transformation:', error);
       alert('Erreur lors de la transformation.');
@@ -323,7 +323,7 @@ const Quotes: React.FC = () => {
       }
 
       alert('Enregistrement réussi !');
-      fetchQuotes();
+      fetchQuotes(true);
     } catch (error) {
       console.error('Erreur sauvegarde:', error);
       alert('Erreur lors de la sauvegarde.');
@@ -350,7 +350,7 @@ const Quotes: React.FC = () => {
           <h1 className="text-4xl font-black text-slate-900 italic tracking-tighter">Gestion des Devis</h1>
           <p className="text-slate-500 font-medium">Propositions commerciales et estimations tarifaires.</p>
         </div>
-        <div className="flex bg-white p-1.5 rounded-[1.25rem] border border-emerald-100/50 shadow-sm tabs-quote">
+        <div className="flex bg-white p-1.5 rounded-lg border border-emerald-100/50 shadow-sm tabs-quote">
           <button 
             onClick={() => setViewMode('LIST')} 
             className={`px-8 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'LIST' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-slate-400 hover:text-emerald-600'}`}
@@ -482,7 +482,7 @@ const Quotes: React.FC = () => {
                 </div>
 
                 {/* Infos Client & Véhicule */}
-                <div className="grid grid-cols-3 gap-10 bg-slate-50/50 p-8 rounded-[2rem] border border-emerald-100/30 shadow-inner relative overflow-hidden">
+                <div className="grid grid-cols-3 gap-10 bg-slate-50/50 p-8 rounded-xl border border-emerald-100/30 shadow-inner relative overflow-hidden">
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase text-emerald-600 tracking-widest opacity-70 flex items-center gap-2">
                       <Users className="w-3 h-3" /> Client
@@ -597,7 +597,7 @@ const Quotes: React.FC = () => {
                   <textarea 
                     value={notes} 
                     onChange={(e) => setNotes(e.target.value)} 
-                    className="w-full bg-emerald-50/20 border border-emerald-100/50 rounded-[1.5rem] p-6 text-sm font-medium outline-none focus:border-emerald-500/50 transition-all shadow-inner" 
+                    className="w-full bg-emerald-50/20 border border-emerald-100/50 rounded-xl p-6 text-sm font-medium outline-none focus:border-emerald-500/50 transition-all shadow-inner" 
                     rows={3} 
                     placeholder="Précisions sur les travaux ou validité du devis..."
                   />
@@ -606,31 +606,31 @@ const Quotes: React.FC = () => {
                 {/* Actions et Total */}
                 <div className="pt-10 flex flex-col md:flex-row justify-between items-end gap-8 border-t-4 border-emerald-500/10 mt-10">
                   <div className="flex flex-wrap gap-4 no-print">
-                    <button onClick={() => handleSaveQuote()} className="bg-emerald-600 text-white px-8 py-4 rounded-[1.25rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center gap-3">
+                    <button onClick={() => handleSaveQuote()} className="bg-emerald-600 text-white px-8 py-4 rounded-lg font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center gap-3">
                       <Save className="w-4 h-4" /> Enregistrer
                     </button>
                     {currentQuoteId && currentQuote?.statut !== 'FACTURE' && (
-                      <button onClick={handleConvertToInvoice} className="bg-slate-900 text-white px-8 py-4 rounded-[1.25rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-emerald-600 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center gap-3">
+                      <button onClick={handleConvertToInvoice} className="bg-slate-900 text-white px-8 py-4 rounded-lg font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-emerald-600 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center gap-3">
                         <ArrowRightCircle className="w-4 h-4" /> Transférer en Facture
                       </button>
                     )}
                     
                     {currentQuoteId && (
                       <div className="flex gap-2">
-                        <button onClick={handleDownloadPDF} title="PDF" className="p-4 bg-blue-50 text-blue-600 rounded-[1.25rem] border border-blue-100 hover:bg-blue-600 hover:text-white transition-all duration-500 shadow-sm">
+                        <button onClick={handleDownloadPDF} title="PDF" className="p-4 bg-blue-50 text-blue-600 rounded-lg border border-blue-100 hover:bg-blue-600 hover:text-white transition-all duration-500 shadow-sm">
                           <Printer className="w-5 h-5" />
                         </button>
-                        <button onClick={handleWhatsAppShare} title="WhatsApp" className="p-4 bg-emerald-50 text-emerald-600 rounded-[1.25rem] border border-emerald-100 hover:bg-[#25D366] hover:text-white transition-all duration-500 shadow-sm">
+                        <button onClick={handleWhatsAppShare} title="WhatsApp" className="p-4 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 hover:bg-[#25D366] hover:text-white transition-all duration-500 shadow-sm">
                           <Share2 className="w-5 h-5" />
                         </button>
-                        <button onClick={handleSendEmail} title="Email" className="p-4 bg-slate-50 text-slate-600 rounded-[1.25rem] border border-slate-200 hover:bg-slate-900 hover:text-white transition-all duration-500 shadow-sm">
+                        <button onClick={handleSendEmail} title="Email" className="p-4 bg-slate-50 text-slate-600 rounded-lg border border-slate-200 hover:bg-slate-900 hover:text-white transition-all duration-500 shadow-sm">
                           <Mail className="w-5 h-5" />
                         </button>
                       </div>
                     )}
                   </div>
 
-                  <div className="w-full md:w-96 bg-slate-900 text-white p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+                  <div className="w-full md:w-96 bg-slate-900 text-white p-10 rounded-xl shadow-2xl relative overflow-hidden group">
                     <div className="relative z-10">
                       <div className="flex justify-between items-center mb-4">
                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Sous-total Estimé</span>
@@ -652,7 +652,7 @@ const Quotes: React.FC = () => {
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-40 opacity-20 text-slate-400 grayscale">
-                <div className="w-24 h-24 bg-emerald-50 rounded-[2.5rem] flex items-center justify-center mb-10 shadow-inner">
+                <div className="w-24 h-24 bg-emerald-50 rounded-xl flex items-center justify-center mb-10 shadow-inner">
                   <FileText className="w-12 h-12 text-emerald-600" />
                 </div>
                 <p className="font-black uppercase tracking-[0.5em] text-2xl">Module Devis</p>

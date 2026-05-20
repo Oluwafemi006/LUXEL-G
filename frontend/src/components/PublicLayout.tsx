@@ -1,6 +1,8 @@
-import React from 'react';
-import { Outlet, useLocation, Link } from 'react-router-dom';
-import { Wrench, Phone, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom';
+import { Phone, MapPin, Mail, Home, Wrench, CalendarCheck, UserCircle, X, Menu, Images } from 'lucide-react';
+import logoImg from '../assets/logo.png';
+import '../pages/PublicPortal.css'; // S'assurer que les styles globaux du portal sont chargés
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -10,109 +12,179 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 
 const PublicLayout: React.FC = () => {
   const location = useLocation();
-  
-  return (
-    <div className="min-h-screen bg-[#FDFDFD] font-sans selection:bg-emerald-200 selection:text-emerald-900 overflow-x-hidden">
-      {/* Barre de Navigation Publique */}
-      <nav className="sticky top-0 z-[100] bg-white/70 backdrop-blur-2xl border-b border-emerald-50 shadow-sm transition-all duration-1000">
-        <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-all duration-700 group">
-            <div className="w-12 h-12 bg-slate-900 text-emerald-400 rounded-2xl flex items-center justify-center shadow-2xl shadow-emerald-900/10 group-hover:rotate-12 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-700">
-              <Wrench className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tighter uppercase italic leading-none transition-colors duration-700 group-hover:text-emerald-600">
-                LUXEL<span className="text-emerald-500">-G</span>
-              </h1>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] leading-none mt-1.5 transition-opacity duration-700 group-hover:opacity-60">Prestige & Performance</p>
-            </div>
-          </Link>
-          
-          <div className="hidden lg:flex items-center gap-10">
-            <a href="/#services" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-emerald-600 transition-all duration-700 hover:translate-y-[-1px]">Expertises</a>
-            <a href="/#booking" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-emerald-600 transition-all duration-700 hover:translate-y-[-1px]">Réservation</a>
-            <Link to="/espace-client" className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 hover:text-white hover:bg-emerald-600 transition-all duration-700 bg-emerald-50 px-8 py-3.5 rounded-2xl border border-emerald-100 shadow-sm active:scale-95">Mon Espace Client</Link>
-          </div>
+  const navigate = useNavigate();
+  const [scrolled, setScrolled] = useState(false);
+  const [activeSection, setActiveSection] = useState('accueil');
 
-          <div className="flex items-center gap-4">
-             <a 
-               href="tel:+2290192629860" 
-               className="hidden md:flex px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-emerald-600 transition-all duration-700 active:scale-95 group"
-             >
-               <Phone className="w-4 h-4 mr-3 group-hover:rotate-12 transition-transform duration-700" />
-               Contact Direct
-             </a>
-             <button className="lg:hidden w-12 h-12 flex flex-col items-center justify-center gap-1.5 bg-slate-50 rounded-xl transition-all duration-700 hover:bg-emerald-50">
-                <div className="w-6 h-0.5 bg-slate-900"></div>
-                <div className="w-6 h-0.5 bg-slate-900"></div>
-             </button>
-          </div>
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 60);
+
+      // Mettre à jour l'état actif pour le bottom nav
+      if (location.pathname === '/') {
+        const sections = ['accueil', 'services', 'galerie', 'pourquoi', 'rdv'];
+        let current = 'accueil';
+        sections.forEach(id => {
+          const el = document.getElementById(id);
+          if (el && window.scrollY >= el.offsetTop - 120) current = id;
+        });
+        setActiveSection(current);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [location]);
+
+  const handleNavClick = (anchor: string) => {
+    if (location.pathname === '/') {
+      const el = document.getElementById(anchor);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      navigate('/');
+      setTimeout(() => {
+        const el = document.getElementById(anchor);
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 150);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[var(--color-bg)] font-inter overflow-x-hidden">
+
+      {/* ─── DESKTOP NAVBAR ─── */}
+      <nav className={`top-nav ${scrolled || location.pathname !== '/' ? 'scrolled' : ''}`}>
+        <div className="logo-wrap cursor-pointer" onClick={() => handleNavClick('accueil')}>
+          <img src={logoImg} alt="Luxury Élégance Garage" className="desktop-logo" />
         </div>
+        <ul className="nav-links">
+          <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none cursor-pointer">Services</button></li>
+          <li><button onClick={() => handleNavClick('galerie')} className="bg-transparent border-none cursor-pointer">Galerie</button></li>
+          <li><button onClick={() => handleNavClick('pourquoi')} className="bg-transparent border-none cursor-pointer">À propos</button></li>
+          <li><button onClick={() => handleNavClick('rdv')} className="bg-transparent border-none cursor-pointer">Contact</button></li>
+          <li>
+            <Link 
+              to="/espace-client" 
+              className={`ml-4 px-3.5 py-1.5 rounded transition-all ${
+                location.pathname === '/espace-client'
+                  ? 'bg-slate-900 !text-white hover:bg-emerald-600 shadow-sm font-semibold'
+                  : 'bg-[rgba(255,255,255,0.1)] text-white hover:bg-[var(--color-green4)] hover:text-[#111]'
+              }`}
+            >
+              Espace Client
+            </Link>
+          </li>
+        </ul>
+        <button className="nav-rdv-btn flex items-center gap-2" onClick={() => handleNavClick('rdv')}>
+          <CalendarCheck className="w-4 h-4" /> Prendre RDV
+        </button>
       </nav>
 
-      <main key={location.pathname} className="page-transition-wrapper min-h-[calc(100-h-24)]">
+      {/* ─── MOBILE TOP HEADER ─── */}
+      <header className={`mobile-header ${scrolled || location.pathname !== '/' ? 'light' : ''}`}>
+        <div className="mh-logo" onClick={() => handleNavClick('accueil')}>
+          <img src={logoImg} alt="LEG Parakou" className="mobile-logo" />
+        </div>
+        <a href="tel:+2290192629860" className="mh-call flex items-center gap-2">
+          <Phone className="w-3 h-3" /> Appeler
+        </a>
+      </header>
+
+      {/* ─── MAIN CONTENT ─── */}
+      <main key={location.pathname} className={`page-transition-wrapper public-portal-body ${location.pathname !== '/' ? 'pt-20 md:pt-24' : ''}`}>
         <Outlet />
       </main>
 
-      {/* Footer Public */}
-      <footer className="bg-slate-950 text-white py-40 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-10 grid grid-cols-1 md:grid-cols-4 gap-24 relative z-10">
-          <div className="col-span-1 md:col-span-1 space-y-10">
-             <h2 className="text-4xl font-black italic tracking-tighter uppercase transition-colors duration-1000 hover:text-emerald-500">LUXEL<span className="text-emerald-500">-G</span></h2>
-             <p className="text-sm text-slate-500 leading-relaxed font-medium italic opacity-80">L'excellence automobile au service de votre distinction. Expertise technique et entretien certifié pour véhicules de prestige.</p>
-             <div className="flex gap-4">
-                <a href="https://wa.me/2290192629860" target="_blank" className="w-12 h-12 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-white hover:bg-[#25D366] hover:border-[#25D366] transition-all duration-700 group">
-                   <WhatsAppIcon className="w-6 h-6" />
-                </a>
-                <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-white hover:bg-emerald-600 transition-all duration-700 cursor-pointer">
-                   <MessageSquare className="w-6 h-6" />
-                </div>
-             </div>
-          </div>
-          
-          <div className="space-y-10">
-             <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500">Navigation</h3>
-             <ul className="text-sm font-bold space-y-6 text-slate-400">
-                <li className="hover:text-white transition-all duration-700 hover:translate-x-2 cursor-pointer">Le Concept Luxel-G</li>
-                <li className="hover:text-white transition-all duration-700 hover:translate-x-2 cursor-pointer">Technologies Atelier</li>
-                <li className="hover:text-white transition-all duration-700 hover:translate-x-2 cursor-pointer">Prise en Charge VIP</li>
-                <li className="hover:text-white transition-all duration-700 hover:translate-x-2 cursor-pointer">Mentions Légales</li>
-             </ul>
-          </div>
-
-          <div className="space-y-10">
-             <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500">Service Hours</h3>
-             <ul className="text-sm font-bold space-y-6 text-slate-400">
-                <li className="flex justify-between items-center border-b border-white/5 pb-4 transition-all duration-700 hover:border-emerald-500/30"><span>Lundi — Vendredi</span> <span className="text-white font-black italic">08:00 — 18:30</span></li>
-                <li className="flex justify-between items-center border-b border-white/5 pb-4 transition-all duration-700 hover:border-emerald-500/30"><span>Samedi</span> <span className="text-white font-black italic">09:00 — 15:00</span></li>
-                <li className="flex justify-between items-center text-emerald-400 pt-2 group cursor-default"><span className="font-black italic transition-transform duration-700 group-hover:scale-110">Dimanche</span> <span className="uppercase tracking-widest opacity-60">Sur RDV Spécifique</span></li>
-             </ul>
-          </div>
-
-          <div className="space-y-10">
-             <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500">Conciergerie</h3>
-             <div className="space-y-6">
-                <p className="text-sm font-bold text-white leading-relaxed">Cotonou, Bénin<br/><span className="text-emerald-500 italic">Zone Industrielle Akpakpa</span></p>
-                <div className="pt-6 border-t border-white/5">
-                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Direct Line</p>
-                   <p className="text-lg font-black text-white italic tracking-widest">+229 01 92 62 98 60</p>
-                </div>
-             </div>
-          </div>
-        </div>
+      {/* ─── BOTTOM NAVIGATION BAR (Mobile Only) ─── */}
+      <nav className="bottom-nav">
+        <button 
+          className={`bn-item ${location.pathname === '/' && activeSection === 'accueil' ? 'active' : ''}`}
+          onClick={() => handleNavClick('accueil')}
+        >
+          <Home className="bn-icon w-5 h-5" />
+          <span className="bn-label">Accueil</span>
+        </button>
+        <button 
+          className={`bn-item ${location.pathname === '/' && activeSection === 'services' ? 'active' : ''}`}
+          onClick={() => handleNavClick('services')}
+        >
+          <Wrench className="bn-icon w-5 h-5" />
+          <span className="bn-label">Services</span>
+        </button>
         
-        <div className="max-w-7xl mx-auto px-10 pt-20 mt-24 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
-           <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em]">© 2026 LUXEL-G SYSTEM — THE LUXURY STANDARD</p>
-           <div className="flex gap-8 text-[9px] font-black text-slate-600 uppercase tracking-widest">
-              <span className="hover:text-emerald-500 cursor-pointer transition-colors duration-700">Privacy</span>
-              <span className="hover:text-emerald-500 cursor-pointer transition-colors duration-700">Terms</span>
-           </div>
-        </div>
+        {/* RDV Button - Centered & Highlighted */}
+        <button 
+          className="bn-item bn-rdv"
+          onClick={() => handleNavClick('rdv')}
+        >
+          <CalendarCheck className="bn-icon w-6 h-6" />
+          <span className="bn-label">RDV</span>
+        </button>
 
-        {/* Decorative Background Elements */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[150px] -translate-y-1/2 translate-x-1/2"></div>
-        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-emerald-500/5 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/2"></div>
+        <button 
+          className={`bn-item ${location.pathname === '/' && activeSection === 'galerie' ? 'active' : ''}`}
+          onClick={() => handleNavClick('galerie')}
+        >
+          <Images className="bn-icon w-5 h-5" />
+          <span className="bn-label">Galerie</span>
+        </button>
+        <Link 
+          to="/espace-client"
+          className={`bn-item ${location.pathname === '/espace-client' ? 'active' : ''}`}
+        >
+          <UserCircle className="bn-icon w-5 h-5" />
+          <span className="bn-label">Client</span>
+        </Link>
+      </nav>
+
+      {/* ─── FLOATING CALL BUTTON (Mobile) ─── */}
+      <a href="tel:+2290192629860" className="fab-call" aria-label="Appeler le garage">
+        <Phone className="w-5 h-5" />
+      </a>
+
+      {/* ─── FOOTER ─── */}
+      <footer className="bg-[var(--color-green)] text-white">
+        <div className="footer-top">
+          <div>
+            <img src={logoImg} alt="Luxury Élégance Garage" className="footer-logo" />
+            <p className="footer-desc">L'excellence automobile au cœur du Bénin. Rigueur, expertise et professionnalisme.</p>
+          </div>
+          <div className="footer-col">
+            <h4>Services</h4>
+            <ul>
+              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Mécanique</button></li>
+              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Électricité</button></li>
+              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Pneumatique</button></li>
+              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Lavage</button></li>
+              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Entretien</button></li>
+            </ul>
+          </div>
+          <div className="footer-col">
+            <h4>Garage</h4>
+            <ul>
+              <li><button onClick={() => handleNavClick('pourquoi')} className="bg-transparent border-none p-0 cursor-pointer text-left">À propos</button></li>
+              <li><button onClick={() => handleNavClick('galerie')} className="bg-transparent border-none p-0 cursor-pointer text-left">Galerie</button></li>
+              <li><button onClick={() => handleNavClick('temoignages')} className="bg-transparent border-none p-0 cursor-pointer text-left">Avis clients</button></li>
+              <li><button onClick={() => handleNavClick('rdv')} className="bg-transparent border-none p-0 cursor-pointer text-left">Rendez-vous</button></li>
+              <li><Link to="/login" className="hover:text-white transition-colors">Portail Staff</Link></li>
+            </ul>
+          </div>
+          <div className="footer-col">
+            <h4>Contact</h4>
+            <ul>
+              <li><a href="https://maps.google.com/?q=Okedama+Parakou+Benin" target="_blank" rel="noreferrer">Okedama, Parakou</a></li>
+              <li><a href="tel:+2290192629860">+229 01 92 62 98 60</a></li>
+              <li><a href="mailto:k29296028@gmail.com">k29296028@gmail.com</a></li>
+              <li className="mt-4"><a href="https://wa.me/2290192629860" className="text-[#25D366] font-semibold flex items-center gap-2"><WhatsAppIcon className="w-4 h-4" /> WhatsApp</a></li>
+            </ul>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <span className="footer-copy">© 2026 Luxury Élégance Garage de Parakou</span>
+          <span className="footer-motto">Excellence · Confiance · Expertise</span>
+        </div>
       </footer>
+
     </div>
   );
 };
