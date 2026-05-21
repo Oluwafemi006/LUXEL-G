@@ -179,6 +179,7 @@ EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'k29296028@gmail.com')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '') 
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'LUXEL-G <k29296028@gmail.com>')
+DEV_EXPOSE_OTP = os.getenv('DEV_EXPOSE_OTP', 'False') == 'True'
 
 JAZZMIN_SETTINGS = {
     "site_title": "LUXEL-G Admin",
@@ -245,4 +246,3 @@ JAZZMIN_UI_TWEAKS = {
         "success": "btn-success"
     }
 }
-

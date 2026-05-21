@@ -14,6 +14,7 @@ from decimal import Decimal
 from django.contrib.auth.models import User
 from django.core.mail import EmailMessage
 from django.db import transaction
+from django.conf import settings
 
 from .utils import generate_document_pdf
 from .models import Client, Vehicule, Reparation, Stock, Facture, LigneTravail, LignePiece, MouvementCaisse, Devis, MaintenancePredictive, Appointment, NotificationClient, Avis, NotificationStaff, MouvementStock
@@ -465,17 +466,18 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         print(f"\n=== [DEV] CODE DE CONNEXION OTP POUR {client.prenoms} {client.nom} ({phone}) : {code} ===\n")
         from .models import ClientOTP
         ClientOTP.objects.create(client=client, code=code)
+        dev_otp_suffix = f" Code test : {code}" if settings.DEV_EXPOSE_OTP else ""
         
         try:
             subject = f"Votre code de connexion LUXEL-G : {code}"
             body = f"Bonjour {client.nom} {client.prenoms},\n\nVotre code de connexion pour l'espace client est : {code}\n\nCe code est valide pendant 10 minutes.\n\nCordialement,\nL'équipe LUXEL-G"
             email = EmailMessage(subject, body, to=[client.email])
             email.send()
-            return Response({'message': 'Code envoyé par email.'})
+            return Response({'message': f'Code envoyé par email.{dev_otp_suffix}'})
         except Exception as e:
             print(f"\n[WARNING] Échec de l'envoi de l'e-mail : {str(e)}\n")
             return Response({
-                'message': 'Code généré ! (L\'envoi de l\'e-mail a échoué, veuillez récupérer le code dans la console du serveur Django).'
+                'message': f"Code généré ! L'envoi de l'e-mail a échoué.{dev_otp_suffix or ' Veuillez récupérer le code dans la console du serveur Django.'}"
             }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'])
