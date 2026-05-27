@@ -85,7 +85,7 @@ interface Maintenance {
 }
 
 const ClientSpace: React.FC = () => {
-  const [phone, setPhone] = useState('');
+  const [identifier, setIdentifier] = useState(''); // email ou téléphone
   const [otp, setOtp] = useState('');
   const [view, setView] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [otpStep, setOtpStep] = useState<'PHONE' | 'OTP'>('PHONE');
@@ -94,6 +94,9 @@ const ClientSpace: React.FC = () => {
   const [error, setError] = useState('');
   const [clientData, setClientData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'VEHICLES' | 'REPAIRS' | 'INVOICES' | 'APPOINTMENTS' | 'PROFILE'>('OVERVIEW');
+
+  // Détection automatique du type d'identifiant
+  const isEmailInput = identifier.includes('@');
 
   // État pour la photo de profil
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
@@ -189,12 +192,12 @@ const ClientSpace: React.FC = () => {
 
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone) return;
+    if (!identifier) return;
 
     setLoading(true);
     setError('');
     try {
-      const response = await api.post('client-space/request_otp/', { phone });
+      const response = await api.post('client-space/request_otp/', { identifier });
       setOtpStep('OTP');
       alert(response.data.message);
     } catch (err: any) {
@@ -211,7 +214,7 @@ const ClientSpace: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.post('client-space/verify_otp/', { phone, code: otp });
+      const response = await api.post('client-space/verify_otp/', { identifier, code: otp });
       localStorage.setItem('access_token', response.data.access);
       localStorage.setItem('refresh_token', response.data.refresh);
       fetchClientData();
@@ -229,6 +232,7 @@ const ClientSpace: React.FC = () => {
     setClientData(null);
     setOtpStep('PHONE');
     setOtp('');
+    setIdentifier('');
   };
 
   const handleAvisSubmit = async (e: React.FormEvent) => {
@@ -273,7 +277,7 @@ const ClientSpace: React.FC = () => {
     setError('');
     try {
       await api.post('client-space/register/', registerData);
-      setPhone(registerData.contact);
+      setIdentifier(registerData.contact);
       setView('LOGIN');
       setOtpStep('PHONE');
       alert('Compte créé avec succès. Veuillez vous connecter.');
@@ -355,18 +359,35 @@ const ClientSpace: React.FC = () => {
             otpStep === 'PHONE' ? (
               <form onSubmit={handleRequestOTP} className="space-y-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest ml-1">Numéro de Téléphone</label>
+                  {/* Label dynamique */}
+                  <div className="flex items-center justify-between ml-1">
+                    <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest">
+                      {isEmailInput ? 'Adresse Email' : 'Téléphone ou Email'}
+                    </label>
+                    {isEmailInput && (
+                      <span className="text-[9px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                        ✓ Email détecté
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
-                    <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                    {isEmailInput
+                      ? <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 w-4 h-4" />
+                      : <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                    }
                     <input 
-                      type="tel" 
+                      type={isEmailInput ? 'email' : 'text'}
                       required 
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
                       className="w-full pl-12 pr-4 py-3.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-sm transition-all"
-                      placeholder="Ex: 0102030405"
+                      placeholder="Téléphone (0101020304) ou Email"
                     />
                   </div>
+                  <p className="text-[9px] text-slate-400 font-medium ml-1">
+                    📧 Email → vous recevrez le code par email<br/>
+                    📱 Téléphone → le code sera envoyé à l'email lié à votre compte
+                  </p>
                 </div>
                 {error && (
                    <div className="p-3 bg-rose-50 border border-rose-100 rounded-md flex items-center gap-2">
@@ -379,7 +400,7 @@ const ClientSpace: React.FC = () => {
                   className="w-full py-4 bg-slate-900 text-white rounded-md font-bebas tracking-widest text-lg hover:bg-emerald-600 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {loading ? <Clock className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
-                  <span>{loading ? 'Recherche...' : 'Continuer'}</span>
+                  <span>{loading ? 'Recherche...' : 'Recevoir le code'}</span>
                 </button>
                 <div className="text-center">
                    <button type="button" onClick={() => setView('REGISTER')} className="text-[10px] font-bold text-emerald-600 hover:text-slate-900 uppercase tracking-widest">Nouveau client ? Créer un compte</button>
@@ -416,7 +437,7 @@ const ClientSpace: React.FC = () => {
                   <span>{loading ? 'Vérification...' : 'Se connecter'}</span>
                 </button>
                 <div className="text-center">
-                   <button type="button" onClick={() => setOtpStep('PHONE')} className="text-[10px] font-bold text-slate-400 hover:text-emerald-600 uppercase tracking-widest">Modifier le numéro</button>
+                   <button type="button" onClick={() => { setOtpStep('PHONE'); setOtp(''); }} className="text-[10px] font-bold text-slate-400 hover:text-emerald-600 uppercase tracking-widest">Modifier l'identifiant</button>
                 </div>
               </form>
             )

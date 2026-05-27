@@ -13,7 +13,7 @@ import {
   Smartphone,
   Info
 } from 'lucide-react';
-import api from '../services/api';
+import api, { fetchAllPages } from '../services/api';
 import ClientForm from '../components/forms/ClientForm';
 import VehicleForm from '../components/forms/VehicleForm';
 import RepairForm from '../components/forms/RepairForm';
@@ -100,8 +100,7 @@ const Reception: React.FC = () => {
   const fetchClients = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const response = await api.get('clients/');
-      setClients(response.data);
+      setClients(await fetchAllPages<Client>('clients/'));
     } catch (error) {
       console.error('Erreur chargement clients:', error);
     } finally {
@@ -172,9 +171,9 @@ const Reception: React.FC = () => {
   };
 
   const filteredClients = clients.filter(c => 
-    c.nom.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    c.prenoms.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.contact.includes(searchQuery)
+    (c.nom || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (c.prenoms || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.contact || "").includes(searchQuery)
   );
 
   return (
@@ -259,7 +258,7 @@ const Reception: React.FC = () => {
                       className="p-6 rounded-xl border border-emerald-100/30 bg-white hover:bg-emerald-50/30 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-900/5 cursor-pointer transition-all duration-700 flex items-center gap-6 group"
                     >
                       <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 font-black text-2xl group-hover:bg-emerald-600 group-hover:text-white group-hover:rotate-3 shadow-inner transition-all duration-700 uppercase">
-                        {c.nom[0]}
+                        {(c.nom || "?")[0]}
                       </div>
                       <div className="flex-1">
                         <p className="font-black text-slate-900 uppercase tracking-tight text-lg group-hover:text-emerald-700 transition-colors duration-500">{c.nom} {c.prenoms}</p>

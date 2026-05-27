@@ -1,9 +1,187 @@
 import io
+import os
+from django.conf import settings
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable, Image
 from reportlab.lib.units import cm
+
+
+def get_logo_image(width=4*cm):
+    """Utility to get the logo image object if it exists."""
+    logo_path = os.path.join(settings.BASE_DIR.parent, 'logo.png')
+    if os.path.exists(logo_path):
+        # Image maintains aspect ratio if only width or height is provided
+        img = Image(logo_path)
+        aspect = img.imageHeight / img.imageWidth
+        img.drawHeight = width * aspect
+        img.drawWidth = width
+        return img
+    return None
+
+
+def generate_fiche_reception_pdf(reparation):
+    """
+    M5 — Génère le PDF de la fiche de réception d'un véhicule,
+    fidèle au document papier existant du garage LUXEL-G.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=1.5*cm, leftMargin=1.5*cm,
+        topMargin=1.5*cm, bottomMargin=1.5*cm
+    )
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Styles personnalisés
+    bold = ParagraphStyle('Bold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9)
+    normal = ParagraphStyle('Norm', parent=styles['Normal'], fontSize=9)
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=16,
+                                  textColor=colors.HexColor('#0056b3'), alignment=1)
+    small = ParagraphStyle('Small', parent=styles['Normal'], fontSize=8)
+
+    # ── EN-TÊTE ────────────────────────────────────────────────
+    logo = get_logo_image(width=2.5*cm)
+    company_info = Paragraph('<b>LUXURY ÉLÉGANCE GARAGE</b><br/>Quartier Okedama, von hôpital Ahmadiyya<br/>Parakou, Bénin<br/>Tél : +229 01 92 62 98 60<br/>IFU : 3202487942483 | RCCM : RB/PKO/24B 1195', small)
+    
+    header_data = [[
+        [logo, company_info] if logo else company_info,
+        Paragraph('FICHE DE RÉCEPTION VÉHICULE', title_style),
+        Paragraph(f'<b>N° OR :</b> {reparation.numero_or or f"OR-{reparation.id}"}<br/>'
+                  f'<b>Date :</b> {reparation.date_creation.strftime("%d/%m/%Y %H:%M")}<br/>'
+                  f'<b>Statut :</b> {reparation.get_statut_display()}', normal),
+    ]]
+    header_table = Table(header_data, colWidths=[6.5*cm, 7.5*cm, 5*cm])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#0056b3')),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f0f4f8')),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('LEFTPADDING', (0, 0), (0, 0), 10),
+    ]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 0.4*cm))
+
+    # ── INFOS CLIENT & VÉHICULE ────────────────────────────────
+    client = reparation.vehicule.client
+    vehicule = reparation.vehicule
+    cv_data = [
+        [Paragraph('<b>INFORMATIONS CLIENT</b>', bold), Paragraph('<b>INFORMATIONS VÉHICULE</b>', bold)],
+        [Paragraph(f'<b>Nom :</b> {client.nom} {client.prenoms}', normal),
+         Paragraph(f'<b>Marque / Modèle :</b> {vehicule.marque} {vehicule.modele}', normal)],
+        [Paragraph(f'<b>Contact :</b> {client.contact}', normal),
+         Paragraph(f'<b>Immatriculation :</b> {vehicule.immatriculation}', normal)],
+        [Paragraph(f'<b>Conducteur :</b> {client.contact_conducteur or "—"}', normal),
+         Paragraph(f'<b>Couleur :</b> {vehicule.couleur or "—"}', normal)],
+        [Paragraph(f'<b>Adresse :</b> {client.adresse or "—"}', normal),
+         Paragraph(f'<b>VIN :</b> {vehicule.vin or "—"}', normal)],
+    ]
+    cv_table = Table(cv_data, colWidths=[9.25*cm, 9.25*cm])
+    cv_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0056b3')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('SPAN', (0, 0), (0, 0)),
+    ]))
+    elements.append(cv_table)
+    elements.append(Spacer(1, 0.3*cm))
+
+    # ── ÉTAT VÉHICULE À LA RÉCEPTION ──────────────────────────
+    niv_carburant = reparation.niveau_carburant or '—'
+    date_sortie = reparation.date_fin_estimee.strftime('%d/%m/%Y') if reparation.date_fin_estimee else '—'
+    etat_data = [
+        [Paragraph('<b>ÉTAT À LA RÉCEPTION</b>', bold), '', '', ''],
+        [Paragraph(f'<b>Kilométrage :</b> {reparation.kilometrage:,} km', normal),
+         Paragraph(f'<b>Niveau carburant :</b> {niv_carburant}', normal),
+         Paragraph(f'<b>Date sortie prévue :</b> {date_sortie}', normal),
+         Paragraph(f'<b>Priorité :</b> {reparation.get_priorite_display()}', normal)],
+    ]
+    etat_table = Table(etat_data, colWidths=[4.6*cm, 4.6*cm, 4.6*cm, 4.6*cm])
+    etat_table.setStyle(TableStyle([
+        ('SPAN', (0, 0), (-1, 0)),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0056b3')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    elements.append(etat_table)
+    elements.append(Spacer(1, 0.3*cm))
+
+    # ── PIÈCES À BORD ─────────────────────────────────────────
+    PIECES_BORD = ['Livret', 'Cric', 'Extincteur', 'Tapis', 'Double clé',
+                   'Assurance', 'TVM', 'Visite technique', 'Clé de roue', 'Pneu secours', 'Batterie']
+
+    def case(label):
+        return Paragraph(f'☐ {label}', small)
+
+    pieces_rows = [[Paragraph('<b>PIÈCES À BORD</b>', bold)] + [''] * (len(PIECES_BORD) - 1)]
+    row = [case(p) for p in PIECES_BORD]
+    pieces_rows.append(row)
+    col_w = 18.5 / len(PIECES_BORD)
+    pieces_table = Table(pieces_rows, colWidths=[col_w*cm] * len(PIECES_BORD))
+    pieces_table.setStyle(TableStyle([
+        ('SPAN', (0, 0), (-1, 0)),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0056b3')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(pieces_table)
+    elements.append(Spacer(1, 0.3*cm))
+
+    # ── SYMPTÔMES & TRAVAUX DEMANDÉS ──────────────────────────
+    symptomes_data = [
+        [Paragraph('<b>SYMPTÔMES / DÉFAUTS SIGNALÉS</b>', bold),
+         Paragraph('<b>TRAVAUX DEMANDÉS</b>', bold)],
+        [Paragraph(reparation.description or '—', normal),
+         Paragraph(reparation.categorie or '—', normal)],
+    ]
+    symptomes_table = Table(symptomes_data, colWidths=[9.25*cm, 9.25*cm])
+    symptomes_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0056b3')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 30),  # Espace pour écriture manuelle
+    ]))
+    elements.append(symptomes_table)
+    elements.append(Spacer(1, 0.5*cm))
+
+    # ── SIGNATURES ────────────────────────────────────────────
+    sig_data = [[
+        Paragraph('<b>Signature du client</b><br/><br/><br/><br/>________________________', normal),
+        Paragraph('<b>Signature du réceptionniste</b><br/><br/><br/><br/>________________________', normal),
+        Paragraph('<b>Cachet du garage</b><br/><br/><br/><br/>________________________', normal),
+    ]]
+    sig_table = Table(sig_data, colWidths=[6.2*cm, 6.2*cm, 6.1*cm])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('BOX', (0, 0), (-1, -1), 0.3, colors.grey),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+    ]))
+    elements.append(sig_table)
+
+    # ── PIED DE PAGE ──────────────────────────────────────────
+    elements.append(Spacer(1, 0.3*cm))
+    elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#0056b3')))
+    elements.append(Paragraph(
+        '<i>« Notre professionnalisme fait la différence » — Luxury Élégance Garage, Parakou, Bénin</i>',
+        ParagraphStyle('Footer', parent=styles['Normal'], fontSize=7, alignment=1, textColor=colors.grey)
+    ))
+
+    doc.build(elements)
+    pdf = buffer.getvalue()
+    buffer.close()
+    return pdf
 
 def generate_document_pdf(obj, doc_type="FACTURE"):
     buffer = io.BytesIO()
@@ -16,15 +194,38 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
     style_label = ParagraphStyle('LabelStyle', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold')
     style_value = ParagraphStyle('ValueStyle', parent=styles['Normal'], fontSize=10)
 
-    # 1. Header (Company Info)
-    elements.append(Paragraph("LUXEL-G", style_title))
-    elements.append(Paragraph("Luxury Elegance Garage", styles['Normal']))
-    elements.append(Paragraph("Expertise Automobile & Entretien", styles['Normal']))
-    elements.append(Spacer(1, 1*cm))
+    # 1. Header (Logo & Company Info)
+    logo = get_logo_image(width=4.5*cm)
+    company_details = Paragraph(
+        '<b>LUXURY ÉLÉGANCE GARAGE</b><br/>'
+        'Expertise Automobile & Entretien<br/>'
+        'Quartier Okedama, Parakou, Bénin<br/>'
+        'Tél : +229 01 92 62 98 60<br/>'
+        'IFU : 3202487942483',
+        ParagraphStyle('CompanyInfo', parent=styles['Normal'], fontSize=10, leading=14, alignment=2)
+    )
+    
+    header_data = [[logo if logo else "", company_details]]
+    header_table = Table(header_data, colWidths=[8.5*cm, 8.5*cm])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+    ]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 0.5*cm))
 
     # 2. Document Info
     doc_number = obj.numero_facture if doc_type == "FACTURE" else obj.numero_devis
-    doc_title = f"{doc_type} N° {doc_number or 'BROUILLON'}"
+    
+    # Label professionnel
+    display_type = doc_type
+    if doc_type == "DEVIS":
+        display_type = "PROFORMA"
+        if not doc_number:
+            doc_number = f"ESTIM-OR-{obj.reparation.id}"
+
+    doc_title = f"{display_type} N° {doc_number or 'BROUILLON'}"
     elements.append(Paragraph(doc_title, styles['Heading2']))
     elements.append(Paragraph(f"Date: {obj.date_creation.strftime('%d/%m/%Y')}", styles['Normal']))
     elements.append(Spacer(1, 1*cm))
@@ -51,14 +252,16 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
     # 4. Items Table (Parts & Labor)
     items_data = [["DESCRIPTION", "QTÉ", "P.U (FCFA)", "TOTAL (FCFA)"]]
     
-    # Labor
+    # Labor - Filtrage des lignes vides
     for t in obj.reparation.travaux.all():
-        items_data.append([t.description, "1", f"{t.montant:,.0f}", f"{t.montant:,.0f}"])
+        if t.description.strip() and t.montant > 0:
+            items_data.append([t.description, "1", f"{t.montant:,.0f}".replace(',', ' '), f"{t.montant:,.0f}".replace(',', ' ')])
     
-    # Parts
+    # Parts - Filtrage des lignes vides
     for p in obj.reparation.pieces.all():
-        total_p = p.quantite * p.prix_unitaire
-        items_data.append([p.description, str(p.quantite), f"{p.prix_unitaire:,.0f}", f"{total_p:,.0f}"])
+        if p.description.strip() and p.prix_unitaire > 0:
+            total_p = p.quantite * p.prix_unitaire
+            items_data.append([p.description, str(p.quantite), f"{p.prix_unitaire:,.0f}".replace(',', ' '), f"{total_p:,.0f}".replace(',', ' ')])
 
     items_table = Table(items_data, colWidths=[9*cm, 2*cm, 3*cm, 3*cm])
     items_table.setStyle(TableStyle([
@@ -66,6 +269,7 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
         ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor("#0056b3")),
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
+        ('ALIGN', (2,0), (3,-1), 'RIGHT'),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
         ('BOTTOMPADDING', (0,0), (-1,-1), 8),
         ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
@@ -75,15 +279,15 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
 
     # 5. Totals
     total_data = [
-        ["", "", "TOTAL HT:", f"{obj.total_ht:,.0f} FCFA"],
-        ["", "", "TVA (0%):", "0 FCFA"],
-        ["", "", "TOTAL TTC:", f"{obj.total_ttc:,.0f} FCFA"],
+        ["", "", "TOTAL HT:", f"{obj.total_ht:,.0f}".replace(',', ' ') + " F"],
+        ["", "", "TVA (0%):", "0 F"],
+        ["", "", "TOTAL TTC:", f"{obj.total_ttc:,.0f}".replace(',', ' ') + " F"],
     ]
     
     if doc_type == "FACTURE":
-        total_data.append(["", "", "MONTANT PAYÉ:", f"{obj.montant_paye:,.0f} FCFA"])
+        total_data.append(["", "", "MONTANT PAYÉ:", f"{obj.montant_paye:,.0f}".replace(',', ' ') + " F"])
         reste = obj.total_ttc - obj.montant_paye
-        total_data.append(["", "", "RESTE À PAYER:", f"{reste:,.0f} FCFA"])
+        total_data.append(["", "", "RESTE À PAYER:", f"{reste:,.0f}".replace(',', ' ') + " F"])
 
     total_table = Table(total_data, colWidths=[9*cm, 2*cm, 3*cm, 3*cm])
     total_table.setStyle(TableStyle([

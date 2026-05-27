@@ -15,7 +15,7 @@ import {
   LayoutList,
   CalendarDays
 } from 'lucide-react';
-import api from '../services/api';
+import api, { fetchAllPages } from '../services/api';
 
 interface Appointment {
   id: number;
@@ -36,8 +36,7 @@ const Appointments: React.FC = () => {
   const fetchAppointments = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const response = await api.get('appointments/');
-      setAppointments(response.data);
+      setAppointments(await fetchAllPages<Appointment>('appointments/'));
     } catch (error) {
       console.error('Erreur RDV:', error);
     } finally {

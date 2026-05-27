@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 
 const DEFAULT_API_BASE_URL = 'http://localhost:8000/api/';
 
@@ -27,6 +28,31 @@ const api = axios.create({
   },
 });
 
+export const fetchAllPages = async <T>(url: string, config: AxiosRequestConfig = {}): Promise<T[]> => {
+  const separator = url.includes('?') ? '&' : '?';
+  let nextUrl: string | null = `${url}${separator}page_size=500`;
+  const items: T[] = [];
+
+  while (nextUrl) {
+    const requestUrl = nextUrl;
+    const response: AxiosResponse<T[] | { results?: T[]; next?: string | null }> = await api.get(requestUrl, config);
+    if (Array.isArray(response.data)) {
+      items.push(...response.data);
+      nextUrl = null;
+    } else {
+      items.push(...(response.data.results ?? []));
+      nextUrl = response.data.next ?? null;
+      if (nextUrl) {
+        nextUrl = nextUrl.startsWith(API_BASE_URL)
+          ? nextUrl.slice(API_BASE_URL.length)
+          : nextUrl;
+      }
+    }
+  }
+
+  return items;
+};
+
 // Intercepteur pour ajouter le token JWT
 api.interceptors.request.use(
   (config) => {
@@ -44,6 +70,12 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    
+    // Ignorer les requêtes d'authentification pour éviter les boucles de redirection
+    if (originalRequest.url?.includes('token/')) {
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem('refresh_token');

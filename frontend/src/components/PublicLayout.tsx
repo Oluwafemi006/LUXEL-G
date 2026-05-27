@@ -143,10 +143,10 @@ const PublicLayout: React.FC = () => {
       </a>
 
       {/* ─── FOOTER ─── */}
-      <footer className="bg-[var(--color-green)] text-white">
+      <footer style={{ background: 'linear-gradient(135deg, #2D7A47 0%, #1F5C35 60%, #174D2C 100%)' }} className="text-white">
         <div className="footer-top">
           <div>
-            <img src={logoImg} alt="Luxury Élégance Garage" className="footer-logo" />
+            <img src={logoImg} alt="Luxury Elegance Garage" className="footer-logo" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.25)) brightness(1.1)' }} />
             <p className="footer-desc">L'excellence automobile au cœur du Bénin. Rigueur, expertise et professionnalisme.</p>
           </div>
           <div className="footer-col">

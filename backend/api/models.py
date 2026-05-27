@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-
+from django.core.validators import MinValueValidator
 class UserProfile(models.Model):
     ROLE_CHOICES = [
         ('DIRECTEUR', 'Directeur'),
@@ -17,7 +17,7 @@ class Client(models.Model):
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='client_profile')
     nom = models.CharField(max_length=100)
     prenoms = models.CharField(max_length=200)
-    contact = models.CharField(max_length=20)
+    contact = models.CharField(max_length=20, unique=True)
     contact_conducteur = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     adresse = models.TextField()
@@ -52,6 +52,8 @@ class Reparation(models.Model):
         ('NORMALE', 'Normale'),
         ('URGENTE', 'Urgente'),
     ]
+    # M1 — Numéro OR séquentiel unique (format OR-0001), généré automatiquement à la création
+    numero_or = models.CharField(max_length=10, unique=True, blank=True, null=True, verbose_name="N° Ordre de Réparation")
     vehicule = models.ForeignKey(Vehicule, on_delete=models.PROTECT, related_name='reparations')
     categorie = models.CharField(max_length=100)
     description = models.TextField()
@@ -60,15 +62,26 @@ class Reparation(models.Model):
     progression = models.IntegerField(default=0)
     technicien = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     
-    # Nouveaux champs pour la réception
+    # Champs pour la réception
     kilometrage = models.IntegerField(default=0)
     niveau_carburant = models.CharField(max_length=50, blank=True, null=True)
     
     date_creation = models.DateTimeField(auto_now_add=True)
     date_fin_estimee = models.DateTimeField(null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        """M1 — Génère automatiquement un numéro OR unique à la première sauvegarde."""
+        if not self.numero_or:
+            if self.pk:
+                self.numero_or = f"OR-{self.pk:04d}"
+            else:
+                super().save(*args, **kwargs)
+                self.numero_or = f"OR-{self.pk:04d}"
+                return super().save(update_fields=['numero_or'])
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"OR-{self.id} | {self.vehicule.immatriculation}"
+        return f"{self.numero_or or f'OR-{self.id}'} | {self.vehicule.immatriculation}"
 
 class LigneTravail(models.Model):
     reparation = models.ForeignKey(Reparation, on_delete=models.PROTECT, related_name='travaux')
@@ -114,16 +127,24 @@ class Facture(models.Model):
     tva = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_ttc = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     
-    # Nouveaux champs pour le suivi financier
+    # Suivi financier
     montant_paye = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     statut_paiement = models.CharField(max_length=20, choices=STATUT_PAIEMENT_CHOICES, default='NON_PAYE')
     mode_paiement = models.CharField(max_length=20, choices=MODE_PAIEMENT_CHOICES, blank=True, null=True)
-    
+
+    # M2 — Champs de traçabilité paiement (requis par le CDC)
+    numero_cheque = models.CharField(max_length=50, blank=True, null=True, verbose_name="N° de chèque")
+    reference_virement = models.CharField(max_length=100, blank=True, null=True, verbose_name="Référence virement")
+
     date_creation = models.DateTimeField(auto_now_add=True)
     date_validation = models.DateTimeField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
-        if self.total_ttc <= 0:
+        # M4 — Ne pas forcer SOLDE automatiquement sur total = 0.
+        # Le statut est géré explicitement par enregistrer_paiement().
+        # Seule exception : les factures de référence créées avec total_ttc = 0
+        # ET montant_paye = 0 (cas de services offerts grâce à une création manuelle admin).
+        if self.total_ttc <= 0 and self.montant_paye <= 0 and self.pk is None:
             self.statut_paiement = 'SOLDE'
         super().save(*args, **kwargs)
 
@@ -175,9 +196,9 @@ class Stock(models.Model):
     nom = models.CharField(max_length=200)
     sku = models.CharField(max_length=50, unique=True)
     categorie = models.CharField(max_length=100)
-    quantite = models.IntegerField(default=0) # Stock Physique Actuel
-    stock_initial = models.IntegerField(default=0) # Au début de la période/mois
-    seuil_alerte = models.IntegerField(default=10)
+    quantite = models.IntegerField(default=0, validators=[MinValueValidator(0)]) # Stock Physique Actuel
+    stock_initial = models.IntegerField(default=0, validators=[MinValueValidator(0)]) # Au début de la période/mois
+    seuil_alerte = models.IntegerField(default=10, validators=[MinValueValidator(0)])
     prix_achat = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2)
     emplacement = models.CharField(max_length=50, blank=True, null=True)

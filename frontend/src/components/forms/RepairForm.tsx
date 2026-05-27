@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Car, Wrench, Gauge, Droplets, User, X, CheckCircle2 } from 'lucide-react';
-import api from '../../services/api';
+import { fetchAllPages } from '../../services/api';
 
 interface Vehicle {
   id: number;
@@ -37,12 +37,12 @@ const RepairForm: React.FC<RepairFormProps> = ({ onSubmit, onCancel, initialVehi
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [vRes, uRes] = await Promise.all([
-          api.get('vehicules/'),
-          api.get('users/')
+        const [vehiclesData, usersData] = await Promise.all([
+          fetchAllPages<Vehicle>('vehicules/'),
+          fetchAllPages<UserType>('users/')
         ]);
-        setVehicles(vRes.data);
-        setUsers(uRes.data);
+        setVehicles(vehiclesData);
+        setUsers(usersData);
       } catch (error) {
         console.error('Erreur lors du chargement des données:', error);
       }

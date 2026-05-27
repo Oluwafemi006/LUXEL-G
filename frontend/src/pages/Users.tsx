@@ -7,7 +7,7 @@ import {
   Search,
   UserPlus
 } from 'lucide-react';
-import api from '../services/api';
+import api, { fetchAllPages } from '../services/api';
 import Modal from '../components/Modal';
 
 interface User {
@@ -39,8 +39,7 @@ const Users: React.FC = () => {
   const fetchUsers = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const response = await api.get('users/');
-      setUsers(response.data);
+      setUsers(await fetchAllPages<User>('users/'));
     } catch (error) {
       console.error('Erreur chargement utilisateurs:', error);
     } finally {

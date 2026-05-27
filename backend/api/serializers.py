@@ -143,11 +143,17 @@ class UserSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        if not ret.get('role'):
-            if instance.is_superuser:
-                ret['role'] = 'DIRECTEUR'
-            else:
-                ret['role'] = 'SECRETAIRE'
+        
+        # Déterminer le rôle de manière plus précise
+        if hasattr(instance, 'profile'):
+            ret['role'] = instance.profile.role
+        elif hasattr(instance, 'client_profile'):
+            ret['role'] = 'CLIENT'
+        elif instance.is_superuser:
+            ret['role'] = 'DIRECTEUR'
+        else:
+            ret['role'] = 'UTILISATEUR' # Cas par défaut pour les autres types de comptes
+            
         return ret
 
     def create(self, validated_data):

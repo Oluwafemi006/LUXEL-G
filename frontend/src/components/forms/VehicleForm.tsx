@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Car, User, Calendar, Settings, ShieldCheck, X, CheckCircle2 } from 'lucide-react';
-import api from '../../services/api';
+import { fetchAllPages } from '../../services/api';
 
 interface Client {
   id: number;
@@ -30,8 +30,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, onCancel, initialCl
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const response = await api.get('clients/');
-        setClients(response.data);
+        setClients(await fetchAllPages<Client>('clients/'));
       } catch (error) {
         console.error('Erreur lors du chargement des clients:', error);
       }

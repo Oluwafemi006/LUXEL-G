@@ -13,6 +13,7 @@ import {
   Warehouse,
   ArrowUpRight,
   ArrowDownLeft,
+  ArrowLeft,
   RefreshCcw,
   FileSpreadsheet,
   CheckCircle2,
@@ -20,7 +21,7 @@ import {
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import StockForm from '../components/forms/StockForm';
-import api from '../services/api';
+import api, { fetchAllPages } from '../services/api';
 
 interface StockItem {
   id: number;
@@ -48,6 +49,7 @@ const Stock: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
+  const [showDetailMobile, setShowDetailMobile] = useState(false);
 
   // Form states
   const [restockData, setRestockData] = useState({ quantite: '', prix_achat_total: '', description: '' });
@@ -56,13 +58,12 @@ const Stock: React.FC = () => {
   const fetchStock = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const response = await api.get('stock/');
-      const data = Array.isArray(response.data) ? response.data : [];
+      const data = await fetchAllPages<StockItem>('stock/');
       setStock(data);
       if (data.length > 0 && !selectedItem) {
         setSelectedItem(data[0]);
       } else if (selectedItem) {
-        const updated = data.find(i => i.id === selectedItem.id);
+        const updated = data.find((i: any) => i.id === selectedItem.id);
         if (updated) setSelectedItem(updated);
       }
     } catch (error) {
@@ -79,9 +80,14 @@ const Stock: React.FC = () => {
   const handleRestock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItem || !restockData.quantite || !restockData.prix_achat_total) return;
+    const qty = parseInt(restockData.quantite);
+    if (qty <= 0) {
+      alert('La quantité à réapprovisionner doit être supérieure à zéro.');
+      return;
+    }
     try {
       await api.post(`stock/${selectedItem.id}/approvisionner/`, {
-        quantite: parseInt(restockData.quantite),
+        quantite: qty,
         prix_achat_total: parseFloat(restockData.prix_achat_total),
         description: restockData.description
       });
@@ -95,10 +101,15 @@ const Stock: React.FC = () => {
 
   const handleAdjust = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedItem || !adjustData.quantite_physique) return;
+    if (!selectedItem || adjustData.quantite_physique === '') return;
+    const qty = parseInt(adjustData.quantite_physique);
+    if (qty < 0) {
+      alert('La quantité physique ne peut pas être négative.');
+      return;
+    }
     try {
       await api.post(`stock/${selectedItem.id}/ajuster_inventaire/`, {
-        quantite_physique: parseInt(adjustData.quantite_physique)
+        quantite_physique: qty
       });
       setIsAdjustModalOpen(false);
       setAdjustData({ quantite_physique: '' });
@@ -133,13 +144,13 @@ const Stock: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-10 pb-20 animate-in fade-in duration-1000">
       {/* Header Luxury */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 px-4 lg:px-0">
         <div className="space-y-4">
           <div className="flex items-center gap-3">
              <div className="h-1 w-8 bg-emerald-500 rounded-full"></div>
              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Opérations Inventaire</p>
           </div>
-          <h1 className="text-6xl font-black text-slate-900 italic tracking-tighter leading-none">Stock & Logistique.</h1>
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 italic tracking-tighter leading-none">Stock & Logistique.</h1>
         </div>
         <div className="flex flex-wrap gap-4">
           <button 
@@ -166,9 +177,9 @@ const Stock: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-10">
+      <div className="grid grid-cols-12 gap-6 lg:gap-10">
         {/* Liste des Articles (Style Luxury) */}
-        <div className="col-span-12 lg:col-span-4 space-y-6">
+        <div className={`col-span-12 lg:col-span-4 space-y-6 ${showDetailMobile ? 'hidden lg:block' : 'block'}`}>
           <div className="card-luxury p-6 bg-white transition-all duration-1000 hover:shadow-emerald-500/10">
             <div className="relative group">
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors duration-700 w-4 h-4" />
@@ -182,7 +193,7 @@ const Stock: React.FC = () => {
             </div>
           </div>
           
-          <div className="space-y-4 max-h-[calc(100vh-350px)] overflow-y-auto no-scrollbar pr-2">
+          <div className="space-y-4 max-h-[calc(100vh-350px)] lg:max-h-[calc(100vh-350px)] overflow-y-auto no-scrollbar pr-2 pb-10 lg:pb-0">
             {loading ? (
               <div className="p-12 text-center flex flex-col items-center gap-6">
                 <div className="w-12 h-12 border-4 border-emerald-50 border-t-emerald-600 rounded-full animate-spin"></div>
@@ -196,7 +207,7 @@ const Stock: React.FC = () => {
             ) : filteredStock.map((item) => (
               <div 
                 key={item.id} 
-                onClick={() => setSelectedItem(item)} 
+                onClick={() => { setSelectedItem(item); setShowDetailMobile(true); }} 
                 className={`card-luxury p-6 cursor-pointer flex items-center gap-5 group relative overflow-hidden transition-all duration-700 ${selectedItem?.id === item.id ? 'border-emerald-600 ring-2 ring-emerald-500/20 translate-x-2' : ''} ${item.quantite < item.seuil_alerte ? 'bg-rose-50/50' : 'bg-white'}`}
               >
                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all duration-700 ${item.quantite < item.seuil_alerte ? 'bg-rose-100 text-rose-600 shadow-rose-200' : 'bg-slate-50 text-slate-400 group-hover:bg-emerald-600 group-hover:text-white group-hover:rotate-6'}`}>
@@ -217,47 +228,55 @@ const Stock: React.FC = () => {
         </div>
 
         {/* Détails Expert (Fiche Luxury) */}
-        <div className="col-span-12 lg:col-span-8">
+        <div className={`col-span-12 lg:col-span-8 ${showDetailMobile ? 'block' : 'hidden lg:block'}`}>
           {selectedItem ? (
-            <div className="space-y-8 animate-in slide-in-from-right-8 duration-1000">
+            <div className="space-y-8 animate-in slide-in-from-right-8 duration-1000 px-2 sm:px-0">
+              {/* Bouton Retour Mobile */}
+              <button 
+                onClick={() => setShowDetailMobile(false)}
+                className="lg:hidden flex items-center gap-2 mb-6 text-emerald-600 font-black text-[10px] uppercase tracking-widest bg-emerald-50 px-4 py-3 rounded-xl border border-emerald-100"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Retour à la liste
+              </button>
               {/* Header Fiche */}
-              <div className="card-luxury p-10 bg-white relative overflow-hidden group">
-                <div className="flex flex-col md:flex-row justify-between items-start gap-8 relative z-10">
-                  <div className="flex gap-10 items-center">
-                    <div className="w-28 h-28 rounded-xl bg-slate-900 text-white flex flex-col items-center justify-center shadow-2xl rotate-3 group-hover:rotate-0 group-hover:scale-105 transition-all duration-1000">
-                      <Package className="w-12 h-12 mb-1 text-emerald-400" />
+              <div className="card-luxury p-6 sm:p-10 bg-white relative overflow-hidden group">
+                <div className="flex flex-col xl:flex-row justify-between items-start gap-8 relative z-10">
+                  <div className="flex flex-col sm:flex-row gap-6 sm:gap-10 items-center sm:items-start xl:items-center w-full sm:w-auto">
+                    <div className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 rounded-xl bg-slate-900 text-white flex flex-col items-center justify-center shadow-2xl rotate-3 group-hover:rotate-0 group-hover:scale-105 transition-all duration-1000">
+                      <Package className="w-10 h-10 sm:w-12 sm:h-12 mb-1 text-emerald-400" />
                       <span className="text-[8px] font-black tracking-[0.4em] text-white uppercase">S/N</span>
                     </div>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <h2 className="text-5xl font-black text-slate-900 italic tracking-tighter uppercase transition-all duration-1000 group-hover:text-emerald-600">{selectedItem.nom}</h2>
-                        <div className="h-2 w-12 bg-emerald-500 rounded-full opacity-20 transition-all duration-1000 group-hover:w-20 group-hover:opacity-100"></div>
+                    <div className="space-y-4 text-center sm:text-left">
+                      <div className="flex flex-col sm:flex-row items-center gap-4">
+                        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 italic tracking-tighter uppercase transition-all duration-1000 group-hover:text-emerald-600">{selectedItem.nom}</h2>
+                        <div className="hidden sm:block h-2 w-12 bg-emerald-500 rounded-full opacity-20 transition-all duration-1000 group-hover:w-20 group-hover:opacity-100"></div>
                       </div>
-                      <div className="flex flex-wrap gap-4">
-                        <span className="flex items-center gap-2 text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-5 py-2.5 rounded-2xl shadow-sm uppercase tracking-widest transition-all duration-700 hover:bg-emerald-600 hover:text-white">
+                      <div className="flex flex-wrap justify-center sm:justify-start gap-3 sm:gap-4">
+                        <span className="flex items-center gap-2 text-[9px] sm:text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-4 sm:px-5 py-2 sm:py-2.5 rounded-2xl shadow-sm uppercase tracking-widest transition-all duration-700 hover:bg-emerald-600 hover:text-white">
                           <Tag className="w-3.5 h-3.5" />
                           SKU: {selectedItem.sku}
                         </span>
-                        <span className="flex items-center gap-2 text-[10px] font-black text-slate-500 bg-slate-50 border border-slate-100 px-5 py-2.5 rounded-2xl shadow-sm uppercase tracking-widest transition-all duration-700 hover:bg-slate-900 hover:text-white">
+                        <span className="flex items-center gap-2 text-[9px] sm:text-[10px] font-black text-slate-500 bg-slate-50 border border-slate-100 px-4 sm:px-5 py-2 sm:py-2.5 rounded-2xl shadow-sm uppercase tracking-widest transition-all duration-700 hover:bg-slate-900 hover:text-white">
                           <Layers className="w-3.5 h-3.5 text-emerald-500" />
                           {selectedItem.categorie.toUpperCase()}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-4 w-full md:w-auto">
+                  <div className="flex flex-col gap-4 w-full xl:w-auto">
                     <button 
                       onClick={() => setIsRestockModalOpen(true)} 
-                      className="btn-primary-luxury flex items-center justify-center gap-3 px-8 py-5 transition-all duration-700 hover:shadow-emerald-500/20 active:scale-95"
+                      className="btn-primary-luxury flex items-center justify-center gap-3 px-6 sm:px-8 py-4 sm:py-5 transition-all duration-700 hover:shadow-emerald-500/20 active:scale-95 text-xs sm:text-sm"
                     >
-                      <ShoppingCart className="w-5 h-5" />
+                      <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
                       <span>Réapprovisionner</span>
                     </button>
                     <button 
                       onClick={() => setIsAdjustModalOpen(true)} 
-                      className="flex items-center justify-center gap-3 px-8 py-5 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-emerald-700 transition-all duration-700 active:scale-95"
+                      className="flex items-center justify-center gap-3 px-6 sm:px-8 py-4 sm:py-5 bg-slate-900 text-white rounded-2xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest shadow-2xl hover:bg-emerald-700 transition-all duration-700 active:scale-95"
                     >
-                      <RefreshCcw className="w-5 h-5" />
+                      <RefreshCcw className="w-4 h-4 sm:w-5 sm:h-5" />
                       <span>Faire l'inventaire</span>
                     </button>
                   </div>
@@ -369,20 +388,20 @@ const Stock: React.FC = () => {
                    <div className="divide-y divide-emerald-50/50">
                       {selectedItem.mouvements && selectedItem.mouvements.length > 0 ? (
                         selectedItem.mouvements.slice(0, 10).map((mv) => (
-                          <div key={mv.id} className="p-6 flex items-center justify-between group hover:bg-emerald-50/20 transition-all duration-700">
-                             <div className="flex items-center gap-6">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-700 ${mv.type_mouvement === 'ENTREE' ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white' : mv.type_mouvement === 'SORTIE' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
-                                   {mv.type_mouvement === 'ENTREE' ? <ArrowUpRight className="w-6 h-6" /> : mv.type_mouvement === 'SORTIE' ? <ArrowDownLeft className="w-6 h-6" /> : <RefreshCcw className="w-6 h-6" />}
+                          <div key={mv.id} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group hover:bg-emerald-50/20 transition-all duration-700">
+                             <div className="flex items-center gap-4 sm:gap-6">
+                                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex-shrink-0 flex items-center justify-center transition-all duration-700 ${mv.type_mouvement === 'ENTREE' ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white' : mv.type_mouvement === 'SORTIE' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
+                                   {mv.type_mouvement === 'ENTREE' ? <ArrowUpRight className="w-5 h-5 sm:w-6 sm:h-6" /> : mv.type_mouvement === 'SORTIE' ? <ArrowDownLeft className="w-5 h-5 sm:w-6 sm:h-6" /> : <RefreshCcw className="w-5 h-5 sm:w-6 sm:h-6" />}
                                 </div>
-                                <div>
-                                   <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{mv.description || (mv.type_mouvement === 'ENTREE' ? 'Réassortiment' : 'Consommation Atelier')}</p>
-                                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                <div className="min-w-0">
+                                   <p className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-tight truncate">{mv.description || (mv.type_mouvement === 'ENTREE' ? 'Réassortiment' : 'Consommation Atelier')}</p>
+                                   <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                                      {new Date(mv.date_mouvement).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} • Par {mv.utilisateur_name || 'Système'}
                                    </p>
                                 </div>
                              </div>
-                             <div className="text-right">
-                                <p className={`text-lg font-black italic tracking-tighter ${mv.type_mouvement === 'ENTREE' ? 'text-emerald-600' : mv.type_mouvement === 'SORTIE' ? 'text-orange-600' : 'text-blue-600'}`}>
+                             <div className="w-full sm:w-auto text-right border-t sm:border-t-0 border-emerald-50/50 pt-2 sm:pt-0">
+                                <p className={`text-base sm:text-lg font-black italic tracking-tighter ${mv.type_mouvement === 'ENTREE' ? 'text-emerald-600' : mv.type_mouvement === 'SORTIE' ? 'text-orange-600' : 'text-blue-600'}`}>
                                    {mv.type_mouvement === 'ENTREE' ? '+' : mv.type_mouvement === 'SORTIE' ? '-' : ''}{mv.quantite}
                                 </p>
                              </div>
@@ -411,52 +430,52 @@ const Stock: React.FC = () => {
 
       {/* Modal Réapprovisionnement Luxury */}
       {isRestockModalOpen && selectedItem && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4 animate-in fade-in duration-700">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-2 sm:p-4 animate-in fade-in duration-700">
           <div className="bg-white rounded-xl w-full max-w-xl shadow-2xl border border-emerald-100/50 animate-in zoom-in-95 duration-1000 overflow-hidden relative">
-            <button onClick={() => setIsRestockModalOpen(false)} className="absolute top-8 right-8 text-slate-300 hover:text-rose-500 transition-all duration-700 hover:rotate-90"><XCircle className="w-7 h-7" /></button>
-            <form onSubmit={handleRestock} className="p-12 space-y-12">
+            <button onClick={() => setIsRestockModalOpen(false)} className="absolute top-4 right-4 sm:top-8 sm:right-8 text-slate-300 hover:text-rose-500 transition-all duration-700 hover:rotate-90"><XCircle className="w-6 h-6 sm:w-7 sm:h-7" /></button>
+            <form onSubmit={handleRestock} className="p-6 sm:p-12 space-y-8 sm:space-y-12">
               <div className="text-center space-y-4">
-                <div className="w-24 h-24 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-6 shadow-inner text-emerald-600 transition-all duration-1000 hover:scale-110 hover:rotate-6">
-                  <ShoppingCart className="w-12 h-12" />
+                <div className="w-16 h-16 sm:w-24 sm:h-24 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-inner text-emerald-600 transition-all duration-1000 hover:scale-110 hover:rotate-6">
+                  <ShoppingCart className="w-8 h-8 sm:w-12 sm:h-12" />
                 </div>
-                <h2 className="text-4xl font-black text-slate-900 italic tracking-tighter uppercase">Réassortiment Expert</h2>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">{selectedItem.nom}</p>
+                <h2 className="text-2xl sm:text-4xl font-black text-slate-900 italic tracking-tighter uppercase">Réassortiment Expert</h2>
+                <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">{selectedItem.nom}</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10">
                 <div className="space-y-3 group">
                   <label className="text-[10px] font-black uppercase text-emerald-600 tracking-widest ml-2 group-focus-within:translate-x-2 transition-transform duration-700">Unités à ajouter</label>
                   <div className="relative">
-                    <input type="number" value={restockData.quantite} onChange={(e) => setRestockData({...restockData, quantite: e.target.value})} className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-500 rounded-2xl px-8 py-6 outline-none font-black text-4xl shadow-inner transition-all duration-700" placeholder="0" required autoFocus />
-                    <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-slate-200 uppercase tracking-widest text-xs">PCS</span>
+                    <input type="number" min="1" value={restockData.quantite} onChange={(e) => setRestockData({...restockData, quantite: e.target.value})} className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-500 rounded-2xl px-6 sm:px-8 py-4 sm:py-6 outline-none font-black text-2xl sm:text-4xl shadow-inner transition-all duration-700" placeholder="0" required autoFocus />
+                    <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-slate-200 uppercase tracking-widest text-[10px]">PCS</span>
                   </div>
                 </div>
 
                 <div className="space-y-3 group">
                   <label className="text-[10px] font-black uppercase text-emerald-600 tracking-widest ml-2 group-focus-within:translate-x-2 transition-transform duration-700">Prix d'achat global</label>
                   <div className="relative">
-                    <input type="number" value={restockData.prix_achat_total} onChange={(e) => setRestockData({...restockData, prix_achat_total: e.target.value})} className="w-full bg-emerald-50/50 border-2 border-transparent focus:border-emerald-500 rounded-2xl px-8 py-6 outline-none font-black text-4xl text-emerald-600 shadow-inner transition-all duration-700" placeholder="0" required />
-                    <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-emerald-200 uppercase tracking-widest text-xs">FCFA</span>
+                    <input type="number" value={restockData.prix_achat_total} onChange={(e) => setRestockData({...restockData, prix_achat_total: e.target.value})} className="w-full bg-emerald-50/50 border-2 border-transparent focus:border-emerald-500 rounded-2xl px-6 sm:px-8 py-4 sm:py-6 outline-none font-black text-2xl sm:text-4xl text-emerald-600 shadow-inner transition-all duration-700" placeholder="0" required />
+                    <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-emerald-200 uppercase tracking-widest text-[10px]">FCFA</span>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-3 group">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2 group-focus-within:translate-x-2 transition-transform duration-700">Commentaire / Origine</label>
-                  <input type="text" value={restockData.description} onChange={(e) => setRestockData({...restockData, description: e.target.value})} className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-500 rounded-2xl px-8 py-4 outline-none font-bold text-sm shadow-inner transition-all duration-700" placeholder="Ex: Arrivage fournisseur France..." />
+                  <input type="text" value={restockData.description} onChange={(e) => setRestockData({...restockData, description: e.target.value})} className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-500 rounded-2xl px-6 sm:px-8 py-3 sm:py-4 outline-none font-bold text-xs sm:text-sm shadow-inner transition-all duration-700" placeholder="Ex: Arrivage fournisseur France..." />
               </div>
 
-              <div className="flex gap-6 pt-6">
+              <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 pt-4 sm:pt-6">
                 <button 
                   type="button" 
                   onClick={() => setIsRestockModalOpen(false)} 
-                  className="flex-1 px-8 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 border-2 border-slate-100 hover:bg-slate-50 transition-all duration-700 active:scale-95"
+                  className="w-full sm:flex-1 px-6 sm:px-8 py-4 sm:py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 border-2 border-slate-100 hover:bg-slate-50 transition-all duration-700 active:scale-95"
                 >
                   Annuler l'entrée
                 </button>
                 <button 
                   type="submit" 
-                  className="flex-1 px-8 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-emerald-600 text-white shadow-2xl shadow-emerald-200 hover:bg-emerald-700 transition-all duration-700 active:scale-95"
+                  className="w-full sm:flex-1 px-6 sm:px-8 py-4 sm:py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-emerald-600 text-white shadow-2xl shadow-emerald-200 hover:bg-emerald-700 transition-all duration-700 active:scale-95"
                 >
                   Valider en Caisse & Stock
                 </button>
@@ -469,36 +488,36 @@ const Stock: React.FC = () => {
 
       {/* Modal Ajustement Inventaire Luxury */}
       {isAdjustModalOpen && selectedItem && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4 animate-in fade-in duration-700">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-2 sm:p-4 animate-in fade-in duration-700">
           <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-blue-100/50 animate-in zoom-in-95 duration-1000 overflow-hidden relative">
-            <button onClick={() => setIsAdjustModalOpen(false)} className="absolute top-8 right-8 text-slate-300 hover:text-rose-500 transition-all duration-700 hover:rotate-90"><XCircle className="w-7 h-7" /></button>
-            <form onSubmit={handleAdjust} className="p-12 space-y-12">
+            <button onClick={() => setIsAdjustModalOpen(false)} className="absolute top-4 right-4 sm:top-8 sm:right-8 text-slate-300 hover:text-rose-500 transition-all duration-700 hover:rotate-90"><XCircle className="w-6 h-6 sm:w-7 sm:h-7" /></button>
+            <form onSubmit={handleAdjust} className="p-6 sm:p-12 space-y-8 sm:space-y-12">
               <div className="text-center space-y-4">
-                <div className="w-24 h-24 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-6 shadow-inner text-blue-600 transition-all duration-1000 hover:scale-110 hover:-rotate-6">
-                  <RefreshCcw className="w-12 h-12" />
+                <div className="w-16 h-16 sm:w-24 sm:h-24 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-inner text-blue-600 transition-all duration-1000 hover:scale-110 hover:-rotate-6">
+                  <RefreshCcw className="w-8 h-8 sm:w-12 sm:h-12" />
                 </div>
-                <h2 className="text-4xl font-black text-slate-900 italic tracking-tighter uppercase">Inventaire Physique</h2>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">{selectedItem.nom}</p>
+                <h2 className="text-2xl sm:text-4xl font-black text-slate-900 italic tracking-tighter uppercase">Inventaire Physique</h2>
+                <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">{selectedItem.nom}</p>
               </div>
 
               <div className="space-y-6">
-                <div className="p-6 bg-slate-50 rounded-2xl space-y-2 border border-slate-100">
+                <div className="p-4 sm:p-6 bg-slate-50 rounded-2xl space-y-2 border border-slate-100">
                    <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 tracking-widest">
                       <span>Stock Théorique</span>
                       <span className="text-slate-900">{selectedItem.stock_theorique} PCS</span>
                    </div>
-                   <p className="text-[9px] font-medium text-slate-400 italic">Le stock calculé par le système basé sur les entrées/sorties.</p>
+                   <p className="text-[9px] font-medium text-slate-400 italic">Le stock calculé par le système.</p>
                 </div>
 
                 <div className="space-y-3 group text-center">
                   <label className="text-[10px] font-black uppercase text-blue-600 tracking-widest group-focus-within:translate-y-[-2px] transition-transform duration-700">Quantité comptée en rayon</label>
-                  <input type="number" value={adjustData.quantite_physique} onChange={(e) => setAdjustData({...adjustData, quantite_physique: e.target.value})} className="w-full bg-blue-50/50 border-2 border-transparent focus:border-blue-500 rounded-2xl px-8 py-8 outline-none font-black text-6xl text-blue-600 shadow-inner transition-all duration-700 text-center" placeholder="0" required autoFocus />
+                  <input type="number" min="0" value={adjustData.quantite_physique} onChange={(e) => setAdjustData({...adjustData, quantite_physique: e.target.value})} className="w-full bg-blue-50/50 border-2 border-transparent focus:border-blue-500 rounded-2xl px-6 sm:px-8 py-6 sm:py-8 outline-none font-black text-4xl sm:text-6xl text-blue-600 shadow-inner transition-all duration-700 text-center" placeholder="0" required autoFocus />
                 </div>
               </div>
 
               <button 
                 type="submit" 
-                className="w-full px-8 py-6 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-slate-900 text-white shadow-2xl hover:bg-blue-600 transition-all duration-700 active:scale-95"
+                className="w-full px-6 sm:px-8 py-4 sm:py-6 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-slate-900 text-white shadow-2xl hover:bg-blue-600 transition-all duration-700 active:scale-95"
               >
                 Mettre à jour & Enregistrer l'Écart
               </button>

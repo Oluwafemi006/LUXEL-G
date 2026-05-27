@@ -101,7 +101,7 @@ const GlobalSearch: React.FC = () => {
   }, []);
 
   return (
-    <div ref={containerRef} className="relative w-96">
+    <div ref={containerRef} className="relative w-full max-w-md">
       {/* Input */}
       <div className={`flex items-center gap-3 bg-slate-50 border px-4 py-1.5 rounded-md transition-all duration-300 ${
         open ? 'border-emerald-500 bg-white shadow-md shadow-emerald-50' : 'border-slate-200'
@@ -160,7 +160,7 @@ const GlobalSearch: React.FC = () => {
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 transition-colors text-left border-b border-slate-50 group"
                     >
                       <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs font-bebas flex-shrink-0 group-hover:scale-105 transition-transform">
-                        {c.nom[0]}
+                        {(c.nom || "?")[0]}
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-oswald font-bold text-slate-900 truncate uppercase tracking-wide">

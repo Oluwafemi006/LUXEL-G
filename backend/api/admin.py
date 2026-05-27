@@ -1,9 +1,35 @@
 from django.contrib import admin
+from django.contrib.auth.models import User
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
     Client, Vehicule, Reparation, LigneTravail, LignePiece, 
     Facture, Devis, Stock, MouvementCaisse, 
-    MaintenancePredictive, Appointment, NotificationClient
+    MaintenancePredictive, Appointment, NotificationClient, UserProfile
 )
+
+# --- Gestion du Personnel (Staff) ---
+class UserProfileInline(admin.StackedInline):
+    model = UserProfile
+    can_delete = False
+    verbose_name_plural = 'Profil Staff'
+
+class UserAdmin(BaseUserAdmin):
+    inlines = (UserProfileInline,)
+    list_display = BaseUserAdmin.list_display + ('get_role',)
+    list_filter = ('is_staff', 'is_superuser', 'is_active', 'profile__role')
+
+    def get_role(self, obj):
+        if hasattr(obj, 'profile'):
+            return obj.profile.get_role_display()
+        if hasattr(obj, 'client_profile'):
+            return "Client (Espace Client)"
+        return "Admin"
+    get_role.short_description = 'Rôle / Type'
+
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)
+
+# --- Configuration des autres modèles ---
 
 class LigneTravailInline(admin.TabularInline):
     model = LigneTravail

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Car, Calendar, ShieldCheck, Warehouse, Info, X, CheckCircle2 } from 'lucide-react';
-import api from '../../services/api';
+import { fetchAllPages } from '../../services/api';
 
 interface Vehicle {
   id: number;
@@ -20,8 +20,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ onSubmit, onCancel }) => {
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
-        const response = await api.get('vehicules/');
-        setVehicles(response.data);
+        setVehicles(await fetchAllPages<Vehicle>('vehicules/'));
       } catch (error) {
         console.error('Erreur lors du chargement des véhicules:', error);
       }

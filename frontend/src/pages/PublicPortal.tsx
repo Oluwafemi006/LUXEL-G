@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Wrench,
-  Bolt, /* Électricité */
-  CircleDot, /* Pneus */
-  Droplets, /* Lavage */
-  Settings, /* Entretien */
+  Bolt,
+  CircleDot,
+  Droplets,
+  Settings,
   Phone,
   CalendarCheck,
   MapPin,
@@ -14,13 +14,23 @@ import {
   Search,
   Clock,
   UserCheck,
-  CheckCircle2
+  CheckCircle2,
+  MessageCircle,
+  X,
+  Send,
+  Bot,
+  Loader2
 } from 'lucide-react';
 import api from '../services/api';
 import './PublicPortal.css';
 import hero1 from '../assets/garage_images/hero/hero_1.jpg';
 import hero2 from '../assets/garage_images/hero/hero_2.jpg';
 import galerie1 from '../assets/garage_images/galeries/galerie_1.jpg';
+
+interface ChatMessage {
+  role: 'user' | 'bot';
+  text: string;
+}
 
 
 const SERVICES = [
@@ -49,6 +59,15 @@ const PublicPortal: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
+  // F1 — Chatbot IA
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    { role: 'bot', text: '👋 Bonjour ! Je suis l\'assistant Luxury Elegance Garage. Comment puis-je vous aider ?' }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   // ─── REFS ───
   const hTrackRef = useRef<HTMLDivElement>(null);
   const gTrackRef = useRef<HTMLDivElement>(null);
@@ -65,6 +84,11 @@ const PublicPortal: React.FC = () => {
     const timer = setInterval(() => setTIdx(p => (p + 1) % 2), 6500);
     return () => clearInterval(timer);
   }, []);
+
+  // F1 — Scroll automatique vers le bas du chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   // ─── SCROLL REVEAL ───
   useEffect(() => {
@@ -112,6 +136,42 @@ const PublicPortal: React.FC = () => {
       alert('Erreur lors de la réservation. Veuillez réessayer ou nous appeler.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Calcul de la date minimale : aujourd'hui, et on bloque le dimanche
+  const getTodayStr = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  const handleDateChange = (val: string) => {
+    if (!val) { setBookingData({...bookingData, date: ''}); return; }
+    const d = new Date(val);
+    if (d.getDay() === 0) {
+      alert('Le garage est fermé le dimanche. Veuillez choisir un autre jour (Lundi–Samedi).');
+      setBookingData({...bookingData, date: ''});
+    } else {
+      setBookingData({...bookingData, date: val});
+    }
+  };
+
+  // F1 — Envoi d'un message au chatbot
+  const sendChat = async () => {
+    const msg = chatInput.trim();
+    if (!msg || chatLoading) return;
+    const history = chatMessages.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'model', text: m.text }));
+    setChatMessages(prev => [...prev, { role: 'user', text: msg }]);
+    setChatInput('');
+    setChatLoading(true);
+    try {
+      const res = await api.post('ai/chatbot/', { message: msg, history });
+      setChatMessages(prev => [...prev, { role: 'bot', text: res.data.reply }]);
+    } catch {
+      setChatMessages(prev => [...prev, { role: 'bot', text: 'Désolé, je rencontre un problème. Appelez-nous au +229 01 92 62 98 60.' }]);
+    }
+ finally {
+      setChatLoading(false);
     }
   };
 
@@ -418,7 +478,7 @@ const PublicPortal: React.FC = () => {
               <div className="rdv-ci-icon"><CalendarCheck /></div>
               <div>
                 <div className="rdv-ci-label">Horaires</div>
-                <div className="rdv-ci-val">Lun – Ven · 08h00 – 18h30<br/>Samedi · 09h00 – 14h00</div>
+                <div className="rdv-ci-val">Lun – Sam · 08h30 – 18h30<br/>Dimanche · Fermé</div>
               </div>
             </div>
           </div>
@@ -456,13 +516,19 @@ const PublicPortal: React.FC = () => {
             </div>
             <div className="fg">
               <label>Date souhaitée</label>
-              <input type="date" required value={bookingData.date} onChange={e => setBookingData({...bookingData, date: e.target.value})} />
+              <input
+                type="date"
+                required
+                min={getTodayStr()}
+                value={bookingData.date}
+                onChange={e => handleDateChange(e.target.value)}
+              />
             </div>
             <div className="fg">
               <label>Créneau horaire</label>
               <select value={bookingData.heure} onChange={e => setBookingData({...bookingData, heure: e.target.value})}>
                 <option value="">Sélectionner…</option>
-                <option value="08:00">08h00 – 10h00</option>
+                <option value="08:30">08h30 – 10h00</option>
                 <option value="10:00">10h00 – 12h00</option>
                 <option value="12:00">12h00 – 14h00</option>
                 <option value="14:00">14h00 – 16h00</option>
@@ -487,6 +553,76 @@ const PublicPortal: React.FC = () => {
       <div className={`toast ${showToast ? 'show' : ''}`}>
         <CheckCircle2 />
         Rendez-vous enregistré ! Nous vous contacterons sous peu.
+      </div>
+
+      {/* ══ F1 — CHATBOT IA FLOTTANT ══ */}
+      <div className="chatbot-fab-wrap">
+        {/* Fenêtre de chat */}
+        {chatOpen && (
+          <div className="chatbot-window">
+            <div className="chatbot-header">
+              <div className="chatbot-header-info">
+                <div className="chatbot-avatar"><Bot size={16} /></div>
+                <div>
+                <div className="chatbot-name">Assistant Luxury Elegance Garage</div>
+                  <div className="chatbot-status">● En ligne</div>
+                </div>
+              </div>
+              <button className="chatbot-close" onClick={() => setChatOpen(false)}><X size={18} /></button>
+            </div>
+
+            <div className="chatbot-messages">
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`chat-msg ${msg.role}`}>
+                  {msg.role === 'bot' && <div className="chat-bot-av"><Bot size={13} /></div>}
+                  <div className="chat-bubble">{msg.text}</div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div className="chat-msg bot">
+                  <div className="chat-bot-av"><Bot size={13} /></div>
+                  <div className="chat-bubble chat-typing">
+                    <Loader2 size={14} className="chat-spin" />
+                    <span>En train d'écrire…</span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            <div className="chatbot-suggestions">
+              {['Quels sont vos horaires ?', 'Prendre un RDV', 'Vos services ?'].map(s => (
+                <button key={s} className="chat-suggest" onClick={() => { setChatInput(s); }}>
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            <div className="chatbot-input-row">
+              <input
+                className="chatbot-input"
+                placeholder="Posez votre question…"
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && sendChat()}
+                disabled={chatLoading}
+              />
+              <button className="chatbot-send" onClick={sendChat} disabled={chatLoading || !chatInput.trim()}>
+                <Send size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Bouton flottant */}
+        <button
+          className={`chatbot-fab ${chatOpen ? 'open' : ''}`}
+          onClick={() => setChatOpen(o => !o)}
+          aria-label="Assistant virtuel"
+        >
+          {chatOpen ? <X size={22} /> : <MessageCircle size={22} />}
+          {!chatOpen && <span className="chatbot-fab-badge">IA</span>}
+        </button>
       </div>
     </>
   );

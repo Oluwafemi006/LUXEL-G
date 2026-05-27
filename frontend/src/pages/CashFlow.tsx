@@ -13,7 +13,7 @@ import {
   TrendingUp,
   Info
 } from 'lucide-react';
-import api from '../services/api';
+import api, { fetchAllPages } from '../services/api';
 
 interface Mouvement {
   id: number;
@@ -53,18 +53,17 @@ const CashFlow: React.FC = () => {
   const fetchData = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [resMouv, resSyn] = await Promise.all([
-        api.get('caisse/'),
+      const [data, resSyn] = await Promise.all([
+        fetchAllPages<Mouvement>('caisse/'),
         api.get('caisse/synthese/')
       ]);
-      const data = Array.isArray(resMouv.data) ? resMouv.data : [];
       setMouvements(data);
       setSynthese(resSyn.data);
       
       setSelectedMouvement(prev => {
         if (!prev && data.length > 0) return data[0];
         if (prev) {
-          const updated = data.find(m => m.id === prev.id);
+          const updated = data.find((m: any) => m.id === prev.id);
           return updated || prev;
         }
         return prev;

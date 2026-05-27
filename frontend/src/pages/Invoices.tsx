@@ -16,9 +16,13 @@ import {
   ChevronRight,
   Wrench,
   Car,
-  Users
+  Users,
+  Trash2,
+  Sparkles,
+  XCircle,
+  Info
 } from 'lucide-react';
-import api from '../services/api';
+import api, { fetchAllPages } from '../services/api';
 import StockSearchInput from '../components/StockSearchInput';
 
 interface LaborLine {
@@ -95,6 +99,10 @@ const Invoices: React.FC = () => {
   const [kmsEntree, setKmsEntree] = useState('');
   const [laborLines, setLaborLines] = useState<LaborLine[]>([]);
   const [partLines, setPartLines] = useState<PartLine[]>([]);
+  const [aiPartLoading, setAiPartLoading] = useState<string | number | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
+  const [isAISuggestionModalOpen, setIsAISuggestionModalOpen] = useState(false);
+  const [activePartLineId, setActivePartLineId] = useState<string | number | null>(null);
 
   const openPaymentModal = (invoice: Invoice) => {
     // Règle des 75% : si premier paiement, proposer 75%
@@ -106,10 +114,50 @@ const Invoices: React.FC = () => {
     setIsPaymentModalOpen(true);
   };
 
+  const handleAISuggestPart = async (lineId: string | number) => {
+    const line = partLines.find(p => p.id === lineId);
+    if (!line || !line.description) {
+        alert('Veuillez saisir une description partielle avant de demander l\'aide de l\'IA.');
+        return;
+    }
+
+    try {
+      setAiPartLoading(lineId);
+      setActivePartLineId(lineId);
+      const response = await api.post('ai/suggest_parts/', { 
+        query: line.description,
+        context: selectedRepair?.categorie || ''
+      });
+      
+      const suggestions = response.data.suggestions;
+      if (suggestions && suggestions.length > 0) {
+        setAiSuggestions(suggestions);
+        setIsAISuggestionModalOpen(true);
+      } else {
+        alert('L\'IA n\'a pas trouvé de suggestion pertinente.');
+      }
+    } catch (error) {
+      console.error('Erreur IA pièces:', error);
+      alert('Erreur lors de la récupération des suggestions IA.');
+    } finally {
+      setAiPartLoading(null);
+    }
+  };
+
+  const selectAISuggestion = (suggestion: any) => {
+    if (activePartLineId) {
+        updatePart(activePartLineId, 'description', suggestion.nom);
+        if (suggestion.reference_standard) updatePart(activePartLineId, 'reference', suggestion.reference_standard);
+        if (suggestion.prix_indicatif) updatePart(activePartLineId, 'prix_unitaire', suggestion.prix_indicatif);
+    }
+    setIsAISuggestionModalOpen(false);
+    setAiSuggestions([]);
+    setActivePartLineId(null);
+  };
+
   const fetchRepairs = async () => {
     try {
-      const response = await api.get('reparations/');
-      setRepairs(Array.isArray(response.data) ? response.data : []);
+      setRepairs(await fetchAllPages<Repair>('reparations/'));
     } catch (error) {
       console.error('Erreur chargement repairs:', error);
     }
@@ -118,8 +166,7 @@ const Invoices: React.FC = () => {
   const fetchInvoices = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const response = await api.get('factures/');
-      setInvoices(Array.isArray(response.data) ? response.data : []);
+      setInvoices(await fetchAllPages<Invoice>('factures/'));
     } catch (error) {
       console.error('Erreur chargement factures:', error);
     } finally {
@@ -129,9 +176,7 @@ const Invoices: React.FC = () => {
 
   const fetchStock = async () => {
     try {
-      const response = await api.get('stock/');
-      const data = Array.isArray(response.data) ? response.data : [];
-      setStock(data);
+      setStock(await fetchAllPages<StockItem>('stock/'));
     } catch (error) {
       console.error('Erreur chargement stock:', error);
     }
@@ -232,14 +277,7 @@ const Invoices: React.FC = () => {
     const amount = parseFloat(paymentAmount);
     const resteAPayer = currentInvoice.total_ttc - currentInvoice.montant_paye;
 
-    // Validation 75% côté client
-    const totalApresPaiement = currentInvoice.montant_paye + amount;
-    const seuil75 = currentInvoice.total_ttc * 0.75;
-    
-    if (totalApresPaiement < seuil75) {
-      alert(`Règle Garage : Un paiement minimal de 75% (${seuil75.toLocaleString()} F) est requis pour entamer les travaux.`);
-      return;
-    }
+    // Règle des 75% : Retirée selon la demande du client. Le système accepte tout paiement.
 
     if (amount > resteAPayer) {
       alert(`Erreur : Le montant saisi dépasse le reste à payer (${resteAPayer.toLocaleString()} F).`);
@@ -309,14 +347,15 @@ const handleDownloadPDF = async () => {
     }
   };
 
-  const handleWhatsAppShare = () => {
+  const handleWhatsAppShare = async () => {
     if (!selectedRepair || !currentInvoice) return;
     
     let phone = selectedRepair.client_contact?.replace(/\D/g, '') || '';
     if (phone.startsWith('00229')) phone = phone.substring(2);
     if (!phone.startsWith('229')) phone = '229' + phone;
     
-    const pdfUrl = `http://${window.location.hostname}:8000/api/factures/${currentInvoice.id}/download_pdf/`;
+    const { data } = await api.get(`factures/${currentInvoice.id}/share_link/`);
+    const pdfUrl = data.url;
     const message = `Bonjour ${selectedRepair.client_name}, LUXEL-G vous informe que votre facture ${currentInvoice.numero_facture || ''} est disponible.\n\n💰 Montant : ${Number(currentInvoice.total_ttc).toLocaleString()} F\n📄 Télécharger votre facture : ${pdfUrl}\n\nMerci pour votre confiance.`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
@@ -327,6 +366,32 @@ const handleDownloadPDF = async () => {
 
   const addLaborLine = () => setLaborLines([...laborLines, { id: `tmp${Date.now()}`, description: '', montant: 0 }]);
   const addPartLine = () => setPartLines([...partLines, { id: `tmp${Date.now()}`, reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
+
+  const removeLaborLine = async (id: string | number) => {
+    if (typeof id === 'number') {
+      if (!window.confirm('Voulez-vous vraiment supprimer cette ligne de travaux ?')) return;
+      try {
+        await api.delete(`travaux/${id}/`);
+      } catch (error) {
+        console.error('Erreur suppression ligne travaux:', error);
+        return;
+      }
+    }
+    setLaborLines(laborLines.filter(l => l.id !== id));
+  };
+
+  const removePartLine = async (id: string | number) => {
+    if (typeof id === 'number') {
+      if (!window.confirm('Voulez-vous vraiment supprimer cette pièce ?')) return;
+      try {
+        await api.delete(`pieces-reparation/${id}/`);
+      } catch (error) {
+        console.error('Erreur suppression ligne pièce:', error);
+        return;
+      }
+    }
+    setPartLines(partLines.filter(p => p.id !== id));
+  };
 
   const updateLabor = (id: string | number, field: keyof LaborLine, value: any) => {
     setLaborLines(laborLines.map(l => l.id === id ? { ...l, [field]: value } : l));
@@ -632,7 +697,7 @@ const handleDownloadPDF = async () => {
                       <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700 flex items-center gap-2">
                         <Wrench className="w-4 h-4" /> I. Travaux & Main d'œuvre
                       </h3>
-                      {!isDefinitive && (
+                      {!(currentInvoice?.montant_paye && currentInvoice.montant_paye > 0) && (
                         <button onClick={addLaborLine} className="bg-emerald-600 text-white p-2 rounded-xl shadow-lg shadow-emerald-200 hover:scale-110 transition-all no-print">
                           <Plus className="w-4 h-4" />
                         </button>
@@ -641,11 +706,16 @@ const handleDownloadPDF = async () => {
                     <div className="space-y-4">
                       {laborLines.map(line => (
                         <div key={line.id} className="flex gap-6 items-center group">
-                          <input disabled={isDefinitive} value={line.description} onChange={(e) => updateLabor(line.id, 'description', e.target.value)} className="flex-1 bg-white border border-emerald-50 rounded-2xl px-6 py-3 text-sm font-bold outline-none focus:border-emerald-500/50 transition-all duration-500 disabled:opacity-60 shadow-sm" placeholder="Description des travaux..."/>
+                          <input disabled={(currentInvoice?.montant_paye ?? 0) > 0} value={line.description} onChange={(e) => updateLabor(line.id, 'description', e.target.value)} className="flex-1 bg-white border border-emerald-50 rounded-2xl px-6 py-3 text-sm font-bold outline-none focus:border-emerald-500/50 transition-all duration-500 disabled:opacity-60 shadow-sm" placeholder="Description des travaux..."/>
                           <div className="relative">
-                            <input disabled={isDefinitive} type="number" value={line.montant || ''} onChange={(e) => updateLabor(line.id, 'montant', parseInt(e.target.value) || 0)} className="w-40 text-right bg-emerald-50/50 border border-emerald-100/30 rounded-2xl px-6 py-3 text-sm font-black outline-none focus:border-emerald-500/50 transition-all duration-500 disabled:opacity-60" placeholder="0"/>
+                            <input disabled={(currentInvoice?.montant_paye ?? 0) > 0} type="number" value={line.montant || ''} onChange={(e) => updateLabor(line.id, 'montant', parseInt(e.target.value) || 0)} className="w-40 text-right bg-emerald-50/50 border border-emerald-100/30 rounded-2xl px-6 py-3 text-sm font-black outline-none focus:border-emerald-500/50 transition-all duration-500 disabled:opacity-60" placeholder="0"/>
                             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-emerald-400">F</span>
                           </div>
+                          {!(currentInvoice?.montant_paye && currentInvoice.montant_paye > 0) && (
+                            <button onClick={() => removeLaborLine(line.id)} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100 no-print">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -657,7 +727,7 @@ const handleDownloadPDF = async () => {
                       <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700 flex items-center gap-2">
                         <Plus className="w-4 h-4" /> II. Pièces & Fournitures
                       </h3>
-                      {!isDefinitive && (
+                      {!(currentInvoice?.montant_paye && currentInvoice.montant_paye > 0) && (
                         <button onClick={addPartLine} className="bg-emerald-600 text-white p-2 rounded-xl shadow-lg shadow-emerald-200 hover:scale-110 transition-all no-print">
                           <Plus className="w-4 h-4" />
                         </button>
@@ -675,10 +745,27 @@ const handleDownloadPDF = async () => {
                       <tbody className="divide-y divide-emerald-50/20">
                         {partLines.map(line => (
                           <tr key={line.id} className="group">
-                            <td className="py-4 px-4">
+                            <td className="py-4 px-4 relative">
+                               {!(currentInvoice?.montant_paye && currentInvoice.montant_paye > 0) && (
+                                <button onClick={() => removePartLine(line.id)} className="absolute -left-4 top-1/2 -translate-y-1/2 p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100 no-print">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                               )}
                                <div className="flex flex-col gap-2">
-                                <input disabled={isDefinitive} value={line.description} onChange={(e) => updatePart(line.id, 'description', e.target.value)} className="w-full bg-transparent outline-none font-black text-sm text-slate-900 uppercase disabled:opacity-60" placeholder="Nom de la pièce..."/>
-                                {!isDefinitive && (
+                                <div className="flex items-center gap-2">
+                                    <input disabled={(currentInvoice?.montant_paye ?? 0) > 0} value={line.description} onChange={(e) => updatePart(line.id, 'description', e.target.value)} className="w-full bg-transparent outline-none font-black text-sm text-slate-900 uppercase disabled:opacity-60" placeholder="Nom de la pièce..."/>
+                                    {!(currentInvoice?.montant_paye && currentInvoice.montant_paye > 0) && (
+                                        <button 
+                                            onClick={() => handleAISuggestPart(line.id)}
+                                            disabled={aiPartLoading === line.id}
+                                            className={`p-2 rounded-xl transition-all duration-500 ${aiPartLoading === line.id ? 'bg-emerald-50 text-emerald-600 animate-pulse' : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                                            title="Assistant IA (Nomenclature)"
+                                        >
+                                            <Sparkles className={`w-3.5 h-3.5 ${aiPartLoading === line.id ? 'animate-spin' : ''}`} />
+                                        </button>
+                                    )}
+                                </div>
+                                {!(currentInvoice?.montant_paye && currentInvoice.montant_paye > 0) && (
                                   <StockSearchInput 
                                     stock={stock} 
                                     onSelect={(item) => handleStockSelect(line.id, item.id.toString())} 
@@ -689,7 +776,7 @@ const handleDownloadPDF = async () => {
                             </td>
                             <td className="py-4">
                               <div className="flex flex-col items-center">
-                                <input disabled={isDefinitive} type="number" value={line.quantite} onChange={(e) => updatePart(line.id, 'quantite', parseInt(e.target.value) || 0)} className="w-16 bg-slate-100/50 rounded-xl py-1 text-center font-black text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-60"/>
+                                <input disabled={(currentInvoice?.montant_paye ?? 0) > 0} type="number" value={line.quantite} onChange={(e) => updatePart(line.id, 'quantite', parseInt(e.target.value) || 0)} className="w-16 bg-slate-100/50 rounded-xl py-1 text-center font-black text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-60"/>
                                 {line.article_stock && stock.find(s => s.id === line.article_stock) && (
                                   <p className={`text-[8px] font-black uppercase mt-1 ${line.quantite > (stock.find(s => s.id === line.article_stock)?.quantite || 0) ? 'text-rose-600' : 'text-emerald-600'}`}> Stock: {stock.find(s => s.id === line.article_stock)?.quantite} </p>
                                 )}
@@ -697,7 +784,7 @@ const handleDownloadPDF = async () => {
                             </td>
                             <td className="py-4 text-right">
                               <div className="flex items-center justify-end gap-1">
-                                <input disabled={isDefinitive} type="number" value={line.prix_unitaire || ''} onChange={(e) => updatePart(line.id, 'prix_unitaire', parseInt(e.target.value) || 0)} className="w-24 bg-transparent outline-none text-right font-bold text-sm disabled:opacity-60" placeholder="0"/>
+                                <input disabled={(currentInvoice?.montant_paye ?? 0) > 0} type="number" value={line.prix_unitaire || ''} onChange={(e) => updatePart(line.id, 'prix_unitaire', parseInt(e.target.value) || 0)} className="w-24 bg-transparent outline-none text-right font-bold text-sm disabled:opacity-60" placeholder="0"/>
                                 <span className="text-[10px] font-black text-slate-300">F</span>
                               </div>
                             </td>
@@ -724,7 +811,7 @@ const handleDownloadPDF = async () => {
                         <Verified className="w-4 h-4" /> Valider Définitive
                       </button>
                     )}
-                    <button onClick={handleSaveInvoice} disabled={isDefinitive} className="bg-white text-slate-600 px-8 py-4 rounded-lg font-black text-xs uppercase tracking-widest border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all duration-500 flex items-center gap-3 disabled:opacity-40">
+                    <button onClick={handleSaveInvoice} disabled={(currentInvoice?.montant_paye ?? 0) > 0} className="bg-white text-slate-600 px-8 py-4 rounded-lg font-black text-xs uppercase tracking-widest border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all duration-500 flex items-center gap-3 disabled:opacity-40">
                       <Save className="w-4 h-4" /> {currentInvoiceId ? 'Mettre à jour' : 'Enregistrer'}
                     </button>
                     
@@ -841,6 +928,79 @@ const handleDownloadPDF = async () => {
                     Confirmer
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Suggestions IA Luxury */}
+      {isAISuggestionModalOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4 animate-in fade-in duration-700">
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl border border-emerald-100/50 animate-in zoom-in-95 duration-700 overflow-hidden">
+            <div className="p-8 sm:p-10 space-y-8">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-inner">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-900 italic tracking-tighter uppercase leading-none">Assistant Pièces IA</h2>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Suggestions basées sur le stock et l'expertise mécanique</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsAISuggestionModalOpen(false)} className="p-2 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all">
+                  <XCircle className="w-6 h-6 text-slate-300" />
+                </button>
+              </div>
+
+              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {aiSuggestions.map((s, idx) => (
+                  <div 
+                    key={idx} 
+                    onClick={() => selectAISuggestion(s)}
+                    className="p-6 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-white hover:border-emerald-500 hover:shadow-xl hover:shadow-emerald-900/5 transition-all duration-500 cursor-pointer group relative overflow-hidden"
+                  >
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-3">
+                           <h3 className="text-lg font-black text-slate-900 uppercase group-hover:text-emerald-600 transition-colors">{s.nom}</h3>
+                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${s.source === 'STOCK_LOCAL' ? 'bg-emerald-600 text-white' : 'bg-blue-100 text-blue-600'}`}>
+                             {s.source === 'STOCK_LOCAL' ? 'En Stock' : 'Suggestion IA'}
+                           </span>
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium leading-relaxed italic">"{s.role}"</p>
+                        <div className="flex gap-4">
+                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <Info className="w-3 h-3" /> {s.categorie}
+                           </span>
+                           {s.reference_standard && (
+                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 font-mono">
+                                REF: {s.reference_standard}
+                            </span>
+                           )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-black text-slate-900 italic tracking-tighter">{Number(s.prix_indicatif).toLocaleString()} F</p>
+                        <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Prix Indicatif</p>
+                      </div>
+                    </div>
+                    <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-emerald-500/5 rounded-full blur-xl group-hover:scale-150 transition-transform duration-1000"></div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-slate-900 p-6 rounded-2xl flex items-center gap-6 group overflow-hidden relative">
+                 <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center relative z-10">
+                    <Wrench className="w-6 h-6 text-emerald-400" />
+                 </div>
+                 <div className="relative z-10">
+                   <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-1">Note Technique</p>
+                   <p className="text-xs text-slate-400 font-medium leading-tight">
+                     Les prix suggérés sont des moyennes du marché à Parakou. Ajustez-les selon votre fournisseur réel.
+                   </p>
+                 </div>
               </div>
             </div>
           </div>

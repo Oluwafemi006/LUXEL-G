@@ -13,7 +13,7 @@ import {
   TrendingDown,
   Layers
 } from 'lucide-react';
-import api from '../services/api';
+import { fetchAllPages } from '../services/api';
 
 interface Alert {
   id: string;
@@ -34,14 +34,14 @@ const Notifications: React.FC = () => {
     try {
       setLoading(true);
       const [stock, maintenance] = await Promise.all([
-        api.get('stock/'),
-        api.get('maintenance-predictive/alertes/')
+        fetchAllPages<any>('stock/'),
+        fetchAllPages<any>('maintenance-predictive/alertes/')
       ]);
 
       const newAlerts: Alert[] = [];
 
       // 1. Stock Alerts
-      stock.data.filter((s: any) => s.quantite < s.seuil_alerte).forEach((s: any) => {
+      stock.filter((s: any) => s.quantite < s.seuil_alerte).forEach((s: any) => {
         newAlerts.push({
           id: `stock-${s.id}`,
           type: 'STOCK',
@@ -54,7 +54,7 @@ const Notifications: React.FC = () => {
       });
 
       // 2. Maintenance Alerts
-      maintenance.data.forEach((m: any) => {
+      maintenance.forEach((m: any) => {
         newAlerts.push({
           id: `maint-${m.id}`,
           type: 'MAINTENANCE',
