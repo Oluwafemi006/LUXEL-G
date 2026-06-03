@@ -1641,3 +1641,14 @@
     max-height: 70vh;
   }
 }
+
+.client-space-adjust {
+  right: auto;
+  left: 1.5rem;
+  align-items: flex-start;
+}
+.client-space-adjust .chatbot-window {
+  right: auto;
+  left: 0;
+  transform-origin: bottom left;
+}

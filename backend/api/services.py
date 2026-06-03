@@ -9,8 +9,7 @@ logger = logging.getLogger(__name__)
 # --- SERVICES SMS ---
 def send_otp_sms(phone_number, code):
     """
-    Service d'envoi de SMS OTP.
-    Supporte Twilio par défaut, mais peut être étendu.
+    Service d'envoi de SMS OTP via Twilio.
     """
     # 1. Toujours logger pour le dev
     logger.debug("[SMS] Envoi du code %s au numéro %s", code, phone_number)
@@ -23,6 +22,9 @@ def send_otp_sms(phone_number, code):
         logger.info("[SMS] Config Twilio manquante. SMS non envoyé (Simulation).")
         return False
 
+    # Utilisation de la bibliothèque twilio
+    from twilio.rest import Client
+    
     try:
         # Formatage du numéro pour Twilio (doit commencer par +)
         if not phone_number.startswith('+'):
@@ -32,24 +34,20 @@ def send_otp_sms(phone_number, code):
             else:
                 phone_number = '+229' + phone_number
 
-        # Utilisation de l'API Twilio via requests (pour éviter d'installer la lib lourde twilio juste pour un test)
-        url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
-        data = {
-            "To": phone_number,
-            "From": from_number,
-            "Body": f"LUXEL-G : Votre code de connexion est {code}. Valide 10 min."
-        }
-        response = requests.post(url, data=data, auth=(account_sid, auth_token))
+        client = Client(account_sid, auth_token)
+        message = client.messages.create(
+            body=f"Luxury Elegance Garage : Votre code de connexion est {code}. Valide 10 min.",
+            from_=from_number,
+            to=phone_number
+        )
         
-        if response.status_code == 201:
-            logger.info("[SMS] SMS envoyé avec succès à %s", phone_number)
+        if message.sid:
+            logger.info("[SMS] SMS envoyé avec succès à %s (SID: %s)", phone_number, message.sid)
             return True
-        else:
-            logger.warning("[SMS] Erreur Twilio: %s", response.text)
-            return False
+        return False
 
     except Exception as e:
-        logger.error("[SMS] Erreur critique: %s", str(e))
+        logger.error("[SMS] Erreur critique SMS: %s", str(e))
         return False
 
 # --- SERVICES IA (GOOGLE GEMINI) ---
@@ -306,3 +304,105 @@ def predict_payment_risk(client_data: dict) -> dict:
         "raisons": raisons,
         "recommandation": "Exiger paiement comptant" if score >= 60 else ("Surveiller les délais" if score >= 30 else "Risque faible")
     }
+
+
+# --- KKIAPAY INTEGRATION ---
+
+def verify_kkiapay_transaction(transaction_id):
+    """
+    Vérifie une transaction Kkiapay via le SDK Python.
+    """
+    from kkiapay import Kkiapay
+    
+    public_key = getattr(settings, 'KKIAPAY_PUBLIC_KEY', os.getenv('KKIAPAY_PUBLIC_KEY'))
+    private_key = getattr(settings, 'KKIAPAY_PRIVATE_KEY', os.getenv('KKIAPAY_PRIVATE_KEY'))
+    secret = getattr(settings, 'KKIAPAY_SECRET', os.getenv('KKIAPAY_SECRET'))
+    sandbox = getattr(settings, 'KKIAPAY_SANDBOX', True)
+
+    if not all([public_key, private_key, secret]):
+        logger.warning("[KKIAPAY] Configuration manquante.")
+        return None
+
+    k = Kkiapay(public_key, private_key, secret, sandbox=sandbox)
+    try:
+        # verify_transaction retourne un tuple (status_code, status_message, transaction_obj)
+        res = k.verify_transaction(transaction_id)
+        if res[0] == 200:
+            return res[2]
+        return None
+    except Exception as e:
+        logger.error("[KKIAPAY] Erreur de vérification : %s", str(e))
+        return None
+
+
+# --- e-MECeF INTEGRATION (DGI BENIN) ---
+
+def generate_emecef_invoice(facture):
+    """
+    Génère une facture normalisée via l'API e-MECeF.
+    """
+    api_token = getattr(settings, 'EMECEF_API_TOKEN', os.getenv('EMECEF_API_TOKEN'))
+    api_url = getattr(settings, 'EMECEF_API_URL', 'https://test-api.impots.bj/sygmef-emcf')
+
+    if not api_token:
+        logger.info("[e-MECeF] Token manquant. Simulation de normalisation.")
+        # Simulation pour le développement
+        return {
+            "uid": f"SIM-{facture.id}",
+            "codeMECeF": "SIM-CODE-MEC-EF-12345678",
+            "qrCode": "https://e-mecef.impots.bj/verify/SIM-CODE",
+            "counters": "1/1000",
+            "status": "SUCCESS"
+        }
+
+    headers = {
+        'Authorization': f'Bearer {api_token}',
+        'Content-Type': 'application/json'
+    }
+
+    # Préparation des données (Simplifié pour l'exemple)
+    payload = {
+        "ifubene": "3202487942483", # IFU du Garage
+        "type": "FV", # Facture de Vente
+        "items": [],
+        "client": {
+            "name": f"{facture.reparation.vehicule.client.nom} {facture.reparation.vehicule.client.prenoms}",
+            "contact": facture.reparation.vehicule.client.contact,
+            "address": facture.reparation.vehicule.client.adresse
+        }
+    }
+
+    # Ajout des lignes de travaux
+    for t in facture.reparation.travaux.all():
+        payload["items"].append({
+            "name": t.description,
+            "price": int(t.montant),
+            "quantity": 1,
+            "taxGroup": "B" # Taxable à 18% par défaut (ou selon config)
+        })
+
+    # Ajout des pièces
+    for p in facture.reparation.pieces.all():
+        payload["items"].append({
+            "name": p.description,
+            "price": int(p.prix_unitaire),
+            "quantity": p.quantite,
+            "taxGroup": "B"
+        })
+
+    try:
+        response = requests.post(f"{api_url}/api/invoice", headers=headers, json=payload, timeout=15)
+        if response.status_code in [200, 201]:
+            data = response.json()
+            # On doit souvent confirmer la facture après soumission pour avoir le QR Code final
+            uid = data.get('uid')
+            confirm_res = requests.put(f"{api_url}/api/invoice/{uid}/confirm", headers=headers, timeout=15)
+            if confirm_res.status_code == 200:
+                return confirm_res.json()
+            return data
+        else:
+            logger.warning("[e-MECeF] Erreur API (%s): %s", response.status_code, response.text)
+            return None
+    except Exception as e:
+        logger.error("[e-MECeF] Erreur critique : %s", str(e))
+        return None

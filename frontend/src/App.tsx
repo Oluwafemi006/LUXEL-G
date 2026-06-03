@@ -16,6 +16,7 @@ import PublicLayout from './components/PublicLayout';
 import PublicPortal from './pages/PublicPortal';
 import ClientSpace from './pages/ClientSpace';
 import Login from './pages/Login';
+import NotFound from './pages/NotFound';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -71,7 +72,7 @@ function App() {
         </Route>
 
         {/* Redirections par défaut */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
       </BrowserRouter>
     </AuthProvider>

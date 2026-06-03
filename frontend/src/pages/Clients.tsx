@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import ClientForm from '../components/forms/ClientForm';
+import Pagination from '../components/Pagination';
 import api, { fetchAllPages } from '../services/api';
 
 interface Vehicle {
@@ -64,6 +65,10 @@ const Clients: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDetailMobile, setShowDetailMobile] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   const fetchClients = async (silent = false) => {
     try {
@@ -141,6 +146,14 @@ const Clients: React.FC = () => {
            (client.email && client.email.toLowerCase().includes(searchLower));
   });
 
+  // Reset pagination when searching
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+  const paginatedClients = filteredClients.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-10">
       {/* Header Section */}
@@ -180,7 +193,7 @@ const Clients: React.FC = () => {
                 <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
                 <p className="font-black text-emerald-600 uppercase text-[10px] tracking-widest">Initialisation...</p>
               </div>
-            ) : filteredClients.map((client) => (
+            ) : paginatedClients.map((client) => (
               <div 
                 key={client.id} 
                 onClick={() => { setSelectedClient(client); setShowDetailMobile(true); }}
@@ -204,6 +217,15 @@ const Clients: React.FC = () => {
               </div>
             ))}
           </div>
+          {!loading && filteredClients.length > 0 && (
+            <Pagination 
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={filteredClients.length}
+              itemsPerPage={itemsPerPage}
+            />
+          )}
         </div>
 
         {/* Détails du Client (Colonne Droite) */}

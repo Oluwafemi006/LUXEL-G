@@ -24,7 +24,13 @@ class FactureSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Facture
-        fields = '__all__'
+        fields = [
+            'id', 'reparation', 'numero_facture', 'type', 'total_ht', 'tva', 'total_ttc',
+            'montant_paye', 'statut_paiement', 'mode_paiement', 'numero_cheque', 
+            'reference_virement', 'date_creation', 'date_validation', 'client_name', 
+            'vehicule_plate', 'reste_a_payer', 'is_normalised', 'emecef_code', 
+            'emecef_qr_code', 'emecef_uid', 'emecef_counters'
+        ]
 
     def get_reste_a_payer(self, obj):
         return obj.total_ttc - obj.montant_paye
@@ -116,6 +122,15 @@ class AppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
         fields = ['id', 'client', 'vehicule', 'nom_client_public', 'telephone_client_public', 'date_rdv', 'service_demande', 'notes', 'statut', 'date_creation', 'client_name', 'vehicule_plate']
+
+    def validate_date_rdv(self, value):
+        from django.utils import timezone
+        # isoweekday() retourne 1 (lundi) à 7 (dimanche)
+        if value.isoweekday() == 7:
+            raise serializers.ValidationError("Le garage est fermé le dimanche. Veuillez choisir un autre jour.")
+        if value < timezone.now():
+            raise serializers.ValidationError("La date du rendez-vous ne peut pas être dans le passé.")
+        return value
 
 class NotificationClientSerializer(serializers.ModelSerializer):
     class Meta:

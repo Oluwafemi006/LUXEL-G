@@ -77,6 +77,11 @@ interface Invoice {
   date_creation: string;
   client_name?: string;
   vehicule_plate?: string;
+  is_normalised?: boolean;
+  emecef_code?: string;
+  emecef_qr_code?: string;
+  emecef_uid?: string;
+  emecef_counters?: string;
 }
 
 const Invoices: React.FC = () => {
@@ -93,6 +98,7 @@ const Invoices: React.FC = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMode, setPaymentMode] = useState('ESPECE');
+  const [isNormalizing, setIsNormalizing] = useState(false);
   
   // États de saisie
   const [isDefinitive, setIsDefinitive] = useState(false);
@@ -303,6 +309,21 @@ const Invoices: React.FC = () => {
       alert(msg);
     }
   };
+
+  const handleNormalize = async () => {
+    if (!currentInvoiceId) return;
+    try {
+      setIsNormalizing(true);
+      const response = await api.post(`factures/${currentInvoiceId}/normaliser/`);
+      alert('Facture normalisée avec succès !');
+      setCurrentInvoice(response.data);
+      fetchInvoices(true);
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Erreur lors de la normalisation.');
+    } finally {
+      setIsNormalizing(false);
+    }
+  };
 const downloadPDF = async (invoice: Invoice) => {
   try {
     const response = await api.get(`factures/${invoice.id}/download_pdf/`, { responseType: 'blob' });
@@ -356,7 +377,7 @@ const handleDownloadPDF = async () => {
     
     const { data } = await api.get(`factures/${currentInvoice.id}/share_link/`);
     const pdfUrl = data.url;
-    const message = `Bonjour ${selectedRepair.client_name}, LUXEL-G vous informe que votre facture ${currentInvoice.numero_facture || ''} est disponible.\n\n💰 Montant : ${Number(currentInvoice.total_ttc).toLocaleString()} F\n📄 Télécharger votre facture : ${pdfUrl}\n\nMerci pour votre confiance.`;
+    const message = `Bonjour ${selectedRepair.client_name}, Luxury Elegance Garage vous informe que votre facture ${currentInvoice.numero_facture || ''} est disponible.\n\n💰 Montant : ${Number(currentInvoice.total_ttc).toLocaleString()} F\n📄 Télécharger votre facture : ${pdfUrl}\n\nMerci pour votre confiance.`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -826,12 +847,31 @@ const handleDownloadPDF = async () => {
                         <button onClick={handleSendEmail} title="Email" className="p-4 bg-slate-50 text-slate-600 rounded-lg border border-slate-200 hover:bg-slate-900 hover:text-white transition-all duration-500 shadow-sm">
                           <Mail className="w-5 h-5" />
                         </button>
+                        {isDefinitive && currentInvoice && !currentInvoice.is_normalised && (
+                          <button 
+                            onClick={handleNormalize} 
+                            disabled={isNormalizing}
+                            title="Normaliser e-MECeF" 
+                            className="p-4 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all duration-500 shadow-sm disabled:opacity-50"
+                          >
+                            <CheckCircle2 className={`w-5 h-5 ${isNormalizing ? 'animate-spin' : ''}`} />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
 
                   <div className="w-full md:w-96 bg-slate-900 text-white p-10 rounded-xl shadow-2xl relative overflow-hidden group">
                     <div className="relative z-10">
+                      {currentInvoice?.is_normalised && (
+                        <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                          <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <Verified className="w-3 h-3" /> Facture Normalisée
+                          </p>
+                          <p className="text-[10px] font-bold text-slate-300 break-all">Code: {currentInvoice.emecef_code}</p>
+                          <p className="text-[10px] font-bold text-slate-300">Compteurs: {currentInvoice.emecef_counters}</p>
+                        </div>
+                      )}
                       <div className="flex justify-between items-center mb-6">
                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Total Hors Taxes</span>
                         <span className="text-lg font-bold">{(grandTotal).toLocaleString()} F</span>
@@ -901,6 +941,7 @@ const handleDownloadPDF = async () => {
                   <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className="w-full bg-slate-50 border border-emerald-100/30 rounded-2xl px-6 py-4 outline-none focus:border-emerald-500/50 font-bold text-sm shadow-inner transition-all duration-500 appearance-none">
                     <option value="ESPECE">Espèce</option>
                     <option value="MOMOPAY">MomoPay</option>
+                    <option value="KKIAPAY">Kkiapay</option>
                     <option value="VIREMENT">Virement Bancaire</option>
                     <option value="CHEQUE">Chèque</option>
                   </select>

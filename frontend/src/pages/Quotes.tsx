@@ -220,7 +220,7 @@ const Quotes: React.FC = () => {
     
     const { data } = await api.get(`devis/${currentQuote.id}/share_link/`);
     const pdfUrl = data.url;
-    const message = `Bonjour ${selectedRepair.client_name}, LUXEL-G vous a envoyé un devis estimé à ${Number(currentQuote.total_ttc).toLocaleString()} F pour votre véhicule ${selectedRepair.vehicule_plate}.\n\n📄 Consulter le devis ici : ${pdfUrl}\n\nNous attendons votre retour pour débuter les travaux.`;
+    const message = `Bonjour ${selectedRepair.client_name}, Luxury Elegance Garage vous a envoyé un devis estimé à ${Number(currentQuote.total_ttc).toLocaleString()} F pour votre véhicule ${selectedRepair.vehicule_plate}.\n\n📄 Consulter le devis ici : ${pdfUrl}\n\nNous attendons votre retour pour débuter les travaux.`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 

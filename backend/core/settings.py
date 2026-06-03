@@ -207,8 +207,26 @@ EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')       # S3 — pas de valeur par défaut exposée
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'LUXEL-G <noreply@luxelg.bj>')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Luxury Elegance Garage <noreply@luxelg.com>')
 DEV_EXPOSE_OTP = os.getenv('DEV_EXPOSE_OTP', 'False') == 'True'
+
+# Fichiers statiques en production
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Configuration Twilio
+TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
+TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
+TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER')
+
+# Paiement Kkiapay
+KKIAPAY_PUBLIC_KEY = os.getenv('KKIAPAY_PUBLIC_KEY')
+KKIAPAY_PRIVATE_KEY = os.getenv('KKIAPAY_PRIVATE_KEY')
+KKIAPAY_SECRET = os.getenv('KKIAPAY_SECRET')
+KKIAPAY_SANDBOX = os.getenv('KKIAPAY_SANDBOX', 'True') == 'True'
+
+# e-MECeF DGI Bénin
+EMECEF_API_TOKEN = os.getenv('EMECEF_API_TOKEN')
+EMECEF_API_URL = os.getenv('EMECEF_API_URL', 'https://test-api.impots.bj/sygmef-emcf')
 
 JAZZMIN_SETTINGS = {
     "site_title": "LUXEL-G Admin",

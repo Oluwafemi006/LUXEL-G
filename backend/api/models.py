@@ -118,6 +118,7 @@ class Facture(models.Model):
         ('MOMOPAY', 'MomoPay'),
         ('VIREMENT', 'Virement Bancaire'),
         ('CHEQUE', 'Chèque'),
+        ('KKIAPAY', 'Kkiapay'),
         ('AUTRE', 'Autre'),
     ]
     reparation = models.OneToOneField(Reparation, on_delete=models.PROTECT, related_name='facture')
@@ -135,6 +136,14 @@ class Facture(models.Model):
     # M2 — Champs de traçabilité paiement (requis par le CDC)
     numero_cheque = models.CharField(max_length=50, blank=True, null=True, verbose_name="N° de chèque")
     reference_virement = models.CharField(max_length=100, blank=True, null=True, verbose_name="Référence virement")
+
+    # e-MECeF fields
+    emecef_uid = models.CharField(max_length=100, blank=True, null=True)
+    emecef_code = models.CharField(max_length=50, blank=True, null=True)
+    emecef_qr_code = models.TextField(blank=True, null=True)
+    emecef_counters = models.CharField(max_length=100, blank=True, null=True)
+    emecef_status = models.CharField(max_length=50, blank=True, null=True)
+    is_normalised = models.BooleanField(default=False)
 
     date_creation = models.DateTimeField(auto_now_add=True)
     date_validation = models.DateTimeField(blank=True, null=True)

@@ -65,10 +65,20 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Intercepteur pour gérer les erreurs 401 (token expiré)
+// Intercepteur pour gérer les erreurs 401 (token expiré) et les erreurs réseau
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // 1. Gestion des erreurs réseau (backend hors ligne ou pas de connexion)
+    if (!error.response && error.isAxiosError) {
+      console.error("Erreur réseau globale :", error.message);
+      // On peut déclencher un événement global ici si on veut afficher un toast UI
+      window.dispatchEvent(new CustomEvent('network_error', { detail: 'Connexion au serveur perdue. Veuillez vérifier votre connexion internet.' }));
+      // Optionnellement une simple alerte (attention, peut être spammy, mais efficace pour le debug)
+      // alert('Connexion au serveur perdue. Vérifiez votre connexion internet.');
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config;
     
     // Ignorer les requêtes d'authentification pour éviter les boucles de redirection

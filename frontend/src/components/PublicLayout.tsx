@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom';
-import { Phone, Home, Wrench, CalendarCheck, UserCircle, Images } from 'lucide-react';
+import { Phone, Home, Wrench, CalendarCheck, UserCircle, Images, Bot, X, MessageCircle, Send, Loader2 } from 'lucide-react';
 import logoImg from '../assets/logo.png';
+import api from '../services/api';
+import '../pages/PublicPortal.css'; // S'assurer que les styles globaux du portal sont chargés
+
+interface ChatMessage {
+  role: 'user' | 'bot';
+  text: string;
+}
 import '../pages/PublicPortal.css'; // S'assurer que les styles globaux du portal sont chargés
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -15,6 +22,37 @@ const PublicLayout: React.FC = () => {
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('accueil');
+
+  // F1 — Chatbot IA
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    { role: 'bot', text: '👋 Bonjour ! Je suis l\'assistant Luxury Elegance Garage. Comment puis-je vous aider ?' }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // F1 — Scroll automatique vers le bas du chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  const sendChat = async () => {
+    const msg = chatInput.trim();
+    if (!msg || chatLoading) return;
+    const history = chatMessages.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'model', text: m.text }));
+    setChatMessages(prev => [...prev, { role: 'user', text: msg }]);
+    setChatInput('');
+    setChatLoading(true);
+    try {
+      const res = await api.post('ai/chatbot/', { message: msg, history });
+      setChatMessages(prev => [...prev, { role: 'bot', text: res.data.response }]);
+    } catch {
+      setChatMessages(prev => [...prev, { role: 'bot', text: 'Désolé, je rencontre un problème de connexion. Veuillez réessayer.' }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -184,6 +222,76 @@ const PublicLayout: React.FC = () => {
           <span className="footer-motto">Excellence · Confiance · Expertise</span>
         </div>
       </footer>
+
+      {/* ══ F1 — CHATBOT IA FLOTTANT (Global) ══ */}
+      <div className={`chatbot-fab-wrap ${location.pathname === '/espace-client' ? 'client-space-adjust' : ''}`}>
+        {/* Fenêtre de chat */}
+        {chatOpen && (
+          <div className="chatbot-window">
+            <div className="chatbot-header">
+              <div className="chatbot-header-info">
+                <div className="chatbot-avatar"><Bot size={16} /></div>
+                <div>
+                <div className="chatbot-name">Assistant Luxury Elegance Garage</div>
+                  <div className="chatbot-status">● En ligne</div>
+                </div>
+              </div>
+              <button className="chatbot-close" onClick={() => setChatOpen(false)}><X size={18} /></button>
+            </div>
+
+            <div className="chatbot-messages">
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`chat-msg ${msg.role}`}>
+                  {msg.role === 'bot' && <div className="chat-bot-av"><Bot size={13} /></div>}
+                  <div className="chat-bubble">{msg.text}</div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div className="chat-msg bot">
+                  <div className="chat-bot-av"><Bot size={13} /></div>
+                  <div className="chat-bubble chat-typing">
+                    <Loader2 size={14} className="chat-spin" />
+                    <span>En train d'écrire…</span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            <div className="chatbot-suggestions">
+              {['Quels sont vos horaires ?', 'Prendre un RDV', 'Vos services ?'].map(s => (
+                <button key={s} className="chat-suggest" onClick={() => { setChatInput(s); }}>
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            <div className="chatbot-input-row">
+              <input
+                className="chatbot-input"
+                placeholder="Posez votre question…"
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && sendChat()}
+                disabled={chatLoading}
+              />
+              <button className="chatbot-send" onClick={sendChat} disabled={chatLoading || !chatInput.trim()}>
+                <Send size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Bouton flottant */}
+        <button
+          className={`chatbot-fab ${chatOpen ? 'open' : ''}`}
+          onClick={() => setChatOpen(o => !o)}
+          aria-label="Assistant virtuel"
+        >
+          {chatOpen ? <X size={22} /> : <MessageCircle size={22} />}
+          {!chatOpen && <span className="chatbot-fab-badge">IA</span>}
+        </button>
+      </div>
 
     </div>
   );

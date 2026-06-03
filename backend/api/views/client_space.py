@@ -54,10 +54,9 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         dev_otp_suffix = f" Code test : {code}" if settings.DEV_EXPOSE_OTP else ""
 
         try:
-            from django.core.mail import EmailMessage
             EmailMessage(
-                f"Votre code de connexion LUXEL-G : {code}",
-                f"Bonjour {client.nom} {client.prenoms},\n\nCode : {code}\n\nValide 10 minutes.\n\nLUXEL-G",
+                f"Votre code de connexion Luxury Elegance Garage : {code}",
+                f"Bonjour {client.nom} {client.prenoms},\n\nCode : {code}\n\nValide 10 minutes.\n\nLuxury Elegance Garage",
                 to=[client.email]
             ).send()
             send_otp_sms(client.contact, code)
@@ -205,3 +204,171 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             serializer.save()
             return Response(ClientSerializer(client).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='request-invoice-modification')
+    def request_invoice_modification(self, request):
+        """
+        Permet au client de demander une modification de sa facture/proforma
+        avant de procéder au paiement (ex: retirer un travail du devis).
+        """
+        try:
+            client = request.user.client_profile
+        except AttributeError:
+            return Response({'error': 'Accès non autorisé'}, status=status.HTTP_403_FORBIDDEN)
+
+        invoice_id = request.data.get('invoice_id')
+        message = (request.data.get('message') or '').strip()
+
+        if not invoice_id or not message:
+            return Response(
+                {'error': 'ID facture et message de modification requis.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Vérifier que la facture appartient bien à ce client
+        facture = Facture.objects.filter(
+            id=invoice_id,
+            reparation__vehicule__client=client
+        ).first()
+
+        if not facture:
+            return Response(
+                {'error': 'Facture introuvable ou accès non autorisé.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if facture.statut_paiement == 'SOLDE':
+            return Response(
+                {'error': 'Cette facture est déjà soldée et ne peut plus être modifiée.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Créer une notification pour le staff
+        NotificationStaff.objects.create(
+            type='DEMANDE_MODIFICATION',
+            message=(
+                f"📝 Demande de modification — {client.nom} {client.prenoms} "
+                f"souhaite modifier la facture {facture.numero_facture or f'#{facture.id}'} "
+                f"({float(facture.total_ttc):,.0f} F) :\n\n\"{message}\""
+            )
+        )
+
+        logger.info(
+            "[CLIENT-MODIF] Client %s demande modification facture %s : %s",
+            client.nom, facture.id, message[:100]
+        )
+
+        return Response({
+            'message': 'Votre demande de modification a été envoyée au garage. '
+                       'Vous serez contacté sous peu.'
+        })
+
+    @action(detail=False, methods=['post'], url_path='pay-kkiapay')
+    def pay_kkiapay(self, request):
+        """
+        Paiement Kkiapay initié depuis l'espace client.
+        Sécurité : la facture doit appartenir au client connecté.
+        """
+        try:
+            client = request.user.client_profile
+        except AttributeError:
+            return Response({'error': 'Accès non autorisé'}, status=status.HTTP_403_FORBIDDEN)
+
+        invoice_id = request.data.get('invoice_id')
+        transaction_id = request.data.get('transaction_id')
+
+        if not invoice_id or not transaction_id:
+            return Response(
+                {'error': 'ID facture et ID transaction requis'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Vérifier que la facture appartient bien à ce client
+        facture = Facture.objects.filter(
+            id=invoice_id,
+            reparation__vehicule__client=client
+        ).first()
+
+        if not facture:
+            return Response(
+                {'error': 'Facture introuvable ou accès non autorisé'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if facture.statut_paiement == 'SOLDE':
+            return Response({'message': 'Cette facture est déjà soldée.'}, status=status.HTTP_200_OK)
+
+        # Vérification de la transaction Kkiapay
+        from api.services import verify_kkiapay_transaction
+        kkiapay_tx = verify_kkiapay_transaction(transaction_id)
+
+        if not kkiapay_tx or kkiapay_tx.get('status') not in ('SUCCESSFULL', 'SUCCESS'):
+            logger.warning("[KKIAPAY-CLIENT] Transaction non valide pour facture %s : %s", invoice_id, kkiapay_tx)
+            return Response(
+                {'error': "Transaction Kkiapay invalide ou non aboutie."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        montant = Decimal(str(kkiapay_tx.get('amount', 0)))
+        if montant <= 0:
+            return Response({'error': 'Montant invalide'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            facture.montant_paye += montant
+            facture.mode_paiement = 'KKIAPAY'
+            facture.statut_paiement = 'SOLDE' if facture.montant_paye >= facture.total_ttc else 'PARTIEL'
+            facture.save()
+
+            MouvementCaisse.objects.create(
+                type_mouvement='RECETTE',
+                categorie='RECETTE_CLIENT',
+                montant=montant,
+                description=f"Paiement Kkiapay — Facture {facture.numero_facture or facture.id} (TX: {transaction_id})",
+                facture=facture,
+                date_mouvement=timezone.now().date(),
+                utilisateur=request.user
+            )
+
+            NotificationStaff.objects.create(
+                type='PAIEMENT_RECU',
+                message=f"Paiement Kkiapay de {montant:,.0f} F reçu de {client.nom} {client.prenoms} — Facture {facture.numero_facture or facture.id}."
+            )
+
+        # Envoi de l'email de reçu avec la facture
+        if client.email:
+            try:
+                from django.core.mail import EmailMessage
+                from django.conf import settings
+                from api.services import generate_document_pdf
+                
+                pdf_content = generate_document_pdf(facture, doc_type="FACTURE")
+                
+                email_subject = f"Reçu de paiement - Facture {facture.numero_facture or facture.id}"
+                email_body = f"""Bonjour {client.nom} {client.prenoms},
+
+Nous avons bien reçu votre paiement de {montant:,.0f} FCFA pour la facture {facture.numero_facture or facture.id}.
+Nous vous remercions pour votre confiance.
+
+Veuillez trouver ci-joint la facture mise à jour.
+
+L'équipe Luxury Elegance Garage"""
+
+                email = EmailMessage(
+                    email_subject,
+                    email_body,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [client.email]
+                )
+                email.attach(f'Facture_{facture.numero_facture or facture.id}.pdf', pdf_content, 'application/pdf')
+                email.send(fail_silently=True)
+                logger.info(f"Email de reçu envoyé à {client.email}")
+            except Exception as e:
+                logger.error(f"Erreur lors de l'envoi de l'email de reçu : {str(e)}")
+
+        logger.info("[KKIAPAY-CLIENT] Facture %s — %s FCFA — Client %s", facture.id, montant, client.nom)
+        return Response({
+            'message': f'Paiement de {montant:,.0f} FCFA validé avec succès !',
+            'statut_paiement': facture.statut_paiement,
+            'montant_paye': str(facture.montant_paye),
+            'reste': str(max(Decimal('0'), facture.total_ttc - facture.montant_paye))
+        })

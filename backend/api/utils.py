@@ -1,5 +1,6 @@
 import io
 import os
+import qrcode
 from django.conf import settings
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -193,6 +194,7 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
     style_title = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor("#0056b3"), alignment=1, spaceAfter=20)
     style_label = ParagraphStyle('LabelStyle', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold')
     style_value = ParagraphStyle('ValueStyle', parent=styles['Normal'], fontSize=10)
+    style_emecef = ParagraphStyle('EmecefStyle', parent=styles['Normal'], fontSize=8, leading=10)
 
     # 1. Header (Logo & Company Info)
     logo = get_logo_image(width=4.5*cm)
@@ -296,6 +298,41 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
         ('TEXTCOLOR', (-2,-1), (-1,-1), colors.HexColor("#0056b3")),
     ]))
     elements.append(total_table)
+
+    # 5b. e-MECeF Security Info (Only for Facture and if Normalised)
+    if doc_type == "FACTURE" and getattr(obj, 'is_normalised', False):
+        elements.append(Spacer(1, 0.5*cm))
+        
+        # Generate QR Code
+        qr_data = obj.emecef_qr_code or obj.emecef_code
+        qr = qrcode.QRCode(version=1, box_size=10, border=1)
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        img_qr = qr.make_image(fill_color="black", back_color="white")
+        
+        qr_buffer = io.BytesIO()
+        img_qr.save(qr_buffer)
+        qr_buffer.seek(0)
+        
+        qr_img_rl = Image(qr_buffer, width=3*cm, height=3*cm)
+        
+        emecef_info = [
+            [qr_img_rl, Paragraph(
+                f"<b>CODE MECeF/DGI :</b> {obj.emecef_code}<br/>"
+                f"<b>COMPTEURS :</b> {obj.emecef_counters}<br/>"
+                f"<b>DATE NORMALISATION :</b> {obj.date_validation.strftime('%d/%m/%Y %H:%M') if obj.date_validation else ''}<br/>"
+                f"<br/><i>Cette facture est certifiée par la DGI Bénin.</i>",
+                style_emecef
+            )]
+        ]
+        emecef_table = Table(emecef_info, colWidths=[3.5*cm, 13.5*cm])
+        emecef_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('ALIGN', (0,0), (0,0), 'LEFT'),
+            ('BOX', (0,0), (-1,-1), 0.5, colors.grey),
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f9f9f9")),
+        ]))
+        elements.append(emecef_table)
     
     # 6. Footer
     elements.append(Spacer(1, 2*cm))

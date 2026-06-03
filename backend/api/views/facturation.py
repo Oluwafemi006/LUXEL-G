@@ -1,7 +1,9 @@
 """Facturation : Factures et Devis."""
 import logging
 from django.core import signing
+from django.db import transaction as db_transaction
 from ._imports import *
+from ..services import verify_kkiapay_transaction, generate_emecef_invoice
 
 logger = logging.getLogger(__name__)
 DOCUMENT_SHARE_SALT = 'luxel-g-document-share'
@@ -75,7 +77,7 @@ class FactureViewSet(viewsets.ModelViewSet):
         facture = self.get_object()
         montant = Decimal(str(request.data.get('montant', 0)))
 
-        MODE_VALIDES = ['ESPECE', 'MOMOPAY', 'VIREMENT', 'CHEQUE', 'AUTRE']
+        MODE_VALIDES = ['ESPECE', 'MOMOPAY', 'VIREMENT', 'CHEQUE', 'KKIAPAY', 'AUTRE']
         mode_paiement = request.data.get('mode_paiement', '').upper()
         if not mode_paiement or mode_paiement not in MODE_VALIDES:
             return Response(
@@ -96,12 +98,10 @@ class FactureViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Montant invalide'}, status=status.HTTP_400_BAD_REQUEST)
 
         total_apres = facture.montant_paye + montant
-        seuil_75 = facture.total_ttc * Decimal('0.75')
-        if total_apres < seuil_75:
-            return Response(
-                {'error': f'Minimum 75% requis ({seuil_75:,.0f} FCFA).'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # M4 — Ne plus forcer 75% si c'est déjà entamé ou selon besoin flexible
+        # seuil_75 = facture.total_ttc * Decimal('0.75')
+        # if total_apres < seuil_75:
+        #    return Response(...)
 
         facture.montant_paye += montant
         facture.mode_paiement = mode_paiement
@@ -121,11 +121,82 @@ class FactureViewSet(viewsets.ModelViewSet):
             date_mouvement=timezone.now().date(),
             utilisateur=request.user if request.user.is_authenticated else None
         )
+
+        # Normalisation automatique e-MECeF au solde (Optionnel)
+        if facture.statut_paiement == 'SOLDE' and not facture.is_normalised:
+            res_emecef = generate_emecef_invoice(facture)
+            if res_emecef:
+                facture.emecef_uid = res_emecef.get('uid')
+                facture.emecef_code = res_emecef.get('codeMECeF')
+                facture.emecef_qr_code = res_emecef.get('qrCode')
+                facture.emecef_counters = res_emecef.get('counters')
+                facture.emecef_status = res_emecef.get('status')
+                facture.is_normalised = True
+                facture.save()
+
         NotificationStaff.objects.create(
             type='PAIEMENT_RECU',
             message=f"Paiement de {montant:,.0f} F reçu pour la facture {facture.numero_facture}."
         )
         return Response(FactureSerializer(facture).data)
+
+    @action(detail=True, methods=['post'])
+    def verify_kkiapay(self, request, pk=None):
+        """Action pour vérifier une transaction Kkiapay depuis le frontend."""
+        facture = self.get_object()
+        transaction_id = request.data.get('transaction_id')
+        if not transaction_id:
+            return Response({'error': 'ID de transaction manquant'}, status=status.HTTP_400_BAD_REQUEST)
+
+        transaction = verify_kkiapay_transaction(transaction_id)
+        if transaction and transaction.status == "SUCCESS":
+            montant = Decimal(str(transaction.amount))
+            with db_transaction.atomic():
+                facture.montant_paye += montant
+                facture.mode_paiement = 'KKIAPAY'
+                facture.statut_paiement = 'SOLDE' if facture.montant_paye >= facture.total_ttc else 'PARTIEL'
+                facture.save()
+                
+                MouvementCaisse.objects.create(
+                    type_mouvement='RECETTE', categorie='RECETTE_CLIENT', montant=montant,
+                    description=f"Paiement Kkiapay {facture.numero_facture} (ID: {transaction_id})", 
+                    facture=facture, date_mouvement=timezone.now().date(),
+                    utilisateur=request.user if request.user.is_authenticated else None
+                )
+
+                if facture.statut_paiement == 'SOLDE' and not facture.is_normalised:
+                    res_emecef = generate_emecef_invoice(facture)
+                    if res_emecef:
+                        facture.emecef_uid = res_emecef.get('uid')
+                        facture.emecef_code = res_emecef.get('codeMECeF')
+                        facture.emecef_qr_code = res_emecef.get('qrCode')
+                        facture.emecef_counters = res_emecef.get('counters')
+                        facture.emecef_status = res_emecef.get('status')
+                        facture.is_normalised = True
+                        facture.save()
+
+            return Response(FactureSerializer(facture).data)
+        return Response({'error': 'Transaction invalide ou échouée'}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def normaliser(self, request, pk=None):
+        """Action pour normaliser manuellement une facture via e-MECeF."""
+        facture = self.get_object()
+        if facture.is_normalised:
+            return Response({'error': 'Facture déjà normalisée'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        res = generate_emecef_invoice(facture)
+        if res:
+            facture.emecef_uid = res.get('uid')
+            facture.emecef_code = res.get('codeMECeF')
+            facture.emecef_qr_code = res.get('qrCode')
+            facture.emecef_counters = res.get('counters')
+            facture.emecef_status = res.get('status')
+            facture.is_normalised = True
+            facture.save()
+            return Response(FactureSerializer(facture).data)
+        
+        return Response({'error': 'Échec de la normalisation'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'])
     def relancer_paiement(self, request, pk=None):
@@ -172,10 +243,10 @@ class FactureViewSet(viewsets.ModelViewSet):
             return Response({'error': "Le client n'a pas d'adresse email."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             pdf = generate_document_pdf(facture, doc_type="FACTURE")
-            subject = f"Facture LUXEL-G - {facture.numero_facture or 'Proforma'}"
-            body = (f"Bonjour {client.nom} {client.prenoms},\n\n"
+            subject = f"Facture Luxury Elegance Garage - {facture.numero_facture or 'Proforma'}"
+            body = (f"Bonjour {facture.reparation.vehicule.client.nom},\n\n"
                     f"Veuillez trouver ci-joint votre facture pour le véhicule {facture.reparation.vehicule.immatriculation}.\n"
-                    f"Montant Total : {facture.total_ttc} FCFA.\n\nCordialement,\nL'équipe LUXEL-G")
+                    f"Montant Total : {facture.total_ttc} FCFA.\n\nCordialement,\nL'équipe Luxury Elegance Garage")
             email = EmailMessage(subject, body, to=[client.email])
             email.attach(f"Facture_{facture.numero_facture or 'Proforma'}.pdf", pdf, 'application/pdf')
             email.send()
@@ -239,10 +310,10 @@ class DevisViewSet(viewsets.ModelViewSet):
             return Response({'error': "Le client n'a pas d'adresse email."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             pdf = generate_document_pdf(devis, doc_type="DEVIS")
-            subject = f"Devis LUXEL-G - {devis.numero_devis or 'Brouillon'}"
-            body = (f"Bonjour {client.nom} {client.prenoms},\n\n"
+            subject = f"Devis Luxury Elegance Garage - {devis.numero_devis or 'Brouillon'}"
+            body = (f"Bonjour {devis.reparation.vehicule.client.nom},\n\n"
                     f"Veuillez trouver ci-joint le devis pour le véhicule {devis.reparation.vehicule.immatriculation}.\n"
-                    f"Total Estimé : {devis.total_ttc} FCFA.\n\nCordialement,\nL'équipe LUXEL-G")
+                    f"Total Estimé : {devis.total_ttc} FCFA.\n\nCordialement,\nL'équipe Luxury Elegance Garage")
             email = EmailMessage(subject, body, to=[client.email])
             email.attach(f"Devis_{devis.numero_devis or 'Brouillon'}.pdf", pdf, 'application/pdf')
             email.send()

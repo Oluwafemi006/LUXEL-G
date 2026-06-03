@@ -7,6 +7,7 @@ import {
   Star, 
   LogOut, 
   Smartphone,
+  Mail,
   History,
   Wrench,
   Clock,
@@ -16,15 +17,37 @@ import {
   Layers,
   FileText,
   Download,
+  CreditCard,
   Calendar,
   AlertCircle,
   Camera,
   MessageSquare,
   Phone,
   Bell,
-  Info
+  Info,
+  Edit3,
+  X,
+  Send
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../services/api';
+
+// Déclaration TypeScript des globaux Kkiapay (chargés via CDN dans index.html)
+declare global {
+  interface Window {
+    openKkiapayWidget: (opts: {
+      amount: number;
+      position?: string;
+      key: string;
+      sandbox?: boolean;
+      name?: string;
+      email?: string;
+      phone?: string;
+      data?: string;
+    }) => void;
+    addKkiapayListener: (event: string, callback: (response: any) => void) => void;
+    removeKkiapayListener: (event: string, callback: (response: any) => void) => void;
+  }
+}
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -59,6 +82,9 @@ interface Invoice {
   statut_paiement: string;
   date_creation: string;
   vehicule_plate: string;
+  is_normalised?: boolean;
+  emecef_code?: string;
+  emecef_qr_code?: string;
 }
 
 interface Appointment {
@@ -85,7 +111,9 @@ interface Maintenance {
 }
 
 const ClientSpace: React.FC = () => {
-  const [identifier, setIdentifier] = useState(''); // email ou téléphone
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [loginMethod, setLoginMethod] = useState<'PHONE' | 'EMAIL'>('PHONE');
   const [otp, setOtp] = useState('');
   const [view, setView] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [otpStep, setOtpStep] = useState<'PHONE' | 'OTP'>('PHONE');
@@ -95,8 +123,9 @@ const ClientSpace: React.FC = () => {
   const [clientData, setClientData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'VEHICLES' | 'REPAIRS' | 'INVOICES' | 'APPOINTMENTS' | 'PROFILE'>('OVERVIEW');
 
-  // Détection automatique du type d'identifiant
-  const isEmailInput = identifier.includes('@');
+  // Détection automatique du type d'identifiant (Legacy, removed for separate fields)
+  // const isEmailInput = identifier.includes('@');
+  const identifier = loginMethod === 'EMAIL' ? email : phone;
 
   // État pour la photo de profil
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
@@ -232,7 +261,8 @@ const ClientSpace: React.FC = () => {
     setClientData(null);
     setOtpStep('PHONE');
     setOtp('');
-    setIdentifier('');
+    setPhone('');
+    setEmail('');
   };
 
   const handleAvisSubmit = async (e: React.FormEvent) => {
@@ -277,7 +307,8 @@ const ClientSpace: React.FC = () => {
     setError('');
     try {
       await api.post('client-space/register/', registerData);
-      setIdentifier(registerData.contact);
+      setPhone(registerData.contact);
+      setLoginMethod('PHONE');
       setView('LOGIN');
       setOtpStep('PHONE');
       alert('Compte créé avec succès. Veuillez vous connecter.');
@@ -337,6 +368,83 @@ const ClientSpace: React.FC = () => {
     }
   };
 
+  // --- PAIEMENT KKIAPAY ---
+  const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
+  const [paySuccess, setPaySuccess] = useState<{ message: string; montant: string } | null>(null);
+
+  // --- DEMANDE DE MODIFICATION FACTURE ---
+  const [modifInvoice, setModifInvoice] = useState<Invoice | null>(null);
+  const [modifMessage, setModifMessage] = useState('');
+  const [modifLoading, setModifLoading] = useState(false);
+  const [modifSuccess, setModifSuccess] = useState(false);
+
+  const handleRequestModification = async () => {
+    if (!modifInvoice || !modifMessage.trim()) return;
+    setModifLoading(true);
+    try {
+      await api.post('client-space/request-invoice-modification/', {
+        invoice_id: modifInvoice.id,
+        message: modifMessage.trim()
+      });
+      setModifSuccess(true);
+      setTimeout(() => {
+        setModifInvoice(null);
+        setModifMessage('');
+        setModifSuccess(false);
+      }, 3000);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erreur lors de l\'envoi de la demande.');
+    } finally {
+      setModifLoading(false);
+    }
+  };
+
+  const handlePayKkiapay = (invoice: Invoice) => {
+    const reste = Number(invoice.total_ttc) - Number(invoice.montant_paye);
+    if (reste <= 0) return;
+
+    if (!window.openKkiapayWidget) {
+      alert('Le module de paiement Kkiapay n\'est pas disponible. Vérifiez votre connexion.');
+      return;
+    }
+
+    setPayingInvoice(invoice);
+
+    // Listener de succès — on l'enregistre UNE SEULE FOIS avant d'ouvrir
+    const onSuccess = async (response: any) => {
+      window.removeKkiapayListener?.('success', onSuccess);
+      try {
+        const res = await api.post('client-space/pay-kkiapay/', {
+          invoice_id: invoice.id,
+          transaction_id: response.transactionId
+        });
+        setPaySuccess({
+          message: res.data.message || 'Paiement validé !',
+          montant: Number(reste).toLocaleString('fr-FR')
+        });
+        fetchClientData(); // Rafraîchir les données
+      } catch (err: any) {
+        alert(err.response?.data?.error || 'Erreur lors de la validation du paiement. Contactez le garage.');
+      } finally {
+        setPayingInvoice(null);
+      }
+    };
+
+    window.addKkiapayListener('success', onSuccess);
+
+    window.openKkiapayWidget({
+      amount: Math.round(reste),
+      position: 'right',
+      key: 'pk_7306233a75871b93196f30a905a567ef672f5d93e506e78864', // À remplacer par la clé prod
+      sandbox: true, // À passer à false en production
+      name: `${clientData?.client?.nom || ''} ${clientData?.client?.prenoms || ''}`.trim(),
+      email: clientData?.client?.email || '',
+      phone: clientData?.client?.contact || '',
+      data: JSON.stringify({ invoice_id: invoice.id })
+    });
+  };
+
+
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 font-oswald animate-in fade-in duration-700">
@@ -359,35 +467,48 @@ const ClientSpace: React.FC = () => {
             otpStep === 'PHONE' ? (
               <form onSubmit={handleRequestOTP} className="space-y-6">
                 <div className="space-y-1">
-                  {/* Label dynamique */}
                   <div className="flex items-center justify-between ml-1">
                     <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest">
-                      {isEmailInput ? 'Adresse Email' : 'Téléphone ou Email'}
+                      {loginMethod === 'EMAIL' ? 'Adresse Email' : 'Numéro de Téléphone'}
                     </label>
-                    {isEmailInput && (
-                      <span className="text-[9px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                        ✓ Email détecté
-                      </span>
-                    )}
                   </div>
                   <div className="relative">
-                    {isEmailInput
-                      ? <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 w-4 h-4" />
-                      : <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
-                    }
-                    <input 
-                      type={isEmailInput ? 'email' : 'text'}
-                      required 
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-sm transition-all"
-                      placeholder="Téléphone (0101020304) ou Email"
-                    />
+                    {loginMethod === 'EMAIL' ? (
+                      <>
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 w-4 h-4" />
+                        <input 
+                          type="email"
+                          required 
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-sm transition-all"
+                          placeholder="votre@email.com"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                        <input 
+                          type="tel"
+                          required 
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-sm transition-all"
+                          placeholder="0102030405"
+                        />
+                      </>
+                    )}
                   </div>
-                  <p className="text-[9px] text-slate-400 font-medium ml-1">
-                    📧 Email → vous recevrez le code par email<br/>
-                    📱 Téléphone → le code sera envoyé à l'email lié à votre compte
-                  </p>
+                  <div className="flex justify-end mt-2">
+                    <button 
+                      type="button" 
+                      onClick={() => setLoginMethod(loginMethod === 'PHONE' ? 'EMAIL' : 'PHONE')}
+                      className="text-[10px] font-bold text-slate-500 hover:text-emerald-600 uppercase tracking-widest flex items-center gap-1.5 transition-colors"
+                    >
+                      {loginMethod === 'PHONE' ? <Mail className="w-3 h-3" /> : <Smartphone className="w-3 h-3" />}
+                      {loginMethod === 'PHONE' ? 'Utiliser mon adresse mail' : 'Utiliser mon téléphone'}
+                    </button>
+                  </div>
                 </div>
                 {error && (
                    <div className="p-3 bg-rose-50 border border-rose-100 rounded-md flex items-center gap-2">
@@ -657,30 +778,135 @@ const ClientSpace: React.FC = () => {
 
           {activeTab === 'INVOICES' && (
             <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-700">
-              {clientData.factures.map((inv: Invoice) => (
-                <div key={inv.id} className="p-6 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 group hover:border-emerald-500 transition-all">
-                  <div className="flex items-center gap-5">
-                    <div className="w-12 h-12 bg-slate-50 rounded-md flex items-center justify-center text-slate-400 group-hover:bg-emerald-600 group-hover:text-white transition-all">
-                      <FileText className="w-6 h-6" />
+
+              {/* Modal de succès paiement */}
+              {paySuccess && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" onClick={() => setPaySuccess(null)}>
+                  <div className="bg-white rounded-2xl p-10 max-w-sm w-full text-center shadow-2xl border border-emerald-100 animate-in zoom-in-95 duration-500" onClick={e => e.stopPropagation()}>
+                    <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <CheckCircle2 className="w-10 h-10 text-emerald-600" />
                     </div>
-                    <div className="space-y-0.5">
-                      <p className="text-sm font-bold text-emerald-600">{inv.numero_facture || 'PROFORMA'}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(inv.date_creation).toLocaleDateString()} • {inv.vehicule_plate}</p>
-                      <p className="text-lg font-bebas tracking-wider uppercase text-slate-900">{Number(inv.total_ttc).toLocaleString()} FCFA</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span className={`px-3 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${inv.statut_paiement === 'SOLDE' ? 'bg-emerald-600 text-white' : 'bg-rose-50 text-rose-600'}`}>
-                      {inv.statut_paiement.replace('_', ' ')}
-                    </span>
-                    <button onClick={() => downloadInvoice(inv.id)} className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-md text-[10px] font-bebas tracking-widest uppercase hover:bg-emerald-600 transition-all active:scale-95">
-                      <Download className="w-3 h-3" /> PDF
+                    <h3 className="text-3xl font-bebas tracking-wider text-slate-900 mb-2">Paiement confirmé !</h3>
+                    <p className="text-emerald-600 font-black text-xl mb-1">{paySuccess.montant} FCFA</p>
+                    <p className="text-slate-400 text-xs font-medium mb-8">{paySuccess.message}</p>
+                    <button
+                      onClick={() => setPaySuccess(null)}
+                      className="w-full bg-slate-900 text-white py-3 rounded-lg font-bebas tracking-widest uppercase text-sm hover:bg-emerald-600 transition-all"
+                    >
+                      Fermer
                     </button>
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* En-tête résumé financier */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-2">
+                <div className="bg-slate-900 text-white p-5 rounded-xl text-center">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-400 mb-1">Total Facturé</p>
+                  <p className="text-2xl font-bebas tracking-wider">
+                    {clientData.factures.reduce((s: number, f: Invoice) => s + Number(f.total_ttc), 0).toLocaleString('fr-FR')}
+                    <span className="text-sm text-slate-400 ml-1">F</span>
+                  </p>
+                </div>
+                <div className="bg-emerald-600 text-white p-5 rounded-xl text-center">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-emerald-200 mb-1">Déjà Payé</p>
+                  <p className="text-2xl font-bebas tracking-wider">
+                    {clientData.factures.reduce((s: number, f: Invoice) => s + Number(f.montant_paye), 0).toLocaleString('fr-FR')}
+                    <span className="text-sm text-emerald-200 ml-1">F</span>
+                  </p>
+                </div>
+                <div className={`p-5 rounded-xl text-center col-span-2 md:col-span-1 ${clientData.solde_impaye > 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-500'}`}>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.3em] mb-1 opacity-70">Reste à Payer</p>
+                  <p className="text-2xl font-bebas tracking-wider">
+                    {Number(clientData.solde_impaye || 0).toLocaleString('fr-FR')}
+                    <span className="text-sm ml-1 opacity-60">F</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Liste des factures */}
+              {clientData.factures.length === 0 ? (
+                <div className="p-12 bg-slate-50 rounded-xl text-center border border-dashed border-slate-200 text-slate-400">
+                  <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-xs font-bold uppercase tracking-widest">Aucune facture disponible.</p>
+                </div>
+              ) : clientData.factures.map((inv: Invoice) => {
+                const reste = Math.max(0, Number(inv.total_ttc) - Number(inv.montant_paye));
+                const pct = inv.total_ttc > 0 ? Math.round((Number(inv.montant_paye) / Number(inv.total_ttc)) * 100) : 100;
+                const isSolde = inv.statut_paiement === 'SOLDE';
+                const isPartiel = inv.statut_paiement === 'PARTIEL';
+
+                return (
+                  <div key={inv.id} className={`p-6 bg-white rounded-xl border shadow-sm transition-all group hover:shadow-md ${isSolde ? 'border-emerald-200' : 'border-rose-200 hover:border-rose-400'}`}>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
+                      {/* Infos facture */}
+                      <div className="flex items-start gap-4 flex-1">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isSolde ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
+                          <FileText className="w-6 h-6" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-black text-emerald-600 tracking-wider">{inv.numero_facture || 'PROFORMA'}</p>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${isSolde ? 'bg-emerald-100 text-emerald-700' : isPartiel ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
+                              {isSolde ? '✓ Soldé' : isPartiel ? 'Partiel' : 'Non payé'}
+                            </span>
+                          </div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                            {new Date(inv.date_creation).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })} • {inv.vehicule_plate}
+                          </p>
+                          {/* Montants */}
+                          <div className="mt-3 space-y-1.5">
+                            <div className="flex justify-between text-xs">
+                              <span className="font-bold text-slate-900">{Number(inv.total_ttc).toLocaleString('fr-FR')} FCFA</span>
+                              {!isSolde && <span className="text-rose-600 font-black">Reste : {reste.toLocaleString('fr-FR')} F</span>}
+                            </div>
+                            {/* Barre de progression paiement */}
+                            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-1000 ${isSolde ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <p className="text-[9px] text-slate-400 font-medium">{pct}% payé</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 flex-shrink-0 self-end md:self-center flex-wrap">
+                        {!isSolde && (
+                          <>
+                            <button
+                              onClick={() => handlePayKkiapay(inv)}
+                              disabled={payingInvoice?.id === inv.id}
+                              className="flex items-center gap-1.5 px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-[10px] font-bebas tracking-widest uppercase hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200 disabled:opacity-50"
+                            >
+                              <CreditCard className="w-3.5 h-3.5" />
+                              {payingInvoice?.id === inv.id ? 'Paiement...' : `Payer ${reste.toLocaleString('fr-FR')} F`}
+                            </button>
+                            <button
+                              onClick={() => { setModifInvoice(inv); setModifMessage(''); setModifSuccess(false); }}
+                              className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-500 text-white rounded-lg text-[10px] font-bebas tracking-widest uppercase hover:bg-amber-600 transition-all active:scale-95 shadow-md"
+                              title="Demander une modification avant paiement"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" /> Modifier
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => downloadInvoice(inv.id)}
+                          className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 text-white rounded-lg text-[10px] font-bebas tracking-widest uppercase hover:bg-emerald-600 transition-all active:scale-95"
+                        >
+                          <Download className="w-3.5 h-3.5" /> PDF
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
+
 
           {activeTab === 'APPOINTMENTS' && (
             <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-700">
@@ -717,7 +943,16 @@ const ClientSpace: React.FC = () => {
                         required
                         type="datetime-local"
                         value={appointmentData.date_rdv}
-                        onChange={e => setAppointmentData({...appointmentData, date_rdv: e.target.value})}
+                        min={new Date().toISOString().slice(0, 16)}
+                        onChange={(e) => {
+                          const selectedDate = new Date(e.target.value);
+                          if (selectedDate.getDay() === 0) {
+                            alert("Le garage est fermé le dimanche. Veuillez choisir un autre jour.");
+                            setAppointmentData({...appointmentData, date_rdv: ''});
+                          } else {
+                            setAppointmentData({...appointmentData, date_rdv: e.target.value});
+                          }
+                        }}
                         className="w-full px-4 py-2.5 rounded-md bg-white border border-slate-200 focus:border-emerald-500 outline-none font-bold text-sm transition-all"
                       />
                     </div>
@@ -970,6 +1205,85 @@ const ClientSpace: React.FC = () => {
           <Phone className="w-5 h-5 md:w-6 md:h-6 text-emerald-400" />
         </a>
       </div>
+
+      {/* ══ MODAL DEMANDE DE MODIFICATION FACTURE ══ */}
+      {modifInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                  <Edit3 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bebas text-lg tracking-wider uppercase">Demander une modification</h3>
+                  <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest">
+                    Facture {modifInvoice.numero_facture || `#${modifInvoice.id}`}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setModifInvoice(null)} className="text-white/70 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              {modifSuccess ? (
+                <div className="text-center py-8 space-y-3 animate-in fade-in duration-500">
+                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                  </div>
+                  <p className="font-bold text-emerald-700 text-sm">Demande envoyée avec succès !</p>
+                  <p className="text-slate-400 text-xs">Le garage vous contactera sous peu pour discuter de cette modification.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                    <p className="text-[11px] text-amber-800 font-medium leading-relaxed">
+                      <Info className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+                      Décrivez les modifications souhaitées sur votre facture. Le garage analysera votre demande 
+                      et vous contactera pour valider les changements avant de commencer les travaux.
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-lg p-3 flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Montant actuel</span>
+                    <span className="text-lg font-black text-slate-900">{Number(modifInvoice.total_ttc).toLocaleString('fr-FR')} F</span>
+                  </div>
+
+                  <textarea
+                    value={modifMessage}
+                    onChange={e => setModifMessage(e.target.value)}
+                    placeholder="Ex : Je souhaite retirer la vidange pour le moment. Ou : Le remplacement du filtre n'est pas nécessaire."
+                    rows={4}
+                    className="w-full border border-slate-200 rounded-lg p-3 text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none transition-all resize-none"
+                  />
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setModifInvoice(null)}
+                      className="flex-1 py-2.5 border border-slate-200 rounded-lg text-xs font-bebas tracking-widest uppercase text-slate-500 hover:bg-slate-50 transition-all"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={handleRequestModification}
+                      disabled={modifLoading || !modifMessage.trim()}
+                      className="flex-1 py-2.5 bg-amber-500 text-white rounded-lg text-xs font-bebas tracking-widest uppercase hover:bg-amber-600 transition-all active:scale-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {modifLoading ? 'Envoi...' : 'Envoyer la demande'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
