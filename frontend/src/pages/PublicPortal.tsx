@@ -6,7 +6,15 @@ import {
   Droplets,
   Settings,
   CalendarCheck,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft,
+  Phone,
+  MapPin,
+  Award,
+  Search,
+  Clock,
+  UserCheck,
+  CheckCircle2
 } from 'lucide-react';
 import api from '../services/api';
 import './PublicPortal.css';
