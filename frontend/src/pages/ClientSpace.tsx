@@ -374,7 +374,6 @@ const ClientSpace: React.FC = () => {
   const [paySuccess, setPaySuccess] = useState<{ message: string; montant: string } | null>(null);
   // Modal choix normalisation IFU
   const [ifuModalInvoice, setIfuModalInvoice] = useState<Invoice | null>(null);
-  const [wantsNormalisation, setWantsNormalisation] = useState<boolean | null>(null);
 
   // --- DEMANDE DE MODIFICATION FACTURE ---
   const [modifInvoice, setModifInvoice] = useState<Invoice | null>(null);
