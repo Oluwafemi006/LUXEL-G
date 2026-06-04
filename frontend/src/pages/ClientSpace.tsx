@@ -425,8 +425,8 @@ const ClientSpace: React.FC = () => {
     window.openKkiapayWidget({
       amount: Math.round(reste),
       position: 'right',
-      key: 'pk_7306233a75871b93196f30a905a567ef672f5d93e506e78864', // À remplacer par la clé prod
-      sandbox: true, // À passer à false en production
+      key: import.meta.env.VITE_KKIAPAY_PUBLIC_KEY,
+      sandbox: import.meta.env.VITE_KKIAPAY_SANDBOX === 'true',
       name: `${clientData?.client?.nom || ''} ${clientData?.client?.prenoms || ''}`.trim(),
       email: clientData?.client?.email || '',
       phone: clientData?.client?.contact || '',
