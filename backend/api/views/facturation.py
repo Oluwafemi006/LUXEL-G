@@ -214,7 +214,14 @@ class FactureViewSet(viewsets.ModelViewSet):
         facture = self.get_object()
         pdf = generate_document_pdf(facture, doc_type="FACTURE")
         response = HttpResponse(pdf, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Facture_{facture.numero_facture}.pdf"'
+        
+        # Nom de fichier professionnel
+        if facture.type == 'DEFINITIVE' and facture.numero_facture:
+            filename = f"Facture_{facture.numero_facture}.pdf"
+        else:
+            filename = f"Proforma_OR-{facture.reparation.id:04d}.pdf"
+            
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
     @action(detail=True, methods=['get'])
@@ -232,7 +239,13 @@ class FactureViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Lien invalide ou expiré'}, status=status.HTTP_403_FORBIDDEN)
         pdf = generate_document_pdf(facture, doc_type="FACTURE")
         response = HttpResponse(pdf, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Facture_{facture.numero_facture or "Proforma"}.pdf"'
+        
+        if facture.type == 'DEFINITIVE' and facture.numero_facture:
+            filename = f"Facture_{facture.numero_facture}.pdf"
+        else:
+            filename = f"Proforma_OR-{facture.reparation.id:04d}.pdf"
+            
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
     @action(detail=True, methods=['post'])
@@ -243,12 +256,18 @@ class FactureViewSet(viewsets.ModelViewSet):
             return Response({'error': "Le client n'a pas d'adresse email."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             pdf = generate_document_pdf(facture, doc_type="FACTURE")
-            subject = f"Facture Luxury Elegance Garage - {facture.numero_facture or 'Proforma'}"
+            if facture.type == 'DEFINITIVE' and facture.numero_facture:
+                filename = f"Facture_{facture.numero_facture}.pdf"
+                subject = f"Facture Luxury Elegance Garage - {facture.numero_facture}"
+            else:
+                filename = f"Proforma_OR-{facture.reparation.id:04d}.pdf"
+                subject = f"Devis / Proforma Luxury Elegance Garage - OR-{facture.reparation.id:04d}"
+                
             body = (f"Bonjour {facture.reparation.vehicule.client.nom},\n\n"
-                    f"Veuillez trouver ci-joint votre facture pour le véhicule {facture.reparation.vehicule.immatriculation}.\n"
+                    f"Veuillez trouver ci-joint votre document concernant le véhicule {facture.reparation.vehicule.immatriculation}.\n"
                     f"Montant Total : {facture.total_ttc} FCFA.\n\nCordialement,\nL'équipe Luxury Elegance Garage")
             email = EmailMessage(subject, body, to=[client.email])
-            email.attach(f"Facture_{facture.numero_facture or 'Proforma'}.pdf", pdf, 'application/pdf')
+            email.attach(filename, pdf, 'application/pdf')
             email.send()
             NotificationClient.objects.create(
                 client=client, type='FACTURE_ENVOYEE',

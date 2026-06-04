@@ -190,7 +190,12 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             return Response({'error': 'Facture non trouvée'}, status=status.HTTP_404_NOT_FOUND)
         pdf = generate_document_pdf(facture, doc_type="FACTURE")
         response = HttpResponse(pdf, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Facture_{facture.numero_facture or "Proforma"}.pdf"'
+        if facture.type == 'DEFINITIVE' and facture.numero_facture:
+            filename = f"Facture_{facture.numero_facture}.pdf"
+        else:
+            filename = f"Proforma_OR-{facture.reparation.id:04d}.pdf"
+            
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
     @action(detail=False, methods=['post'], url_path='update')
