@@ -40,36 +40,11 @@ class FactureViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        with transaction.atomic():
-            year = timezone.now().year
-            last_invoice = (
-                Facture.objects.filter(numero_facture__startswith=f"FAC-{year}")
-                .select_for_update().order_by('-numero_facture').first()
-            )
-            if last_invoice and last_invoice.numero_facture:
-                try:
-                    last_num = int(last_invoice.numero_facture.split('-')[-1])
-                    count = last_num + 1
-                except (ValueError, IndexError):
-                    count = Facture.objects.filter(type='DEFINITIVE').count() + 1
-            else:
-                count = Facture.objects.filter(type='DEFINITIVE').count() + 1
-
-            facture.numero_facture = f"FAC-{year}-{count:04d}"
-            facture.type = 'DEFINITIVE'
-            facture.date_validation = timezone.now()
-            facture.save()
-
-            for piece in facture.reparation.pieces.select_related('article_stock').all():
-                if piece.article_stock:
-                    stock_item = piece.article_stock
-                    stock_item.quantite = max(0, stock_item.quantite - piece.quantite)
-                    stock_item.save()
-                    MouvementStock.objects.create(
-                        article=stock_item, type_mouvement='SORTIE', quantite=piece.quantite,
-                        description=f"Sortie auto — Facture {facture.numero_facture}",
-                        utilisateur=request.user if request.user.is_authenticated else None
-                    )
+        from api.services import valider_et_normaliser_facture
+        
+        user = request.user if request.user.is_authenticated else None
+        facture = valider_et_normaliser_facture(facture, request_user=user)
+        
         return Response(FactureSerializer(facture).data)
 
     @action(detail=True, methods=['post'])

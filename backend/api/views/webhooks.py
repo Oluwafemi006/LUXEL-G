@@ -69,9 +69,17 @@ def kkiapay_webhook(request):
     if facture.statut_paiement == 'SOLDE':
         return Response({'status': 'ALREADY_PAID'}, status=status.HTTP_200_OK)
 
+    # Sécurité : empêcher le montant payé de dépasser le total
+    reste_a_payer = facture.total_ttc - facture.montant_paye
+    if montant > reste_a_payer:
+        logger.warning(f"[WEBHOOK KKIAPAY] Surplus ignoré: payé {montant}, reste {reste_a_payer}")
+        montant_enregistre = reste_a_payer
+    else:
+        montant_enregistre = montant
+
     # Valider le paiement
     with transaction.atomic():
-        facture.montant_paye += montant
+        facture.montant_paye += montant_enregistre
         facture.mode_paiement = 'KKIAPAY'
         facture.statut_paiement = 'SOLDE' if facture.montant_paye >= facture.total_ttc else 'PARTIEL'
         facture.save()
@@ -79,7 +87,7 @@ def kkiapay_webhook(request):
         MouvementCaisse.objects.create(
             type_mouvement='RECETTE',
             categorie='RECETTE_CLIENT',
-            montant=montant,
+            montant=montant_enregistre,
             description=f"Paiement Kkiapay — Facture {facture.numero_facture or facture.id} (TX: {transaction_id})",
             facture=facture,
             date_mouvement=timezone.now().date(),
@@ -88,8 +96,12 @@ def kkiapay_webhook(request):
 
         NotificationStaff.objects.create(
             type='PAIEMENT_RECU',
-            message=f"Paiement Kkiapay (Webhook) de {montant:,.0f} F reçu pour la facture {facture.numero_facture or facture.id}."
+            message=f"Paiement Kkiapay (Webhook) de {montant_enregistre:,.0f} F reçu pour la facture {facture.numero_facture or facture.id}."
         )
+
+        from api.services import valider_et_normaliser_facture
+        if facture.statut_paiement == 'SOLDE':
+            facture = valider_et_normaliser_facture(facture)
 
     logger.info(f"[WEBHOOK KKIAPAY] Paiement de la facture {invoice_id} validé avec succès.")
     return Response({'status': 'SUCCESS'}, status=status.HTTP_200_OK)

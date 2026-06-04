@@ -303,8 +303,12 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         if facture.statut_paiement == 'SOLDE':
             return Response({'message': 'Cette facture est déjà soldée.'}, status=status.HTTP_200_OK)
 
+        # Vérifier que la transaction n'a pas déjà été traitée
+        if MouvementCaisse.objects.filter(description__contains=transaction_id).exists():
+            return Response({'message': 'Cette transaction a déjà été traitée.'}, status=status.HTTP_200_OK)
+
         # Vérification de la transaction Kkiapay
-        from api.services import verify_kkiapay_transaction
+        from api.services import verify_kkiapay_transaction, valider_et_normaliser_facture
         kkiapay_tx = verify_kkiapay_transaction(transaction_id)
 
         if not kkiapay_tx or kkiapay_tx.get('status') not in ('SUCCESSFULL', 'SUCCESS'):
@@ -318,8 +322,17 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         if montant <= 0:
             return Response({'error': 'Montant invalide'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Sécurité : empêcher le montant payé de dépasser le total
+        reste_a_payer = facture.total_ttc - facture.montant_paye
+        if montant > reste_a_payer:
+            # On accepte le paiement mais on plafonne l'enregistrement (le surplus devra être géré via Kkiapay)
+            logger.warning(f"Surplus de paiement ignoré: payé {montant}, reste {reste_a_payer}")
+            montant_enregistre = reste_a_payer
+        else:
+            montant_enregistre = montant
+
         with transaction.atomic():
-            facture.montant_paye += montant
+            facture.montant_paye += montant_enregistre
             facture.mode_paiement = 'KKIAPAY'
             facture.statut_paiement = 'SOLDE' if facture.montant_paye >= facture.total_ttc else 'PARTIEL'
             facture.save()
@@ -327,7 +340,7 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             MouvementCaisse.objects.create(
                 type_mouvement='RECETTE',
                 categorie='RECETTE_CLIENT',
-                montant=montant,
+                montant=montant_enregistre,
                 description=f"Paiement Kkiapay — Facture {facture.numero_facture or facture.id} (TX: {transaction_id})",
                 facture=facture,
                 date_mouvement=timezone.now().date(),
@@ -336,8 +349,11 @@ class ClientSpaceViewSet(viewsets.ViewSet):
 
             NotificationStaff.objects.create(
                 type='PAIEMENT_RECU',
-                message=f"Paiement Kkiapay de {montant:,.0f} F reçu de {client.nom} {client.prenoms} — Facture {facture.numero_facture or facture.id}."
+                message=f"Paiement Kkiapay de {montant_enregistre:,.0f} F reçu de {client.nom} {client.prenoms} — Facture {facture.numero_facture or facture.id}."
             )
+
+            if facture.statut_paiement == 'SOLDE':
+                facture = valider_et_normaliser_facture(facture, request_user=request.user)
 
         # Envoi de l'email de reçu avec la facture
         if client.email:

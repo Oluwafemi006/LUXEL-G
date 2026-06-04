@@ -395,3 +395,60 @@ def generate_emecef_invoice(facture):
     except Exception as e:
         logger.error("[e-MECeF] Erreur critique : %s", str(e))
         return None
+
+def valider_et_normaliser_facture(facture, request_user=None):
+    """
+    Transforme une facture PROFORMA en DEFINITIVE, décrémente les stocks,
+    et lance la normalisation e-MECeF. Doit être appelé lorsque la facture est soldée
+    ou validée manuellement.
+    Retourne la facture mise à jour.
+    """
+    if facture.type != 'PROFORMA':
+        return facture
+
+    from django.db import transaction as db_transaction
+    from django.utils import timezone
+    from api.models import Facture, MouvementStock
+
+    with db_transaction.atomic():
+        last_invoice = Facture.objects.filter(type='DEFINITIVE').order_by('numero_facture').last()
+        year = timezone.now().year
+        count = 1
+        if last_invoice and last_invoice.numero_facture and f"FAC-{year}" in last_invoice.numero_facture:
+            try:
+                last_num = int(last_invoice.numero_facture.split('-')[-1])
+                count = last_num + 1
+            except (ValueError, IndexError):
+                count = Facture.objects.filter(type='DEFINITIVE').count() + 1
+        else:
+            count = Facture.objects.filter(type='DEFINITIVE').count() + 1
+
+        facture.numero_facture = f"FAC-{year}-{count:04d}"
+        facture.type = 'DEFINITIVE'
+        facture.date_validation = timezone.now()
+        
+        # Décrémenter les stocks physiques
+        for piece in facture.reparation.pieces.select_related('article_stock').all():
+            if piece.article_stock:
+                stock_item = piece.article_stock
+                stock_item.quantite = max(0, stock_item.quantite - piece.quantite)
+                stock_item.save()
+                MouvementStock.objects.create(
+                    article=stock_item, type_mouvement='SORTIE', quantite=piece.quantite,
+                    description=f"Sortie auto — Facture {facture.numero_facture}",
+                    utilisateur=request_user
+                )
+
+        # Normalisation automatique e-MECeF
+        if not facture.is_normalised:
+            res_emecef = generate_emecef_invoice(facture)
+            if res_emecef:
+                facture.emecef_uid = res_emecef.get('uid')
+                facture.emecef_code = res_emecef.get('codeMECeF')
+                facture.emecef_qr_code = res_emecef.get('qrCode')
+                facture.emecef_counters = res_emecef.get('counters')
+                facture.emecef_status = res_emecef.get('status')
+                facture.is_normalised = True
+
+        facture.save()
+        return facture
