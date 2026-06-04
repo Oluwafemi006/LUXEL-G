@@ -344,7 +344,7 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             try:
                 from django.core.mail import EmailMessage
                 from django.conf import settings
-                from api.services import generate_document_pdf
+                from api.utils import generate_document_pdf
                 
                 pdf_content = generate_document_pdf(facture, doc_type="FACTURE")
                 
