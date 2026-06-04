@@ -329,48 +329,59 @@ def verify_kkiapay_transaction(transaction_id):
 def generate_emecef_invoice(facture):
     """
     Génère une facture normalisée via l'API e-MECeF.
+    Logue chaque tentative (succès ET échec) dans LogNormalisationEmecef.
     """
+    from api.models import LogNormalisationEmecef
+
     api_token = getattr(settings, 'EMECEF_API_TOKEN', os.getenv('EMECEF_API_TOKEN'))
     api_url = getattr(settings, 'EMECEF_API_URL', 'https://test-api.impots.bj/sygmef-emcf')
 
+    client = facture.reparation.vehicule.client
+
     if not api_token:
         logger.info("[e-MECeF] Token manquant. Simulation de normalisation.")
-        # Simulation pour le développement
-        return {
+        result = {
             "uid": f"SIM-{facture.id}",
             "codeMECeF": "SIM-CODE-MEC-EF-12345678",
             "qrCode": "https://e-mecef.impots.bj/verify/SIM-CODE",
             "counters": "1/1000",
             "status": "SUCCESS"
         }
+        LogNormalisationEmecef.objects.create(
+            facture=facture,
+            statut='SIMULATION',
+            payload_envoye=None,
+            reponse_recue=result,
+            code_http=200,
+            uid_emecef=result['uid']
+        )
+        return result
 
     headers = {
         'Authorization': f'Bearer {api_token}',
         'Content-Type': 'application/json'
     }
 
-    # Préparation des données (Simplifié pour l'exemple)
     payload = {
-        "ifubene": "3202487942483", # IFU du Garage
-        "type": "FV", # Facture de Vente
-        "items": [],
+        "ifubene": getattr(settings, 'GARAGE_IFU', os.getenv('GARAGE_IFU', '')),
+        "type": "FV",
         "client": {
-            "name": f"{facture.reparation.vehicule.client.nom} {facture.reparation.vehicule.client.prenoms}",
-            "contact": facture.reparation.vehicule.client.contact,
-            "address": facture.reparation.vehicule.client.adresse
-        }
+            "name": f"{client.nom} {client.prenoms}",
+            "ifu": client.ifu or "0000000000000",
+            "contact": client.contact,
+            "address": client.adresse,
+        },
+        "items": []
     }
 
-    # Ajout des lignes de travaux
     for t in facture.reparation.travaux.all():
         payload["items"].append({
             "name": t.description,
             "price": int(t.montant),
             "quantity": 1,
-            "taxGroup": "B" # Taxable à 18% par défaut (ou selon config)
+            "taxGroup": "B"
         })
 
-    # Ajout des pièces
     for p in facture.reparation.pieces.all():
         payload["items"].append({
             "name": p.description,
@@ -381,19 +392,45 @@ def generate_emecef_invoice(facture):
 
     try:
         response = requests.post(f"{api_url}/api/invoice", headers=headers, json=payload, timeout=15)
-        if response.status_code in [200, 201]:
+        code_http = response.status_code
+
+        if code_http in [200, 201]:
             data = response.json()
-            # On doit souvent confirmer la facture après soumission pour avoir le QR Code final
             uid = data.get('uid')
             confirm_res = requests.put(f"{api_url}/api/invoice/{uid}/confirm", headers=headers, timeout=15)
-            if confirm_res.status_code == 200:
-                return confirm_res.json()
-            return data
+            final_data = confirm_res.json() if confirm_res.status_code == 200 else data
+
+            LogNormalisationEmecef.objects.create(
+                facture=facture,
+                statut='SUCCES',
+                payload_envoye=payload,
+                reponse_recue=final_data,
+                code_http=confirm_res.status_code if confirm_res.status_code == 200 else code_http,
+                uid_emecef=uid
+            )
+            return final_data
         else:
-            logger.warning("[e-MECeF] Erreur API (%s): %s", response.status_code, response.text)
+            err_text = response.text
+            logger.warning("[e-MECeF] Erreur API (%s): %s", code_http, err_text)
+            LogNormalisationEmecef.objects.create(
+                facture=facture,
+                statut='ECHEC',
+                payload_envoye=payload,
+                reponse_recue=None,
+                code_http=code_http,
+                message_erreur=err_text
+            )
             return None
     except Exception as e:
         logger.error("[e-MECeF] Erreur critique : %s", str(e))
+        LogNormalisationEmecef.objects.create(
+            facture=facture,
+            statut='ECHEC',
+            payload_envoye=payload,
+            reponse_recue=None,
+            code_http=None,
+            message_erreur=str(e)
+        )
         return None
 
 def valider_et_normaliser_facture(facture, request_user=None):
@@ -439,8 +476,8 @@ def valider_et_normaliser_facture(facture, request_user=None):
                     utilisateur=request_user
                 )
 
-        # Normalisation automatique e-MECeF
-        if not facture.is_normalised:
+        # Normalisation e-MECeF uniquement si le client l'a demandée
+        if facture.demande_normalisation and not facture.is_normalised:
             res_emecef = generate_emecef_invoice(facture)
             if res_emecef:
                 facture.emecef_uid = res_emecef.get('uid')

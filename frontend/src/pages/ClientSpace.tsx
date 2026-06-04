@@ -67,6 +67,7 @@ interface Invoice {
   is_normalised?: boolean;
   emecef_code?: string;
   emecef_qr_code?: string;
+  demande_normalisation?: boolean;
 }
 
 interface Appointment {
@@ -371,6 +372,9 @@ const ClientSpace: React.FC = () => {
   // --- PAIEMENT KKIAPAY ---
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
   const [paySuccess, setPaySuccess] = useState<{ message: string; montant: string } | null>(null);
+  // Modal choix normalisation IFU
+  const [ifuModalInvoice, setIfuModalInvoice] = useState<Invoice | null>(null);
+  const [wantsNormalisation, setWantsNormalisation] = useState<boolean | null>(null);
 
   // --- DEMANDE DE MODIFICATION FACTURE ---
   const [modifInvoice, setModifInvoice] = useState<Invoice | null>(null);
@@ -408,25 +412,39 @@ const ClientSpace: React.FC = () => {
       return;
     }
 
+    // Si le client a un IFU, afficher le modal de choix avant de payer
+    const clientIfu = clientData?.client?.ifu;
+    if (clientIfu) {
+      setIfuModalInvoice(invoice);
+      setWantsNormalisation(null);
+      return;
+    }
+
+    openKkiapayWidget(invoice, false);
+  };
+
+  const openKkiapayWidget = (invoice: Invoice, demandeNormalisation: boolean) => {
+    const reste = Number(invoice.total_ttc) - Number(invoice.montant_paye);
     setPayingInvoice(invoice);
 
-    // Listener de succès — on l'enregistre UNE SEULE FOIS avant d'ouvrir
     const onSuccess = async (response: any) => {
       window.removeKkiapayListener?.('success', onSuccess);
       try {
         const res = await api.post('client-space/pay-kkiapay/', {
           invoice_id: invoice.id,
-          transaction_id: response.transactionId
+          transaction_id: response.transactionId,
+          demande_normalisation: demandeNormalisation
         });
         setPaySuccess({
           message: res.data.message || 'Paiement validé !',
           montant: Number(reste).toLocaleString('fr-FR')
         });
-        fetchClientData(); // Rafraîchir les données
+        fetchClientData();
       } catch (err: any) {
         alert(err.response?.data?.error || 'Erreur lors de la validation du paiement. Contactez le garage.');
       } finally {
         setPayingInvoice(null);
+        setIfuModalInvoice(null);
       }
     };
 
@@ -778,6 +796,57 @@ const ClientSpace: React.FC = () => {
 
           {activeTab === 'INVOICES' && (
             <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-700">
+
+              {/* Modal Choix Normalisation e-MECeF (affiché uniquement si le client a un IFU) */}
+              {ifuModalInvoice && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                  <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-300 space-y-6">
+                    <div className="text-center space-y-2">
+                      <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto">
+                        <FileText className="w-8 h-8 text-emerald-600" />
+                      </div>
+                      <h3 className="text-2xl font-bebas tracking-wider text-slate-900 uppercase">Type de facture</h3>
+                      <p className="text-xs text-slate-400 font-medium">
+                        Souhaitez-vous une facture normalisée (e-MECeF) pour cette transaction ?
+                      </p>
+                    </div>
+
+                    {/* Affichage IFU en lecture seule pour vérification */}
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Votre Numéro IFU (fourni par le garage)</p>
+                      <p className="text-lg font-bebas text-emerald-600 tracking-widest">{clientData?.client?.ifu}</p>
+                      <p className="text-[9px] text-slate-400 italic">Si ce numéro est incorrect, contactez le garage avant de payer.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => {
+                          setIfuModalInvoice(null);
+                          openKkiapayWidget(ifuModalInvoice, false);
+                        }}
+                        className="py-3 px-4 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                      >
+                        Non, facture standard
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIfuModalInvoice(null);
+                          openKkiapayWidget(ifuModalInvoice, true);
+                        }}
+                        className="py-3 px-4 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-emerald-700 transition-all"
+                      >
+                        ✓ Oui, normaliser
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => setIfuModalInvoice(null)}
+                      className="w-full text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Modal de succès paiement */}
               {paySuccess && (

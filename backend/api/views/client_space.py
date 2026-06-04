@@ -250,11 +250,22 @@ class ClientSpaceViewSet(viewsets.ViewSet):
 
         # Créer une notification pour le staff
         NotificationStaff.objects.create(
-            type='DEMANDE_MODIFICATION',
+            type='DEMANDE_MODIFICATION_PROFORMA',
             message=(
                 f"📝 Demande de modification — {client.nom} {client.prenoms} "
                 f"souhaite modifier la facture {facture.numero_facture or f'#{facture.id}'} "
                 f"({float(facture.total_ttc):,.0f} F) :\n\n\"{message}\""
+            )
+        )
+
+        # Confirmation au client
+        NotificationClient.objects.create(
+            client=client,
+            type='MODIFICATION_ACCEPTEE',
+            message=(
+                f"📩 Votre demande de modification pour la facture "
+                f"{facture.numero_facture or f'#{facture.id}'} a bien été transmise au garage. "
+                f"Nous en tiendrons compte."
             )
         )
 
@@ -281,6 +292,7 @@ class ClientSpaceViewSet(viewsets.ViewSet):
 
         invoice_id = request.data.get('invoice_id')
         transaction_id = request.data.get('transaction_id')
+        demande_normalisation = bool(request.data.get('demande_normalisation', False))
 
         if not invoice_id or not transaction_id:
             return Response(
@@ -353,7 +365,19 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             )
 
             if facture.statut_paiement == 'SOLDE':
+                facture.demande_normalisation = demande_normalisation
+                facture.save(update_fields=['demande_normalisation'])
                 facture = valider_et_normaliser_facture(facture, request_user=request.user)
+
+        # Notification de confirmation au client
+        NotificationClient.objects.create(
+            client=client,
+            type='PAIEMENT_CONFIRME',
+            message=(
+                f"✅ Votre paiement de {montant_enregistre:,.0f} FCFA pour la facture "
+                f"{facture.numero_facture or f'#{facture.id}'} a bien été enregistré. Merci !"
+            )
+        )
 
         # Envoi de l'email de reçu avec la facture
         if client.email:

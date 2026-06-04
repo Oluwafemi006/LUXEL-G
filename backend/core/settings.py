@@ -200,23 +200,21 @@ STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Configuration Email — S3 : toutes les valeurs sensibles viennent exclusivement du .env
+# Configuration Email — Brevo (Sendinblue)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp-relay.brevo.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')       # S3 — pas de valeur par défaut exposée
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Luxury Elegance Garage <noreply@luxelg.com>')
 DEV_EXPOSE_OTP = os.getenv('DEV_EXPOSE_OTP', 'False') == 'True'
 
+# Configuration Brevo API (pour les SMS)
+BREVO_API_KEY = os.getenv('BREVO_API_KEY')
+
 # Fichiers statiques en production
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-
-# Configuration Twilio
-TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
-TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
-TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER')
 
 # Paiement Kkiapay
 KKIAPAY_PUBLIC_KEY = os.getenv('KKIAPAY_PUBLIC_KEY')

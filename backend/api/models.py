@@ -22,6 +22,8 @@ class Client(models.Model):
     email = models.EmailField(blank=True, null=True)
     adresse = models.TextField()
     photo = models.ImageField(upload_to='clients_photos/', blank=True, null=True)
+    # Fiscal — renseigné par le staff uniquement
+    ifu = models.CharField(max_length=13, blank=True, null=True, verbose_name="Numéro IFU")
     date_creation = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -132,6 +134,8 @@ class Facture(models.Model):
     montant_paye = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     statut_paiement = models.CharField(max_length=20, choices=STATUT_PAIEMENT_CHOICES, default='NON_PAYE')
     mode_paiement = models.CharField(max_length=20, choices=MODE_PAIEMENT_CHOICES, blank=True, null=True)
+    # Normalisation e-MECeF — demandée par le client au moment du paiement
+    demande_normalisation = models.BooleanField(default=False, verbose_name="Facture normalisée demandée")
 
     # M2 — Champs de traçabilité paiement (requis par le CDC)
     numero_cheque = models.CharField(max_length=50, blank=True, null=True, verbose_name="N° de chèque")
@@ -297,6 +301,8 @@ class NotificationClient(models.Model):
         ('RDV_CONFIRME', 'RDV Confirmé'),
         ('FACTURE_ENVOYEE', 'Facture envoyée'),
         ('DEVIS_ENVOYE', 'Devis envoyé'),
+        ('PAIEMENT_CONFIRME', 'Paiement confirmé'),
+        ('MODIFICATION_ACCEPTEE', 'Modification prise en compte'),
     ]
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='notifications')
     type = models.CharField(max_length=30, choices=TYPE_CHOICES)
@@ -313,6 +319,7 @@ class NotificationStaff(models.Model):
         ('NOUVEL_AVIS', 'Nouvel Avis Client'),
         ('STOCK_BAS', 'Alerte Stock Bas'),
         ('PAIEMENT_RECU', 'Paiement Reçu'),
+        ('DEMANDE_MODIFICATION_PROFORMA', 'Demande de modification proforma'),
     ]
     type = models.CharField(max_length=30, choices=TYPE_CHOICES)
     message = models.TextField()
@@ -345,3 +352,30 @@ class ClientOTP(models.Model):
 
     def __str__(self):
         return f"OTP {self.client.nom} - {self.code}"
+
+class LogNormalisationEmecef(models.Model):
+    """
+    Trace chaque tentative de normalisation e-MECeF (succès ET échec).
+    Permet de répondre à toute contestation de la DGI en production.
+    """
+    STATUT_CHOICES = [
+        ('SUCCES', 'Succès'),
+        ('ECHEC', 'Échec'),
+        ('SIMULATION', 'Simulation (dev)'),
+    ]
+    facture = models.ForeignKey(Facture, on_delete=models.PROTECT, related_name='logs_emecef')
+    statut = models.CharField(max_length=15, choices=STATUT_CHOICES)
+    payload_envoye = models.JSONField(null=True, blank=True, verbose_name="Payload envoyé à la DGI")
+    reponse_recue = models.JSONField(null=True, blank=True, verbose_name="Réponse reçue de la DGI")
+    code_http = models.IntegerField(null=True, blank=True, verbose_name="Code HTTP de la réponse")
+    message_erreur = models.TextField(blank=True, null=True, verbose_name="Détail de l'erreur")
+    uid_emecef = models.CharField(max_length=100, blank=True, null=True, verbose_name="UID e-MECeF retourné")
+    date_tentative = models.DateTimeField(auto_now_add=True, verbose_name="Date de la tentative")
+
+    class Meta:
+        verbose_name = "Log Normalisation e-MECeF"
+        verbose_name_plural = "Logs Normalisation e-MECeF"
+        ordering = ['-date_tentative']
+
+    def __str__(self):
+        return f"[{self.statut}] Facture #{self.facture_id} — {self.date_tentative.strftime('%d/%m/%Y %H:%M')}"
