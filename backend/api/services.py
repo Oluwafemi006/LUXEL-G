@@ -9,50 +9,51 @@ logger = logging.getLogger(__name__)
 # --- SERVICES SMS ---
 def send_otp_sms(phone_number, code):
     """
-    Service d'envoi de SMS OTP via Twilio.
+    Service d'envoi de SMS OTP via Brevo (Sendinblue).
     """
-    # 1. Toujours logger pour le dev
-    logger.debug("[SMS] Envoi du code %s au numéro %s", code, phone_number)
+    logger.debug("[SMS] Tentative d'envoi du code %s au numéro %s", code, phone_number)
 
-    account_sid = getattr(settings, 'TWILIO_ACCOUNT_SID', None)
-    auth_token = getattr(settings, 'TWILIO_AUTH_TOKEN', None)
-    from_number = getattr(settings, 'TWILIO_PHONE_NUMBER', None)
-
-    if not all([account_sid, auth_token, from_number]):
-        logger.info("[SMS] Config Twilio manquante. SMS non envoyé (Simulation).")
-        return False
-
-    # Utilisation de la bibliothèque twilio
-    from twilio.rest import Client
+    api_key = getattr(settings, 'BREVO_API_KEY', os.getenv('BREVO_API_KEY'))
     
-    try:
-        # Formatage du numéro pour Twilio (doit commencer par +)
-        if not phone_number.startswith('+'):
-            # On assume +229 si pas d'indicatif (Bénin)
-            if phone_number.startswith('229'):
-                phone_number = '+' + phone_number
-            else:
-                phone_number = '+229' + phone_number
-
-        client = Client(account_sid, auth_token)
-        message = client.messages.create(
-            body=f"Luxury Elegance Garage : Votre code de connexion est {code}. Valide 10 min.",
-            from_=from_number,
-            to=phone_number
-        )
-        
-        if message.sid:
-            logger.info("[SMS] SMS envoyé avec succès à %s (SID: %s)", phone_number, message.sid)
-            return True
+    if not api_key:
+        logger.info("[SMS] Config Brevo manquante. SMS non envoyé (Simulation).")
         return False
 
+    import sib_api_v3_sdk
+    from sib_api_v3_sdk.rest import ApiException
+
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key['api-key'] = api_key
+
+    api_instance = sib_api_v3_sdk.TransactionalSMSApi(sib_api_v3_sdk.ApiClient(configuration))
+    
+    # Formatage du numéro (doit inclure l'indicatif sans + pour Brevo parfois, mais + est supporté)
+    # Pour le Bénin, on s'assure d'avoir 229
+    clean_phone = phone_number.replace(' ', '').replace('+', '')
+    if not clean_phone.startswith('229'):
+        clean_phone = '229' + clean_phone
+
+    send_transac_sms = sib_api_v3_sdk.SendTransacSms(
+        sender="LUXEL-G",
+        recipient=clean_phone,
+        content=f"LUXEL-G : Votre code de connexion est {code}. Valide 10 min.",
+        type="transactional"
+    )
+
+    try:
+        api_response = api_instance.send_transac_sms(send_transac_sms)
+        logger.info("[SMS] SMS envoyé via Brevo à %s", clean_phone)
+        return True
+    except ApiException as e:
+        logger.error("[SMS] Erreur Brevo SMS: %s", e)
+        return False
     except Exception as e:
         logger.error("[SMS] Erreur critique SMS: %s", str(e))
         return False
 
 # --- SERVICES IA (GOOGLE GEMINI) ---
 
-def call_gemini_api(prompt):
+def call_gemini_api(prompt, max_tokens=1024):
     """
     Appelle l'API Google Gemini avec un prompt spécifique.
     """
@@ -61,7 +62,8 @@ def call_gemini_api(prompt):
         logger.warning("[AI] Clé API Gemini manquante.")
         return None
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # Utilisation de gemini-2.0-flash sur v1beta (plus récent)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
     headers = {'Content-Type': 'application/json'}
     payload = {
         "contents": [{
@@ -69,14 +71,12 @@ def call_gemini_api(prompt):
         }],
         "generationConfig": {
             "temperature": 0.7,
-            "topK": 40,
-            "topP": 0.95,
-            "maxOutputTokens": 1024,
+            "maxOutputTokens": max_tokens,
         }
     }
 
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        response = requests.post(url, headers=headers, json=payload, timeout=15)
         if response.status_code == 200:
             result = response.json()
             return result['candidates'][0]['content']['parts'][0]['text']
@@ -100,7 +100,7 @@ def generate_repair_summary(repair_data):
     
     RÉPONSE (en français, maximum 4-5 phrases) :
     """
-    return call_gemini_api(prompt)
+    return call_gemini_api(prompt, max_tokens=500)
 
 def suggest_parts_ai(query, context=""):
     """
@@ -170,10 +170,6 @@ def chatbot_garage_response(user_message: str, conversation_history: list = None
     F1 — Génère une réponse de l'assistant IA du garage LUXEL-G.
     conversation_history : liste de dicts [{role: 'user'|'model', text: '...'}]
     """
-    api_key = getattr(settings, 'GEMINI_API_KEY', os.getenv('GEMINI_API_KEY'))
-    if not api_key:
-        return "Je suis temporairement indisponible. Appelez-nous au +229 01 92 62 98 60."
-
     history = conversation_history or []
 
     # Construction du prompt avec historique
@@ -185,19 +181,10 @@ def chatbot_garage_response(user_message: str, conversation_history: list = None
     prompt_parts.append("Assistant :")
 
     full_prompt = "\n".join(prompt_parts)
-
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    payload = {
-        "contents": [{"parts": [{"text": full_prompt}]}],
-        "generationConfig": {"temperature": 0.6, "maxOutputTokens": 300}
-    }
-    try:
-        r = requests.post(url, json=payload, timeout=10)
-        if r.status_code == 200:
-            return r.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-        logger.warning("[CHATBOT] Erreur Gemini %s", r.status_code)
-    except Exception as e:
-        logger.error("[CHATBOT] Erreur critique : %s", e)
+    
+    response_text = call_gemini_api(full_prompt, max_tokens=300)
+    if response_text:
+        return response_text.strip()
 
     return "Désolé, je rencontre un problème technique. Contactez-nous au +229 01 92 62 98 60."
 
@@ -325,13 +312,15 @@ def verify_kkiapay_transaction(transaction_id):
 
     k = Kkiapay(public_key, private_key, secret, sandbox=sandbox)
     try:
-        # verify_transaction retourne un tuple (status_code, status_message, transaction_obj)
+        # Le SDK retourne directement le dictionnaire JSON de la réponse
         res = k.verify_transaction(transaction_id)
-        if res[0] == 200:
-            return res[2]
+        
+        # res est un dict (ex: {"status": "SUCCESS", "amount": ...})
+        if isinstance(res, dict) and res.get('status') in ['SUCCESS', 'SUCCESSFULL']:
+            return res
         return None
     except Exception as e:
-        logger.error("[KKIAPAY] Erreur de vérification : %s", str(e))
+        logger.error("[KKIAPAY] Erreur de vérification : %s", repr(e))
         return None
 
 
