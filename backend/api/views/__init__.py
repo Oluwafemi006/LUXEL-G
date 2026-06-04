@@ -10,6 +10,7 @@ from .stock import StockViewSet, MouvementCaisseViewSet, MaintenancePredictiveVi
 from .appointments import AppointmentViewSet, NotificationClientViewSet, NotificationStaffViewSet, AvisViewSet
 from .client_space import ClientSpaceViewSet
 from .dashboard import AIViewSet, UserViewSet, StatsViewSet
+from .webhooks import kkiapay_webhook
 
 __all__ = [
     'IsDirecteur', 'IsStaffMember',

@@ -9,7 +9,7 @@ from .views import (
     FactureViewSet, DevisViewSet,
     StockViewSet, MouvementCaisseViewSet, MaintenancePredictiveViewSet, StatsViewSet,
     AppointmentViewSet, NotificationClientViewSet, NotificationStaffViewSet, AvisViewSet,
-    ClientSpaceViewSet, AIViewSet, UserViewSet,
+    ClientSpaceViewSet, AIViewSet, UserViewSet, kkiapay_webhook,
 )
 
 router = DefaultRouter()
@@ -37,4 +37,5 @@ urlpatterns = [
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('search/', GlobalSearchView.as_view(), name='global-search'),
+    path('webhooks/kkiapay/', kkiapay_webhook, name='kkiapay_webhook'),
 ]
