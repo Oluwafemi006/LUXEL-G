@@ -53,10 +53,14 @@ export const fetchAllPages = async <T>(url: string, config: AxiosRequestConfig =
   return items;
 };
 
-// Intercepteur pour ajouter le token JWT
+// Intercepteur pour ajouter le token JWT approprié (Client ou Staff)
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    // Les requêtes du client commencent par "client-space/"
+    const isClient = config.url?.startsWith('client-space/');
+    const tokenKey = isClient ? 'client_access_token' : 'staff_access_token';
+    const token = localStorage.getItem(tokenKey);
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -65,44 +69,53 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Intercepteur pour gérer les erreurs 401 (token expiré) et les erreurs réseau
+// Intercepteur pour gérer les erreurs 401 (token expiré) et réseau
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // 1. Gestion des erreurs réseau (backend hors ligne ou pas de connexion)
+    // 1. Gestion des erreurs réseau
     if (!error.response && error.isAxiosError) {
       console.error("Erreur réseau globale :", error.message);
-      // On peut déclencher un événement global ici si on veut afficher un toast UI
       window.dispatchEvent(new CustomEvent('network_error', { detail: 'Connexion au serveur perdue. Veuillez vérifier votre connexion internet.' }));
-      // Optionnellement une simple alerte (attention, peut être spammy, mais efficace pour le debug)
-      // alert('Connexion au serveur perdue. Vérifiez votre connexion internet.');
       return Promise.reject(error);
     }
 
     const originalRequest = error.config;
     
-    // Ignorer les requêtes d'authentification pour éviter les boucles de redirection
-    if (originalRequest.url?.includes('token/')) {
+    // Ignorer les requêtes d'authentification pour éviter les boucles
+    if (originalRequest.url?.includes('token/') || originalRequest.url?.includes('client-space/verify_otp/')) {
       return Promise.reject(error);
     }
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      const refreshToken = localStorage.getItem('refresh_token');
+      
+      const isClient = originalRequest.url?.startsWith('client-space/');
+      const prefix = isClient ? 'client' : 'staff';
+      
+      const refreshToken = localStorage.getItem(`${prefix}_refresh_token`);
+      
       if (refreshToken) {
         try {
           const response = await axios.post(`${API_BASE_URL}token/refresh/`, { refresh: refreshToken });
-          localStorage.setItem('access_token', response.data.access);
+          localStorage.setItem(`${prefix}_access_token`, response.data.access);
           originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
           return api(originalRequest);
         } catch (err) {
-          // Si le refresh token est expiré aussi, déconnexion
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          window.location.href = '/login';
+          // Si le refresh token est expiré
+          localStorage.removeItem(`${prefix}_access_token`);
+          localStorage.removeItem(`${prefix}_refresh_token`);
+          
+          if (!isClient) {
+             window.location.href = '/login'; // Rediriger l'admin
+          } else {
+             window.dispatchEvent(new CustomEvent('client_auth_error')); // Notifier l'espace client
+          }
         }
       } else {
-        window.location.href = '/login';
+        if (!isClient) {
+           window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);

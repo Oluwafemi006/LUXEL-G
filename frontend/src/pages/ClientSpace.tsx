@@ -147,12 +147,20 @@ const ClientSpace: React.FC = () => {
     email: ''
   });
 
-  // Vérifier si une session existe au chargement
+  // Vérifier si une session existe au chargement et écouter les erreurs d'authentification
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('client_access_token');
     if (token) {
       fetchClientData();
     }
+
+    const handleAuthError = () => {
+      setError('Session expirée. Veuillez vous reconnecter.');
+      handleLogout();
+    };
+
+    window.addEventListener('client_auth_error', handleAuthError);
+    return () => window.removeEventListener('client_auth_error', handleAuthError);
   }, []);
 
   // Polling des notifications toutes les 30 secondes
@@ -226,8 +234,8 @@ const ClientSpace: React.FC = () => {
     setError('');
     try {
       const response = await api.post('client-space/verify_otp/', { identifier, code: otp });
-      localStorage.setItem('access_token', response.data.access);
-      localStorage.setItem('refresh_token', response.data.refresh);
+      localStorage.setItem('client_access_token', response.data.access);
+      localStorage.setItem('client_refresh_token', response.data.refresh);
       fetchClientData();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Code invalide.');
@@ -237,8 +245,8 @@ const ClientSpace: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('client_access_token');
+    localStorage.removeItem('client_refresh_token');
     setIsLoggedIn(false);
     setClientData(null);
     setOtpStep('PHONE');

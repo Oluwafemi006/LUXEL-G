@@ -37,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('staff_access_token');
     if (token) {
       fetchUser().finally(() => setLoading(false));
     } else {
@@ -46,14 +46,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (access: string, refresh: string) => {
-    localStorage.setItem('access_token', access);
-    localStorage.setItem('refresh_token', refresh);
+    localStorage.setItem('staff_access_token', access);
+    localStorage.setItem('staff_refresh_token', refresh);
     await fetchUser();
   };
 
   const logout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('staff_access_token');
+    localStorage.removeItem('staff_refresh_token');
     setIsAuthenticated(false);
     setUser(null);
   };
