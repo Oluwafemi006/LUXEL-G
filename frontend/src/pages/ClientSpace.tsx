@@ -415,7 +415,6 @@ const ClientSpace: React.FC = () => {
     const clientIfu = clientData?.client?.ifu;
     if (clientIfu) {
       setIfuModalInvoice(invoice);
-      setWantsNormalisation(null);
       return;
     }
 
