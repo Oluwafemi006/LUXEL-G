@@ -1,19 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
-
 @theme {
+  /* ── Override Tailwind Colors (Pour impacter l'Espace Client) ── */
+  --color-emerald-400:  #04A83D;
+  --color-emerald-500:  #038F33; /* Vert demandé */
+  --color-emerald-600:  #027329;
+  --color-emerald-700:  #025C21;
+
   /* ── Palette principale (interface staff) ── */
-  --color-primary:      #10b981;
-  --color-primary-soft: #ecfdf5;
-  --color-primary-dark: #065f46;
+  --color-primary:      #038F33;
+  --color-primary-soft: #E6F4EA;
+  --color-primary-dark: #027329;
   --color-background:   #f4f7f6;
   --color-surface:      #ffffff;
 
   /* ── Palette publique (portail client) ── */
-  --color-green:   #1F5C35;
-  --color-green2:  #2E7D4E;
-  --color-green3:  #EBF4EF;
-  --color-green4:  #7ECB9A;
+  --color-green:   #027329; /* Pour le texte sur fond clair */
+  --color-green2:  #038F33; /* Le vert demandé */
+  --color-green3:  #E6F4EA; 
+  --color-green4:  #04A83D;
   --color-bg:      #F7F8F5;
   --color-bg2:     #FFFFFF;
   --color-bg3:     #EFF3EE;

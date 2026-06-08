@@ -1,14 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom';
-import { Phone, Home, Wrench, CalendarCheck, UserCircle, Images, Bot, X, MessageCircle, Send, Loader2 } from 'lucide-react';
+import { Phone, Home, Wrench, CalendarCheck, UserCircle, Images } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 import api from '../services/api';
 import '../pages/PublicPortal.css'; // S'assurer que les styles globaux du portal sont chargés
-
-interface ChatMessage {
-  role: 'user' | 'bot';
-  text: string;
-}
 import '../pages/PublicPortal.css'; // S'assurer que les styles globaux du portal sont chargés
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -22,37 +17,6 @@ const PublicLayout: React.FC = () => {
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('accueil');
-
-  // F1 — Chatbot IA
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { role: 'bot', text: '👋 Bonjour ! Je suis l\'assistant Luxury Elegance Garage. Comment puis-je vous aider ?' }
-  ]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // F1 — Scroll automatique vers le bas du chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
-
-  const sendChat = async () => {
-    const msg = chatInput.trim();
-    if (!msg || chatLoading) return;
-    const history = chatMessages.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'model', text: m.text }));
-    setChatMessages(prev => [...prev, { role: 'user', text: msg }]);
-    setChatInput('');
-    setChatLoading(true);
-    try {
-      const res = await api.post('ai/chatbot/', { message: msg, history });
-      setChatMessages(prev => [...prev, { role: 'bot', text: res.data.response }]);
-    } catch {
-      setChatMessages(prev => [...prev, { role: 'bot', text: 'Désolé, je rencontre un problème de connexion. Veuillez réessayer.' }]);
-    } finally {
-      setChatLoading(false);
-    }
-  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -123,7 +87,7 @@ const PublicLayout: React.FC = () => {
         <div className="mh-logo" onClick={() => handleNavClick('accueil')}>
           <img src={logoImg} alt="LEG Parakou" className="mobile-logo" />
         </div>
-        <a href="tel:+2290192629860" className="mh-call flex items-center gap-2">
+        <a href="tel:+2290155119999" className="mh-call flex items-center gap-2">
           <Phone className="w-3 h-3" /> Appeler
         </a>
       </header>
@@ -176,12 +140,12 @@ const PublicLayout: React.FC = () => {
       </nav>
 
       {/* ─── FLOATING CALL BUTTON (Mobile) ─── */}
-      <a href="tel:+2290192629860" className="fab-call" aria-label="Appeler le garage">
+      <a href="tel:+2290155119999" className="fab-call" aria-label="Appeler le garage">
         <Phone className="w-5 h-5" />
       </a>
 
       {/* ─── FOOTER ─── */}
-      <footer style={{ background: 'linear-gradient(135deg, #2D7A47 0%, #1F5C35 60%, #174D2C 100%)' }} className="text-white">
+      <footer className="footer bg-white border-t border-emerald-100">
         <div className="footer-top">
           <div>
             <img src={logoImg} alt="Luxury Elegance Garage" className="footer-logo" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.25)) brightness(1.1)' }} />
@@ -190,11 +154,11 @@ const PublicLayout: React.FC = () => {
           <div className="footer-col">
             <h4>Services</h4>
             <ul>
-              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Mécanique</button></li>
-              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Électricité</button></li>
-              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Pneumatique</button></li>
-              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Lavage</button></li>
-              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Entretien</button></li>
+              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Mécanique & Électricité</button></li>
+              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Tôlerie & Peinture</button></li>
+              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Pneumatique & Parallélisme</button></li>
+              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Diagnostic & Scannage</button></li>
+              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Vente & Location</button></li>
             </ul>
           </div>
           <div className="footer-col">
@@ -211,9 +175,9 @@ const PublicLayout: React.FC = () => {
             <h4>Contact</h4>
             <ul>
               <li><a href="https://maps.google.com/?q=Okedama+Parakou+Benin" target="_blank" rel="noreferrer">Okedama, Parakou</a></li>
-              <li><a href="tel:+2290192629860">+229 01 92 62 98 60</a></li>
+              <li><a href="tel:+2290155119999">+229 01 55 11 99 99</a></li>
               <li><a href="mailto:k29296028@gmail.com">k29296028@gmail.com</a></li>
-              <li className="mt-4"><a href="https://wa.me/2290192629860" className="text-[#25D366] font-semibold flex items-center gap-2"><WhatsAppIcon className="w-4 h-4" /> WhatsApp</a></li>
+              <li className="mt-4"><a href="https://wa.me/2290155119999" className="text-[#25D366] font-semibold flex items-center gap-2"><WhatsAppIcon className="w-4 h-4" /> WhatsApp</a></li>
             </ul>
           </div>
         </div>
@@ -223,74 +187,17 @@ const PublicLayout: React.FC = () => {
         </div>
       </footer>
 
-      {/* ══ F1 — CHATBOT IA FLOTTANT (Global) ══ */}
+      {/* ══ F1 — BOUTON WHATSAPP FLOTTANT (Global) ══ */}
       <div className={`chatbot-fab-wrap ${location.pathname === '/espace-client' ? 'client-space-adjust' : ''}`}>
-        {/* Fenêtre de chat */}
-        {chatOpen && (
-          <div className="chatbot-window">
-            <div className="chatbot-header">
-              <div className="chatbot-header-info">
-                <div className="chatbot-avatar"><Bot size={16} /></div>
-                <div>
-                <div className="chatbot-name">Assistant Luxury Elegance Garage</div>
-                  <div className="chatbot-status">● En ligne</div>
-                </div>
-              </div>
-              <button className="chatbot-close" onClick={() => setChatOpen(false)}><X size={18} /></button>
-            </div>
-
-            <div className="chatbot-messages">
-              {chatMessages.map((msg, i) => (
-                <div key={i} className={`chat-msg ${msg.role}`}>
-                  {msg.role === 'bot' && <div className="chat-bot-av"><Bot size={13} /></div>}
-                  <div className="chat-bubble">{msg.text}</div>
-                </div>
-              ))}
-              {chatLoading && (
-                <div className="chat-msg bot">
-                  <div className="chat-bot-av"><Bot size={13} /></div>
-                  <div className="chat-bubble chat-typing">
-                    <Loader2 size={14} className="chat-spin" />
-                    <span>En train d'écrire…</span>
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            <div className="chatbot-suggestions">
-              {['Quels sont vos horaires ?', 'Prendre un RDV', 'Vos services ?'].map(s => (
-                <button key={s} className="chat-suggest" onClick={() => { setChatInput(s); }}>
-                  {s}
-                </button>
-              ))}
-            </div>
-
-            <div className="chatbot-input-row">
-              <input
-                className="chatbot-input"
-                placeholder="Posez votre question…"
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendChat()}
-                disabled={chatLoading}
-              />
-              <button className="chatbot-send" onClick={sendChat} disabled={chatLoading || !chatInput.trim()}>
-                <Send size={16} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Bouton flottant */}
-        <button
-          className={`chatbot-fab ${chatOpen ? 'open' : ''}`}
-          onClick={() => setChatOpen(o => !o)}
-          aria-label="Assistant virtuel"
+        <a 
+          href="https://wa.me/2290155119999"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="chatbot-fab flex items-center justify-center bg-[#25D366] hover:bg-[#128C7E] transition-colors"
+          aria-label="Nous contacter sur WhatsApp"
         >
-          {chatOpen ? <X size={22} /> : <MessageCircle size={22} />}
-          {!chatOpen && <span className="chatbot-fab-badge">IA</span>}
-        </button>
+          <WhatsAppIcon className="w-6 h-6 text-white" />
+        </a>
       </div>
 
     </div>

@@ -1350,23 +1350,23 @@
 }
 
 .footer-logo { height: 50px; width: auto; object-fit: contain; margin-bottom: 1rem; }
-.footer-desc { font-family: 'Inter', sans-serif; font-size: 0.85rem; color: rgba(255,255,255,0.5); line-height: 1.8; max-width: 300px; }
+.footer-desc { font-family: 'Inter', sans-serif; font-size: 0.85rem; color: var(--color-green2); line-height: 1.8; max-width: 300px; }
 
-.footer-col h4 { font-family: 'Outfit', sans-serif; font-size: 0.85rem; letter-spacing: 0.15em; text-transform: uppercase; color: #fff; margin-bottom: 1.5rem; }
+.footer-col h4 { font-family: 'Outfit', sans-serif; font-size: 0.85rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--color-green); margin-bottom: 1.5rem; font-weight: 700; }
 .footer-col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.8rem; }
-.footer-col ul li a, .footer-col ul li button { font-family: 'Inter', sans-serif; font-size: 0.85rem; color: rgba(255,255,255,0.5); text-decoration: none; transition: color 0.25s; display: inline-block; background: none; border: none; padding: 0; cursor: pointer; text-align: left; }
-.footer-col ul li a:hover, .footer-col ul li button:hover { color: var(--color-green4); transform: translateX(2px); }
+.footer-col ul li a, .footer-col ul li button, .footer-col ul li { font-family: 'Inter', sans-serif; font-size: 0.85rem; color: var(--color-green2); text-decoration: none; transition: color 0.25s; display: inline-block; background: none; border: none; padding: 0; cursor: pointer; text-align: left; }
+.footer-col ul li a:hover, .footer-col ul li button:hover { color: var(--color-green); transform: translateX(2px); font-weight: 600; }
 
 .footer-bottom {
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid rgba(16, 185, 129, 0.2);
   padding: 2rem 3.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.footer-copy { font-family: 'Inter', sans-serif; font-size: 0.75rem; color: rgba(255,255,255,0.4); }
-.footer-motto { font-family: 'Outfit', sans-serif; font-size: 0.65rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--color-green4); font-weight: 600; }
+.footer-copy { font-family: 'Inter', sans-serif; font-size: 0.75rem; color: var(--color-green2); }
+.footer-motto { font-family: 'Outfit', sans-serif; font-size: 0.65rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--color-green); font-weight: 700; }
 
 @media (max-width: 767px) {
   .footer-top { grid-template-columns: 1fr; gap: 2.5rem; padding: 4rem 1.2rem 0; }

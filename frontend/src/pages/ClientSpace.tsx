@@ -98,7 +98,7 @@ const ClientSpace: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [loginMethod, setLoginMethod] = useState<'PHONE' | 'EMAIL'>('PHONE');
   const [otp, setOtp] = useState('');
-  const [view, setView] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+
   const [otpStep, setOtpStep] = useState<'PHONE' | 'OTP'>('PHONE');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -139,14 +139,7 @@ const ClientSpace: React.FC = () => {
     email: ''
   });
 
-  // États pour l'inscription
-  const [registerData, setRegisterData] = useState({
-    nom: '',
-    prenoms: '',
-    contact: '',
-    adresse: '',
-    email: ''
-  });
+
 
   // Vérifier si une session existe au chargement et écouter les erreurs d'authentification
   useEffect(() => {
@@ -221,7 +214,11 @@ const ClientSpace: React.FC = () => {
       setOtpStep('OTP');
       alert(response.data.message);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Une erreur est survenue.');
+      if (err.response?.status === 404) {
+        setError("Vous n'êtes pas encore enregistré au garage. Veuillez prendre rendez-vous pour votre première visite.");
+      } else {
+        setError(err.response?.data?.error || 'Une erreur est survenue.');
+      }
     } finally {
       setLoading(false);
     }
@@ -287,24 +284,6 @@ const ClientSpace: React.FC = () => {
       alert('Votre rendez-vous a été enregistré avec succès.');
     } catch (err: any) {
       alert('Erreur lors de la prise de rendez-vous.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    try {
-      await api.post('client-space/register/', registerData);
-      setPhone(registerData.contact);
-      setLoginMethod('PHONE');
-      setView('LOGIN');
-      setOtpStep('PHONE');
-      alert('Compte créé avec succès. Veuillez vous connecter.');
-    } catch (err: any) {
-      setError('Erreur lors de la création du compte. Vérifiez vos informations.');
     } finally {
       setLoading(false);
     }
@@ -466,154 +445,109 @@ const ClientSpace: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 font-oswald animate-in fade-in duration-700">
         <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-xl border border-emerald-100/50 space-y-8 relative overflow-hidden">
           <div className="text-center space-y-2">
-            <div className="w-16 h-16 bg-slate-900 text-emerald-400 rounded-md flex items-center justify-center mx-auto shadow-lg mb-6 transition-all duration-500 hover:bg-emerald-600 hover:text-white">
-              {view === 'LOGIN' ? <Lock className="w-7 h-7" /> : <UserPlus className="w-7 h-7" />}
+            <div className="w-16 h-16 bg-slate-900 text-emerald-400 rounded-md flex items-center justify-center mx-auto shadow-lg mb-6 transition-all duration-500 hover:bg-emerald-500 hover:text-white">
+              <Lock className="w-7 h-7" />
             </div>
             <h1 className="text-4xl font-bebas text-slate-900 tracking-wider uppercase leading-none">
-               {view === 'LOGIN' ? 'Espace Client' : 'Inscription'}
+               Espace Client
             </h1>
             <p className="text-slate-400 font-medium text-xs tracking-wider uppercase">
-               {view === 'LOGIN' 
-                 ? 'Accédez à votre garage numérique' 
-                 : 'Rejoignez Luxury Elegance Garage'}
+               Accédez à votre garage numérique
             </p>
           </div>
 
-          {view === 'LOGIN' ? (
-            otpStep === 'PHONE' ? (
-              <form onSubmit={handleRequestOTP} className="space-y-6">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between ml-1">
-                    <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest">
-                      {loginMethod === 'EMAIL' ? 'Adresse Email' : 'Numéro de Téléphone'}
-                    </label>
-                  </div>
-                  <div className="relative">
-                    {loginMethod === 'EMAIL' ? (
-                      <>
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 w-4 h-4" />
-                        <input 
-                          type="email"
-                          required 
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full pl-12 pr-4 py-3.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-sm transition-all"
-                          placeholder="votre@email.com"
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
-                        <input 
-                          type="tel"
-                          required 
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          className="w-full pl-12 pr-4 py-3.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-sm transition-all"
-                          placeholder="0102030405"
-                        />
-                      </>
-                    )}
-                  </div>
-                  <div className="flex justify-end mt-2">
-                    <button 
-                      type="button" 
-                      onClick={() => setLoginMethod(loginMethod === 'PHONE' ? 'EMAIL' : 'PHONE')}
-                      className="text-[10px] font-bold text-slate-500 hover:text-emerald-600 uppercase tracking-widest flex items-center gap-1.5 transition-colors"
-                    >
-                      {loginMethod === 'PHONE' ? <Mail className="w-3 h-3" /> : <Smartphone className="w-3 h-3" />}
-                      {loginMethod === 'PHONE' ? 'Utiliser mon adresse mail' : 'Utiliser mon téléphone'}
-                    </button>
-                  </div>
+          {otpStep === 'PHONE' ? (
+            <form onSubmit={handleRequestOTP} className="space-y-6">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between ml-1">
+                  <label className="text-[10px] font-bold uppercase text-emerald-500 tracking-widest">
+                    {loginMethod === 'EMAIL' ? 'Adresse Email' : 'Numéro de Téléphone'}
+                  </label>
                 </div>
-                {error && (
-                   <div className="p-3 bg-rose-50 border border-rose-100 rounded-md flex items-center gap-2">
-                      <Info className="w-3.5 h-3.5 text-rose-600" />
-                      <p className="text-rose-600 text-[10px] font-bold uppercase tracking-widest">{error}</p>
-                   </div>
-                )}
-                <button 
-                  disabled={loading}
-                  className="w-full py-4 bg-slate-900 text-white rounded-md font-bebas tracking-widest text-lg hover:bg-emerald-600 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {loading ? <Clock className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
-                  <span>{loading ? 'Recherche...' : 'Recevoir le code'}</span>
-                </button>
-                <div className="text-center">
-                   <button type="button" onClick={() => setView('REGISTER')} className="text-[10px] font-bold text-emerald-600 hover:text-slate-900 uppercase tracking-widest">Nouveau client ? Créer un compte</button>
+                <div className="relative">
+                  {loginMethod === 'EMAIL' ? (
+                    <>
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 w-4 h-4" />
+                      <input 
+                        type="email"
+                        required 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-sm transition-all"
+                        placeholder="votre@email.com"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                      <input 
+                        type="tel"
+                        required 
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-sm transition-all"
+                        placeholder="0102030405"
+                      />
+                    </>
+                  )}
                 </div>
-              </form>
-            ) : (
-              <form onSubmit={handleVerifyOTP} className="space-y-6">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest ml-1">Code de vérification (6 chiffres)</label>
-                  <div className="relative">
-                    <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
-                    <input 
-                      type="text" 
-                      maxLength={6}
-                      required 
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-xl tracking-[0.5em] text-center transition-all"
-                      placeholder="000000"
-                    />
-                  </div>
+                <div className="flex justify-end mt-2">
+                  <button 
+                    type="button" 
+                    onClick={() => setLoginMethod(loginMethod === 'PHONE' ? 'EMAIL' : 'PHONE')}
+                    className="text-[10px] font-bold text-slate-500 hover:text-emerald-500 uppercase tracking-widest flex items-center gap-1.5 transition-colors"
+                  >
+                    {loginMethod === 'PHONE' ? <Mail className="w-3 h-3" /> : <Smartphone className="w-3 h-3" />}
+                    {loginMethod === 'PHONE' ? 'Utiliser mon adresse mail' : 'Utiliser mon téléphone'}
+                  </button>
                 </div>
-                {error && (
-                   <div className="p-3 bg-rose-50 border border-rose-100 rounded-md flex items-center gap-2">
-                      <Info className="w-3.5 h-3.5 text-rose-600" />
-                      <p className="text-rose-600 text-[10px] font-bold uppercase tracking-widest">{error}</p>
-                   </div>
-                )}
-                <button 
-                  disabled={loading}
-                  className="w-full py-4 bg-emerald-600 text-white rounded-md font-bebas tracking-widest text-lg hover:bg-slate-900 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {loading ? <Clock className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
-                  <span>{loading ? 'Vérification...' : 'Se connecter'}</span>
-                </button>
-                <div className="text-center">
-                   <button type="button" onClick={() => { setOtpStep('PHONE'); setOtp(''); }} className="text-[10px] font-bold text-slate-400 hover:text-emerald-600 uppercase tracking-widest">Modifier l'identifiant</button>
-                </div>
-              </form>
-            )
-          ) : (
-            <form onSubmit={handleRegister} className="space-y-4">
-               <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                     <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest ml-1">Nom</label>
-                     <input required type="text" value={registerData.nom} onChange={e => setRegisterData({...registerData, nom: e.target.value})} className="w-full px-4 py-2.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none font-bold text-sm" />
-                  </div>
-                  <div className="space-y-1">
-                     <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest ml-1">Prénoms</label>
-                     <input required type="text" value={registerData.prenoms} onChange={e => setRegisterData({...registerData, prenoms: e.target.value})} className="w-full px-4 py-2.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none font-bold text-sm" />
-                  </div>
-               </div>
-               <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                     <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest ml-1">Téléphone</label>
-                     <input required type="tel" value={registerData.contact} onChange={e => setRegisterData({...registerData, contact: e.target.value})} className="w-full px-4 py-2.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none font-bold text-sm" placeholder="0192629860" />
-                  </div>
-                  <div className="space-y-1">
-                     <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest ml-1">Email</label>
-                     <input required type="email" value={registerData.email} onChange={e => setRegisterData({...registerData, email: e.target.value})} className="w-full px-4 py-2.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none font-bold text-sm" placeholder="votre@email.com" />
-                  </div>
-               </div>
-               <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest ml-1">Adresse</label>
-                  <input required type="text" value={registerData.adresse} onChange={e => setRegisterData({...registerData, adresse: e.target.value})} className="w-full px-4 py-2.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none font-bold text-sm" />
-               </div>
-               {error && <p className="text-rose-600 text-[10px] font-bold text-center uppercase tracking-widest">{error}</p>}
-               <button 
+              </div>
+              {error && (
+                 <div className="p-3 bg-rose-50 border border-rose-100 rounded-md flex items-center gap-2">
+                    <Info className="w-3.5 h-3.5 text-rose-600" />
+                    <p className="text-rose-600 text-[10px] font-bold uppercase tracking-widest">{error}</p>
+                 </div>
+              )}
+              <button 
                 disabled={loading}
-                className="w-full py-4 bg-slate-900 text-white rounded-md font-bebas tracking-widest text-lg hover:bg-emerald-600 transition-all mt-2 flex items-center justify-center gap-2"
+                className="w-full py-4 bg-slate-900 text-white rounded-md font-bebas tracking-widest text-lg hover:bg-emerald-500 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {loading ? <Clock className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
-                <span>{loading ? 'Création...' : 'Valider'}</span>
+                {loading ? <Clock className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
+                <span>{loading ? 'Recherche...' : 'Recevoir le code'}</span>
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyOTP} className="space-y-6">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-emerald-500 tracking-widest ml-1">Code de vérification (6 chiffres)</label>
+                <div className="relative">
+                  <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                  <input 
+                    type="text" 
+                    maxLength={6}
+                    required 
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-xl tracking-[0.5em] text-center transition-all"
+                    placeholder="000000"
+                  />
+                </div>
+              </div>
+              {error && (
+                 <div className="p-3 bg-rose-50 border border-rose-100 rounded-md flex items-center gap-2">
+                    <Info className="w-3.5 h-3.5 text-rose-600" />
+                    <p className="text-rose-600 text-[10px] font-bold uppercase tracking-widest">{error}</p>
+                 </div>
+              )}
+              <button 
+                disabled={loading}
+                className="w-full py-4 bg-emerald-500 text-white rounded-md font-bebas tracking-widest text-lg hover:bg-slate-900 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loading ? <Clock className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
+                <span>{loading ? 'Vérification...' : 'Se connecter'}</span>
               </button>
               <div className="text-center">
-                 <button type="button" onClick={() => setView('LOGIN')} className="text-[10px] font-bold text-slate-400 hover:text-emerald-600 uppercase tracking-widest">Retour à la connexion</button>
+                 <button type="button" onClick={() => { setOtpStep('PHONE'); setOtp(''); }} className="text-[10px] font-bold text-slate-400 hover:text-emerald-500 uppercase tracking-widest">Modifier l'identifiant</button>
               </div>
             </form>
           )}
@@ -630,14 +564,14 @@ const ClientSpace: React.FC = () => {
       <div className="flex justify-between items-center w-full gap-4">
         <div className="flex items-center gap-4">
           <div className="relative group">
-            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-2xl sm:text-3xl font-bebas shadow-xl overflow-hidden border-2 border-white transition-all duration-500">
+            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-2xl sm:text-3xl font-bebas shadow-xl overflow-hidden border-2 border-white transition-all duration-500">
               {clientData.client.photo ? (
                 <img src={resolveMediaUrl(clientData.client.photo)} alt="Profil" className="w-full h-full object-cover" />
               ) : (
                 clientData.client.nom[0]
               )}
             </div>
-            <button onClick={() => setActiveTab('PROFILE')} className="absolute -right-1 -bottom-1 p-1.5 bg-slate-900 text-white rounded-lg shadow-lg hover:bg-emerald-600 transition-colors">
+            <button onClick={() => setActiveTab('PROFILE')} className="absolute -right-1 -bottom-1 p-1.5 bg-slate-900 text-white rounded-lg shadow-lg hover:bg-emerald-500 transition-colors">
               <Camera className="w-3 h-3" />
             </button>
           </div>
@@ -646,7 +580,7 @@ const ClientSpace: React.FC = () => {
               Bonjour, {clientData.client.prenoms}
             </h1>
             <div className="flex flex-wrap gap-2">
-              <p className="text-emerald-600 font-bold text-[10px] uppercase tracking-widest flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100">
+              <p className="text-emerald-500 font-bold text-[10px] uppercase tracking-widest flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100">
                 <CheckCircle2 className="w-3 h-3" /> Membre Certifié
               </p>
               {soldeImpaye > 0 && (
@@ -678,7 +612,7 @@ const ClientSpace: React.FC = () => {
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`flex flex-col sm:flex-row items-center gap-1 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 rounded-lg text-[9px] sm:text-[11px] font-bold uppercase tracking-widest transition-all whitespace-nowrap min-w-[60px] sm:min-w-0 ${
-              activeTab === tab.id ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
+              activeTab === tab.id ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50'
             }`}
           >
             <tab.icon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
@@ -705,7 +639,7 @@ const ClientSpace: React.FC = () => {
                       <div key={r.id} className="p-6 bg-white rounded-lg border border-slate-200 shadow-sm hover:border-emerald-500 transition-all group relative overflow-hidden">
                         <div className="flex justify-between items-start mb-4 relative z-10">
                           <div className="space-y-1">
-                            <span className="font-bebas text-sm text-emerald-600 px-2 py-0.5 bg-emerald-50 rounded">OR-{r.id.toString().padStart(4, '0')}</span>
+                            <span className="font-bebas text-sm text-emerald-500 px-2 py-0.5 bg-emerald-50 rounded">OR-{r.id.toString().padStart(4, '0')}</span>
                             <h3 className="text-2xl font-bebas text-slate-900 tracking-wider uppercase">{r.vehicule_plate}</h3>
                           </div>
                           <div className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${r.statut === 'EN_COURS' ? 'bg-blue-600 text-white' : 'bg-orange-500 text-white'}`}>
@@ -715,10 +649,10 @@ const ClientSpace: React.FC = () => {
                         <div className="space-y-2 relative z-10">
                           <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest">
                             <span className="text-slate-400">Progression</span>
-                            <span className="text-emerald-600">{r.progression}%</span>
+                            <span className="text-emerald-500">{r.progression}%</span>
                           </div>
                           <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-600 rounded-full transition-all duration-1000" style={{ width: `${r.progression}%` }}></div>
+                            <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${r.progression}%` }}></div>
                           </div>
                         </div>
                       </div>
@@ -760,11 +694,11 @@ const ClientSpace: React.FC = () => {
             <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-bottom-4 duration-700">
               {clientData.vehicules.map((v: Vehicle) => (
                 <div key={v.id} className="p-6 bg-white rounded-lg border border-slate-200 shadow-sm flex items-center gap-5 group hover:border-emerald-500 transition-all">
-                  <div className="w-16 h-16 bg-slate-50 text-slate-400 rounded-md flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                  <div className="w-16 h-16 bg-slate-50 text-slate-400 rounded-md flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all">
                     <Car className="w-8 h-8" />
                   </div>
                   <div>
-                    <p className="font-bebas text-2xl text-emerald-600 tracking-wider uppercase">{v.immatriculation}</p>
+                    <p className="font-bebas text-2xl text-emerald-500 tracking-wider uppercase">{v.immatriculation}</p>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{v.marque} {v.modele}</p>
                   </div>
                 </div>
@@ -776,13 +710,13 @@ const ClientSpace: React.FC = () => {
             <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-700">
               {clientData.reparations.map((r: Repair) => (
                 <div key={r.id} className="p-6 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6 items-start md:items-center group hover:border-emerald-500 transition-all">
-                  <div className="w-12 h-12 bg-slate-50 rounded-md flex items-center justify-center text-slate-400 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                  <div className="w-12 h-12 bg-slate-50 rounded-md flex items-center justify-center text-slate-400 group-hover:bg-emerald-500 group-hover:text-white transition-all">
                     <History className="w-6 h-6" />
                   </div>
                   <div className="flex-1 space-y-1">
                     <div className="flex justify-between items-center">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(r.date_creation).toLocaleDateString()}</p>
-                      <span className={`px-2.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${r.statut === 'TERMINE' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{r.statut.replace('_', ' ')}</span>
+                      <span className={`px-2.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest ${r.statut === 'TERMINE' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-700'}`}>{r.statut.replace('_', ' ')}</span>
                     </div>
                     <h4 className="text-xl font-bebas text-slate-900 tracking-wider uppercase">{r.vehicule_plate} — {r.categorie}</h4>
                     <p className="text-xs text-slate-500 font-medium italic opacity-70">"{r.description}"</p>
@@ -801,7 +735,7 @@ const ClientSpace: React.FC = () => {
                   <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-300 space-y-6">
                     <div className="text-center space-y-2">
                       <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto">
-                        <FileText className="w-8 h-8 text-emerald-600" />
+                        <FileText className="w-8 h-8 text-emerald-500" />
                       </div>
                       <h3 className="text-2xl font-bebas tracking-wider text-slate-900 uppercase">Type de facture</h3>
                       <p className="text-xs text-slate-400 font-medium">
@@ -812,7 +746,7 @@ const ClientSpace: React.FC = () => {
                     {/* Affichage IFU en lecture seule pour vérification */}
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Votre Numéro IFU (fourni par le garage)</p>
-                      <p className="text-lg font-bebas text-emerald-600 tracking-widest">{clientData?.client?.ifu}</p>
+                      <p className="text-lg font-bebas text-emerald-500 tracking-widest">{clientData?.client?.ifu}</p>
                       <p className="text-[9px] text-slate-400 italic">Si ce numéro est incorrect, contactez le garage avant de payer.</p>
                     </div>
 
@@ -831,7 +765,7 @@ const ClientSpace: React.FC = () => {
                           setIfuModalInvoice(null);
                           openKkiapayWidget(ifuModalInvoice, true);
                         }}
-                        className="py-3 px-4 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-emerald-700 transition-all"
+                        className="py-3 px-4 bg-emerald-500 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all"
                       >
                         ✓ Oui, normaliser
                       </button>
@@ -851,14 +785,14 @@ const ClientSpace: React.FC = () => {
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" onClick={() => setPaySuccess(null)}>
                   <div className="bg-white rounded-2xl p-10 max-w-sm w-full text-center shadow-2xl border border-emerald-100 animate-in zoom-in-95 duration-500" onClick={e => e.stopPropagation()}>
                     <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+                      <CheckCircle2 className="w-10 h-10 text-emerald-500" />
                     </div>
                     <h3 className="text-3xl font-bebas tracking-wider text-slate-900 mb-2">Paiement confirmé !</h3>
-                    <p className="text-emerald-600 font-black text-xl mb-1">{paySuccess.montant} FCFA</p>
+                    <p className="text-emerald-500 font-black text-xl mb-1">{paySuccess.montant} FCFA</p>
                     <p className="text-slate-400 text-xs font-medium mb-8">{paySuccess.message}</p>
                     <button
                       onClick={() => setPaySuccess(null)}
-                      className="w-full bg-slate-900 text-white py-3 rounded-lg font-bebas tracking-widest uppercase text-sm hover:bg-emerald-600 transition-all"
+                      className="w-full bg-slate-900 text-white py-3 rounded-lg font-bebas tracking-widest uppercase text-sm hover:bg-emerald-500 transition-all"
                     >
                       Fermer
                     </button>
@@ -875,7 +809,7 @@ const ClientSpace: React.FC = () => {
                     <span className="text-sm text-slate-400 ml-1">F</span>
                   </p>
                 </div>
-                <div className="bg-emerald-600 text-white p-5 rounded-xl text-center">
+                <div className="bg-emerald-500 text-white p-5 rounded-xl text-center">
                   <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-emerald-200 mb-1">Déjà Payé</p>
                   <p className="text-2xl font-bebas tracking-wider">
                     {clientData.factures.reduce((s: number, f: Invoice) => s + Number(f.montant_paye), 0).toLocaleString('fr-FR')}
@@ -908,13 +842,13 @@ const ClientSpace: React.FC = () => {
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
                       {/* Infos facture */}
                       <div className="flex items-start gap-4 flex-1">
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isSolde ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isSolde ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}>
                           <FileText className="w-6 h-6" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-black text-emerald-600 tracking-wider">{inv.numero_facture || 'PROFORMA'}</p>
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${isSolde ? 'bg-emerald-100 text-emerald-700' : isPartiel ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
+                            <p className="text-sm font-black text-emerald-500 tracking-wider">{inv.numero_facture || 'PROFORMA'}</p>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${isSolde ? 'bg-emerald-100 text-emerald-600' : isPartiel ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
                               {isSolde ? '✓ Soldé' : isPartiel ? 'Partiel' : 'Non payé'}
                             </span>
                           </div>
@@ -946,7 +880,7 @@ const ClientSpace: React.FC = () => {
                             <button
                               onClick={() => handlePayKkiapay(inv)}
                               disabled={payingInvoice?.id === inv.id}
-                              className="flex items-center gap-1.5 px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-[10px] font-bebas tracking-widest uppercase hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200 disabled:opacity-50"
+                              className="flex items-center gap-1.5 px-5 py-2.5 bg-emerald-500 text-white rounded-lg text-[10px] font-bebas tracking-widest uppercase hover:bg-emerald-600 transition-all active:scale-95 shadow-lg shadow-emerald-200 disabled:opacity-50"
                             >
                               <CreditCard className="w-3.5 h-3.5" />
                               {payingInvoice?.id === inv.id ? 'Paiement...' : `Payer ${reste.toLocaleString('fr-FR')} F`}
@@ -962,7 +896,7 @@ const ClientSpace: React.FC = () => {
                         )}
                         <button
                           onClick={() => downloadInvoice(inv.id)}
-                          className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 text-white rounded-lg text-[10px] font-bebas tracking-widest uppercase hover:bg-emerald-600 transition-all active:scale-95"
+                          className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 text-white rounded-lg text-[10px] font-bebas tracking-widest uppercase hover:bg-emerald-500 transition-all active:scale-95"
                         >
                           <Download className="w-3.5 h-3.5" /> PDF
                         </button>
@@ -981,7 +915,7 @@ const ClientSpace: React.FC = () => {
                  <h2 className="text-xl font-bebas text-slate-900 tracking-wider uppercase">Mes rendez-vous</h2>
                  <button 
                   onClick={() => setShowAppointmentForm(!showAppointmentForm)}
-                  className="px-5 py-2 bg-slate-900 text-white rounded-md text-xs font-bebas tracking-widest uppercase hover:bg-emerald-600 transition-all"
+                  className="px-5 py-2 bg-slate-900 text-white rounded-md text-xs font-bebas tracking-widest uppercase hover:bg-emerald-500 transition-all"
                  >
                    {showAppointmentForm ? 'Annuler' : '+ Prendre RDV'}
                  </button>
@@ -991,7 +925,7 @@ const ClientSpace: React.FC = () => {
                 <form onSubmit={handleBookAppointment} className="p-6 bg-slate-50 rounded-lg border border-slate-200 space-y-4 animate-in zoom-in-95 duration-500">
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest ml-1">Véhicule</label>
+                      <label className="text-[10px] font-bold uppercase text-emerald-500 tracking-widest ml-1">Véhicule</label>
                       <select 
                         required
                         value={appointmentData.vehicule}
@@ -1005,7 +939,7 @@ const ClientSpace: React.FC = () => {
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest ml-1">Date & Heure</label>
+                      <label className="text-[10px] font-bold uppercase text-emerald-500 tracking-widest ml-1">Date & Heure</label>
                       <input 
                         required
                         type="datetime-local"
@@ -1025,7 +959,7 @@ const ClientSpace: React.FC = () => {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest ml-1">Service demandé</label>
+                    <label className="text-[10px] font-bold uppercase text-emerald-500 tracking-widest ml-1">Service demandé</label>
                     <input 
                       required
                       type="text"
@@ -1036,7 +970,7 @@ const ClientSpace: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase text-emerald-600 tracking-widest ml-1">Notes (Optionnel)</label>
+                    <label className="text-[10px] font-bold uppercase text-emerald-500 tracking-widest ml-1">Notes (Optionnel)</label>
                     <textarea 
                       value={appointmentData.notes}
                       onChange={e => setAppointmentData({...appointmentData, notes: e.target.value})}
@@ -1046,7 +980,7 @@ const ClientSpace: React.FC = () => {
                   </div>
                   <button 
                     disabled={loading}
-                    className="w-full py-3 bg-emerald-600 text-white rounded-md font-bebas tracking-widest text-lg hover:bg-slate-900 transition-all active:scale-95 disabled:opacity-50"
+                    className="w-full py-3 bg-emerald-500 text-white rounded-md font-bebas tracking-widest text-lg hover:bg-slate-900 transition-all active:scale-95 disabled:opacity-50"
                   >
                     {loading ? 'Enregistrement...' : 'Confirmer le rendez-vous'}
                   </button>
@@ -1054,18 +988,18 @@ const ClientSpace: React.FC = () => {
               )}
 
               {clientData.rdvs.length > 0 ? clientData.rdvs.map((rdv: Appointment) => (
-                <div key={rdv.id} className="p-6 bg-white rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-emerald-600 group hover:border-emerald-500 transition-all">
+                <div key={rdv.id} className="p-6 bg-white rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-emerald-500 group hover:border-emerald-500 transition-all">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-3">
-                      <Calendar className="w-5 h-5 text-emerald-600" />
+                      <Calendar className="w-5 h-5 text-emerald-500" />
                       <p className="text-xl font-bebas text-slate-900 tracking-wider uppercase">{new Date(rdv.date_rdv).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
-                    <span className={`px-3 py-1 rounded text-[9px] font-bold uppercase tracking-widest ${rdv.statut === 'CONFIRME' ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white'}`}>
+                    <span className={`px-3 py-1 rounded text-[9px] font-bold uppercase tracking-widest ${rdv.statut === 'CONFIRME' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
                       {rdv.statut.replace('_', ' ')}
                     </span>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-md space-y-1">
-                    <p className="text-[9px] font-bold uppercase text-emerald-600 tracking-widest">Service demandé</p>
+                    <p className="text-[9px] font-bold uppercase text-emerald-500 tracking-widest">Service demandé</p>
                     <p className="text-sm font-bold text-slate-700">{rdv.service_demande}</p>
                     {rdv.notes && <p className="text-xs text-slate-400 italic font-medium opacity-70">"{rdv.notes}"</p>}
                   </div>
@@ -1085,7 +1019,7 @@ const ClientSpace: React.FC = () => {
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Paramètres</p>
                     <h2 className="text-2xl font-bebas text-slate-900 tracking-wider uppercase">Informations personnelles</h2>
                  </div>
-                 <button onClick={() => setEditMode((prev) => !prev)} className="px-5 py-2.5 bg-slate-900 text-white rounded-md font-bebas tracking-widest uppercase text-sm hover:bg-emerald-600 transition-all active:scale-95 shadow-lg shadow-slate-200">
+                 <button onClick={() => setEditMode((prev) => !prev)} className="px-5 py-2.5 bg-slate-900 text-white rounded-md font-bebas tracking-widest uppercase text-sm hover:bg-emerald-500 transition-all active:scale-95 shadow-lg shadow-slate-200">
                    {editMode ? 'Annuler' : 'Modifier le profil'}
                  </button>
               </div>
@@ -1136,7 +1070,7 @@ const ClientSpace: React.FC = () => {
                  </div>
 
                  {editMode && (
-                    <button disabled={loading} className="w-full py-4 bg-slate-900 text-white rounded-md font-bebas tracking-widest text-lg hover:bg-emerald-600 transition-all active:scale-95 shadow-xl">
+                    <button disabled={loading} className="w-full py-4 bg-slate-900 text-white rounded-md font-bebas tracking-widest text-lg hover:bg-emerald-500 transition-all active:scale-95 shadow-xl">
                        {loading ? 'Mise à jour...' : 'Enregistrer les modifications'}
                     </button>
                  )}
@@ -1187,7 +1121,7 @@ const ClientSpace: React.FC = () => {
                    >
                      <div className="flex justify-between items-center mb-2">
                        <div className="flex items-center gap-2">
-                         <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest bg-white px-2 py-0.5 rounded border border-emerald-100">
+                         <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest bg-white px-2 py-0.5 rounded border border-emerald-100">
                            {n.type.replace(/_/g, ' ')}
                          </span>
                          {!n.lu && (
@@ -1212,13 +1146,13 @@ const ClientSpace: React.FC = () => {
                     <div className="h-1 w-4 bg-emerald-500 rounded-full"></div>
                     <h2 className="text-xl font-bebas text-slate-900 tracking-wider uppercase">Votre avis</h2>
                  </div>
-                 <button onClick={() => setShowAvisForm(!showAvisForm)} className="text-[10px] font-bold text-emerald-600 hover:text-slate-900 uppercase tracking-widest transition-colors flex items-center gap-1.5">
+                 <button onClick={() => setShowAvisForm(!showAvisForm)} className="text-[10px] font-bold text-emerald-500 hover:text-slate-900 uppercase tracking-widest transition-colors flex items-center gap-1.5">
                     <Star className="w-3 h-3" /> Témoigner
                  </button>
               </div>
 
               {showAvisForm && (
-                <form onSubmit={handleAvisSubmit} className="p-6 bg-emerald-600 text-white rounded-lg shadow-xl space-y-4 animate-in slide-in-from-top-4 duration-700">
+                <form onSubmit={handleAvisSubmit} className="p-6 bg-emerald-500 text-white rounded-lg shadow-xl space-y-4 animate-in slide-in-from-top-4 duration-700">
                    <div className="flex gap-1.5 justify-center">
                       {[1, 2, 3, 4, 5].map(star => (
                         <button key={star} type="button" onClick={() => setAvisData({...avisData, note: star})} className={`transition-all hover:scale-125 ${star <= avisData.note ? 'text-orange-400' : 'text-white/20'}`}>
@@ -1248,15 +1182,15 @@ const ClientSpace: React.FC = () => {
 
            <section className="bg-emerald-50 rounded-lg p-6 space-y-5 border border-emerald-100 group transition-all">
               <div className="flex items-center gap-4">
-                 <div className="w-10 h-10 bg-white rounded-md flex items-center justify-center text-emerald-600 shadow-sm transition-all group-hover:scale-110">
+                 <div className="w-10 h-10 bg-white rounded-md flex items-center justify-center text-emerald-500 shadow-sm transition-all group-hover:scale-110">
                     <MessageSquare className="w-5 h-5" />
                  </div>
                  <div>
                     <h3 className="text-xs font-bold uppercase text-slate-900 tracking-wider">Support VIP</h3>
-                    <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Disponible 24/7</p>
+                    <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest">Disponible 24/7</p>
                  </div>
               </div>
-              <a href="https://wa.me/2290192629860" target="_blank" className="flex items-center justify-center gap-2 w-full py-3 bg-[#25D366] text-white rounded-md font-bebas tracking-widest uppercase hover:bg-emerald-600 transition-all shadow-md text-sm">
+              <a href="https://wa.me/2290155119999" target="_blank" className="flex items-center justify-center gap-2 w-full py-3 bg-[#25D366] text-white rounded-md font-bebas tracking-widest uppercase hover:bg-emerald-500 transition-all shadow-md text-sm">
                  <WhatsAppIcon className="w-4 h-4" /> WhatsApp
               </a>
            </section>
@@ -1265,10 +1199,10 @@ const ClientSpace: React.FC = () => {
 
       {/* Floating Action Buttons — repositionnés pour ne pas se superposer à la bottom nav mobile */}
       <div className="fixed bottom-24 md:bottom-8 right-4 md:right-8 flex flex-col gap-3 z-40 no-print">
-        <a href="https://wa.me/2290192629860" target="_blank" className="w-12 h-12 md:w-14 md:h-14 bg-[#25D366] text-white rounded-xl flex items-center justify-center shadow-xl hover:scale-110 transition-all group relative">
+        <a href="https://wa.me/2290155119999" target="_blank" className="w-12 h-12 md:w-14 md:h-14 bg-[#25D366] text-white rounded-xl flex items-center justify-center shadow-xl hover:scale-110 transition-all group relative">
           <WhatsAppIcon className="w-6 h-6 md:w-7 md:h-7" />
         </a>
-        <a href="tel:+2290192629860" className="w-12 h-12 md:w-14 md:h-14 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-xl hover:scale-110 transition-all group relative border border-white/10">
+        <a href="tel:+2290155119999" className="w-12 h-12 md:w-14 md:h-14 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-xl hover:scale-110 transition-all group relative border border-white/10">
           <Phone className="w-5 h-5 md:w-6 md:h-6 text-emerald-400" />
         </a>
       </div>
@@ -1300,9 +1234,9 @@ const ClientSpace: React.FC = () => {
               {modifSuccess ? (
                 <div className="text-center py-8 space-y-3 animate-in fade-in duration-500">
                   <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                    <CheckCircle2 className="w-8 h-8 text-emerald-500" />
                   </div>
-                  <p className="font-bold text-emerald-700 text-sm">Demande envoyée avec succès !</p>
+                  <p className="font-bold text-emerald-600 text-sm">Demande envoyée avec succès !</p>
                   <p className="text-slate-400 text-xs">Le garage vous contactera sous peu pour discuter de cette modification.</p>
                 </div>
               ) : (

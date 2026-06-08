@@ -14,7 +14,16 @@ import {
   Search,
   Clock,
   UserCheck,
-  CheckCircle2
+  CheckCircle2,
+  Settings2,
+  Zap,
+  Hammer,
+  Paintbrush,
+  Snowflake,
+  Gauge,
+  Cpu,
+  HelpCircle,
+  Car
 } from 'lucide-react';
 import api from '../services/api';
 import './PublicPortal.css';
@@ -25,11 +34,18 @@ import galerie1 from '../assets/garage_images/galeries/galerie_1.jpg';
 
 
 const SERVICES = [
-  { id: 'mec', icon: Wrench, title: 'Mécanique Générale', desc: 'Diagnostic, réparation et maintenance de tous types de véhicules. Moteur, transmission, suspension.' },
-  { id: 'elec', icon: Bolt, title: 'Électricité Auto', desc: 'Diagnostic électronique avancé, câblage, batterie, alternateur, démarreur.' },
-  { id: 'pneu', icon: CircleDot, title: 'Pneumatique', desc: 'Montage, équilibrage, permutation et réparation de pneumatiques.' },
-  { id: 'lav', icon: Droplets, title: 'Lavage Complet', desc: 'Nettoyage intérieur et extérieur, lavage moteur, aspiration, traitement surfaces.' },
-  { id: 'ent', icon: Settings, title: 'Entretien Général', desc: 'Vidange, filtres, bougies, freins, liquides — entretien complet du véhicule.' },
+  { id: 'mec', icon: Wrench, title: 'Mécanique Générale', desc: 'Diagnostic, réparation et maintenance de tous types de véhicules.' },
+  { id: 'paral', icon: Settings2, title: 'Parallélisme / Géométrie', desc: 'Ajustement précis des angles de roues pour une tenue de route optimale.' },
+  { id: 'elec', icon: Zap, title: 'Électricité Auto', desc: 'Diagnostic électronique avancé, câblage, batterie, alternateur.' },
+  { id: 'tol', icon: Hammer, title: 'Tôlerie', desc: 'Redressage, réparation de carrosserie et remplacement d\'éléments.' },
+  { id: 'peint', icon: Paintbrush, title: 'Peinture', desc: 'Raccord, peinture complète ou personnalisée avec finitions parfaites.' },
+  { id: 'pneu', icon: CircleDot, title: 'Pneumatique', desc: 'Changement de roues, réparation, montage et permutation.' },
+  { id: 'lav', icon: Droplets, title: 'Lavage', desc: 'Nettoyage complet intérieur et extérieur, aspiration, traitement surfaces.' },
+  { id: 'froid', icon: Snowflake, title: 'Froid (Climatisation)', desc: 'Recharge de gaz, recherche de fuites et réparation de circuits A/C.' },
+  { id: 'eq', icon: Gauge, title: 'Équilibrage de roue', desc: 'Suppression des vibrations pour un confort de conduite parfait.' },
+  { id: 'scan', icon: Cpu, title: 'Scannage', desc: 'Diagnostic électronique par valise pour détection rapide des pannes.' },
+  { id: 'cons', icon: HelpCircle, title: 'Conseils assistance', desc: 'Accompagnement expert pour le choix ou le changement de votre véhicule.' },
+  { id: 'vente', icon: Car, title: 'Ventes / Location', desc: 'Achat, vente et location de véhicules répondant à vos exigences.' },
 ];
 
 const TESTIMONIALS = [
@@ -59,15 +75,52 @@ const PublicPortal: React.FC = () => {
 
   // ─── HERO CAROUSEL ───
   useEffect(() => {
-    const timer = setInterval(() => setHIdx(p => (p + 1) % 3), 5500);
+    const timer = setInterval(() => setHIdx(p => (p + 1) % 3), 8000);
     return () => clearInterval(timer);
   }, []);
 
   // ─── TESTIMONIALS CAROUSEL ───
   useEffect(() => {
-    const timer = setInterval(() => setTIdx(p => (p + 1) % 2), 6500);
+    const timer = setInterval(() => setTIdx(p => (p + 1) % 2), 8000);
     return () => clearInterval(timer);
   }, []);
+
+  // ─── SWIPE LOGIC ───
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    setTouchEndX(null);
+    if ('touches' in e) setTouchStartX(e.targetTouches[0].clientX);
+    else setTouchStartX((e as React.MouseEvent).clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if ('touches' in e) setTouchEndX(e.targetTouches[0].clientX);
+    else setTouchEndX((e as React.MouseEvent).clientX);
+  };
+
+  const onTouchEndHero = () => {
+    if (!touchStartX || !touchEndX) return;
+    const distance = touchStartX - touchEndX;
+    if (distance > minSwipeDistance) hNext();
+    if (distance < -minSwipeDistance) hPrev();
+  };
+
+  const onTouchEndTestimonials = () => {
+    if (!touchStartX || !touchEndX) return;
+    const distance = touchStartX - touchEndX;
+    if (distance > minSwipeDistance) setTIdx(p => (p + 1) % 2);
+    if (distance < -minSwipeDistance) setTIdx(p => (p - 1 + 2) % 2);
+  };
+
+  const onTouchEndGallery = () => {
+    if (!touchStartX || !touchEndX) return;
+    const distance = touchStartX - touchEndX;
+    if (distance > minSwipeDistance) gNext();
+    if (distance < -minSwipeDistance) gPrev();
+  };
 
 
 
@@ -143,7 +196,18 @@ const PublicPortal: React.FC = () => {
     <>
       {/* ══ HERO CAROUSEL ══ */}
       <section className="hero" id="accueil">
-        <div className="hero-track" ref={hTrackRef} style={{ transform: `translateX(-${(hIdx * 100) / 3}%)` }}>
+        <div 
+          className="hero-track" 
+          ref={hTrackRef} 
+          style={{ transform: `translateX(-${(hIdx * 100) / 3}%)` }}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEndHero}
+          onMouseDown={onTouchStart}
+          onMouseMove={onTouchMove}
+          onMouseUp={onTouchEndHero}
+          onMouseLeave={onTouchEndHero}
+        >
           
           <div className={`hero-slide ${hIdx === 0 ? 'active' : ''}`}>
             <div className="hs-img">
@@ -214,7 +278,7 @@ const PublicPortal: React.FC = () => {
       {/* ══ QUICK ACTIONS (mobile) ══ */}
       <div className="quick-actions">
         <div className="qa-grid">
-          <a href="tel:+2290192629860" className="qa-btn">
+          <a href="tel:+2290155119999" className="qa-btn">
             <Phone className="w-5 h-5 mb-1" />
             <span>Appeler</span>
           </a>
@@ -282,10 +346,14 @@ const PublicPortal: React.FC = () => {
             ref={gTrackRef}
             style={{ 
               transform: `translateX(-${gIdx * (window.innerWidth < 768 ? 85 : 33.33)}%)`,
-              // L'ajustement exact du translateX en react nécessiterait un hook ResizeObserver complet.
-              // Ici on fait simple: la classe CSS gère le layout flex, on scrolle via transform.
-              // Sur mobile (min-width 80vw), sur desktop (min-width 33.33%)
             }}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEndGallery}
+            onMouseDown={onTouchStart}
+            onMouseMove={onTouchMove}
+            onMouseUp={onTouchEndGallery}
+            onMouseLeave={onTouchEndGallery}
           >
             {[
               { src: galerie1, lbl: "Atelier principal" },
@@ -372,7 +440,18 @@ const PublicPortal: React.FC = () => {
           <h2 className="sec-title">AVIS DE NOS <span>CLIENTS</span></h2>
         </div>
         <div className="testi-wrap reveal">
-          <div className="testi-track" ref={tTrackRef} style={{ transform: `translateX(-${tIdx * 100}%)` }}>
+          <div 
+            className="testi-track" 
+            ref={tTrackRef} 
+            style={{ transform: `translateX(-${tIdx * 100}%)` }}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEndTestimonials}
+            onMouseDown={onTouchStart}
+            onMouseMove={onTouchMove}
+            onMouseUp={onTouchEndTestimonials}
+            onMouseLeave={onTouchEndTestimonials}
+          >
             
             {/* Slide 1 */}
             <div className="testi-slide">
@@ -435,7 +514,7 @@ const PublicPortal: React.FC = () => {
               <div className="rdv-ci-icon"><Phone /></div>
               <div>
                 <div className="rdv-ci-label">Téléphone</div>
-                <div className="rdv-ci-val"><a href="tel:+2290192629860">+229 01 92 62 98 60</a></div>
+                <div className="rdv-ci-val"><a href="tel:+2290155119999">+229 01 55 11 99 99</a></div>
               </div>
             </div>
             <div className="rdv-ci">
@@ -471,10 +550,17 @@ const PublicPortal: React.FC = () => {
               <select required value={bookingData.service} onChange={e => setBookingData({...bookingData, service: e.target.value})}>
                 <option value="">Sélectionner…</option>
                 <option value="Mécanique générale">Mécanique générale</option>
-                <option value="Électricité auto">Électricité auto</option>
-                <option value="Pneumatique">Pneumatique</option>
-                <option value="Lavage complet">Lavage complet</option>
-                <option value="Entretien général">Entretien général</option>
+                <option value="Parallélisme / Géométrie">Parallélisme / Géométrie</option>
+                <option value="Electricité">Electricité</option>
+                <option value="Tôlerie">Tôlerie</option>
+                <option value="Peinture">Peinture</option>
+                <option value="Pneumatique">Pneumatique (changement de roue)</option>
+                <option value="Lavage">Lavage</option>
+                <option value="Froid (climatisation)">Froid (climatisation)</option>
+                <option value="Equilibrage de roue">Equilibrage de roue</option>
+                <option value="Scannage">Scannage</option>
+                <option value="Conseils assistance">Conseils assistance pour changement</option>
+                <option value="Vente / Location">Ventes / location de véhicules</option>
                 <option value="Autre">Autre</option>
               </select>
             </div>

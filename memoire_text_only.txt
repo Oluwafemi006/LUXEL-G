@@ -1,0 +1,396 @@
+         RÉPUBLIQUE DU BÉNIN
+ **********
+MINISTÈRE DE L’ENSEIGNEMENT SECONDAIRE ET DE LA RECHERCHE
+SCIENTIFIQUE (MESRS)
+**********
+UNIVERSITÉ DE PARAKOU(UP)
+**********
+INSTITUT UNIVERSITAIRE DE TECHNOLOGIE (IUT)
+**********
+MÉMOIRE DE FIN DE FORMATION DE LICENCE PROFESSIONNELLE
+**********
+CYCLE : Licence professionnelle                  FILIÈRE : Informatique de Gestion
+                             THÈME
+REALISE PAR :
+BONI Adje Oladjidé Kenneth Eddy                                                DOHOU Tchegnou. Esaie Stephane
+SOUS LA SUPERVISION DE :
+  Maître de stage :                                                                                              Maître de mémoire :
+Juillet 2025
+AVERTISSEMENT
+L’Institut Universitaire de Technologie (IUT) de l’Université de Parakou n’entend donner ni approbation ni improbation aux opinions émises dans ce mémoire. Ces opinions doivent être considérées propres à leurs auteurs. »
+DÉDICACE 1
+DÉDICACE 2
+REMERCIEMENTS 
+La réalisation de ce mémoire a été rendue possible grâce au soutien, aux conseils et à l’accompagnement de plusieurs personnes que nous tenons à remercier sincèrement. Il s’agit entre autres : 
+du Directeur de l’Institut Universitaire de Technologie (IUT) de Parakou; 
+du Maître de Conférence Agréé Boris LOKONON, Directeur adjoint de l’Institut Universitaire de Technologie (IUT) de Parakou; 
+de notre maître mémoire, le Dr , Maître de Conférence, qui a dirigé notre travail. Ses conseils, apports scientifiques et professionnels nous ont permis de surmonter les difficultés et de progresser dans le travail
+de tous les enseignants de l’Institut Universitaire de Technologie (IUT) en particulier ceux de la filière Informatique de Gestion, notamment Dr Mêton Mêton ATINDEHOU et Dr MOUSSE Mikaël Ange; 
+de tous les honorables membres du jury qui ont accepté évaluer notre tâche et d’apporter leur appréciation pour son amélioration ; 
+ de toute la 23ème promotion de l’IUT en particulier ceux de la filière Informatique de Gestion pour les analyses, les critiques et les encouragements ; 
+de tous ceux qui, de près ou de loin ou de quelque manière que ce soit, ont apporté une touche particulière à la réalisation de ce mémoire. 
+SIGLES ET ACRONYMES
+LISTE DES FIGURES
+LISTE DES TABLEAUX
+SOMMAIRE
+INTRODUCTION14
+PARTIE I : PRESENTATION DU CONTEXETE D’ETUDE16
+Chapitre 1 : Présentation de la structure d’accueil17
+I-Historique17
+II-Organigramme17
+III-Ressource matérielle17
+IV-Déroulement du stage17
+Chapitre 2 : Présentation du projet18
+I-Problématique18
+II-Objectifs et défis du projet19
+III-Etat de l’art20
+PARTIE II : ANALYSE DU SYSTEME28
+Chapitre 1 : Les méthodes de modélisation29
+I-La méthodes MERISE29
+II- Le langage UML30
+Chapitre 2 : analyse et modélisation du système33
+I-Identifications des acteurs33
+II-Définition des exigences33
+III-Diagramme de conception36
+PARTIE III : IMPLEMENTATION DU SYSTEME
+Chapitre 1 : Technologie et outils utilisées 
+Technologie utilisée
+Outils utilisés
+Chapitre 2 : Présentation de LUXEL-G
+INTRODUCTION
+À l'ère de la transformation numérique, l'intégration des technologies de l'information et de la communication (TIC) est devenue un levier de performance incontournable pour les entreprises de tous les secteurs. Au Bénin, cette dynamique de digitalisation touche progressivement les petites et moyennes entreprises qui cherchent à optimiser leurs processus pour rester compétitives. Le secteur de la maintenance automobile n'échappe pas à cette règle. En effet, un garage moderne ne se limite plus à la simple réparation mécanique ; il doit gérer de manière optimale ses flux financiers, ses stocks de pièces de rechange et, surtout, garantir un suivi client irréprochable pour assurer sa pérennité.
+C'est dans cette optique que s'inscrit le Luxury Élégance Garage, une structure spécialisée implantée à Parakou. Fort de son expertise technique, ce garage attire une clientèle exigeante. Cependant, la gestion quotidienne de ses activités – de la création des ordres de réparation à la facturation, en passant par le suivi de la trésorerie – repose encore en grande partie sur des outils traditionnels et manuels. Cette organisation déconnectée limite la traçabilité des interventions, alourdit les tâches administratives et freine la mise en place d'une véritable stratégie de fidélisation de la clientèle.
+Face à ce constat, il s'avère nécessaire de repenser le système d'information de l'entreprise afin d'aligner la qualité du service administratif sur l'excellence technique de l'atelier. C'est ce qui justifie le choix de notre thème d'étude intitulé : « Conception et développement d'un système de gestion des interventions, du suivi client et de prise de rendez-vous en ligne pour un garage automobile spécialisé : cas du Luxury Élégance Garage de Parakou ».
+Le présent document a pour vocation de retracer l'ensemble de notre démarche d'ingénierie logicielle visant à apporter une solution numérique sur mesure à cette structure. L'objectif est de doter le garage d'une plateforme centralisée, capable de dématérialiser la gestion de l'atelier tout en offrant un portail interactif aux clients pour le suivi de leurs véhicules.
+Pour mener à bien ce travail et répondre à notre problématique, notre réflexion s'articulera autour de trois grandes parties. Le premier chapitre sera consacré au cadre institutionnel de l'étude et à l'analyse de l'existant, permettant d'identifier les failles du système actuel. Le deuxième chapitre abordera la modélisation du nouveau système d'information, en s'appuyant sur des méthodes d'analyse conceptuelle. Enfin, le dernier chapitre présentera les choix technologiques, l'architecture logicielle retenue ainsi que la réalisation technique et le déploiement de l'application.
+PARTIE I : PRESENTATION DU CONTEXETE D’ETUDEPARTIE I : PRESENTATION DU CONTEXETE D’ETUDEPARTIE I : PRESENTATION DU CONTEXETE D’ETUDEPARTIE I : PRESENTATION DU CONTEXETE D’ETUDE
+PARTIE I : PRESENTATION DU CONTEXETE D’ETUDE
+PARTIE I : PRESENTATION DU CONTEXETE D’ETUDE
+Chapitre 1 : Présentation de la structure d’accueil
+Historique
+Organigramme
+Ressource matérielle
+Déroulement du stage
+Chapitre 2 : Présentation du projet 
+Problématique
+Dans le secteur de la maintenance automobile, la performance d’un garage ne dépend plus uniquement de la qualité des réparations effectuées, mais également de l’efficacité de son organisation administrative et de la qualité du service offert à la clientèle. Pourtant, plusieurs garages automobiles, notamment le Luxury Élégance Garage de Parakou, continuent d’utiliser des méthodes de gestion traditionnelles basées sur des carnets, des fiches papier ou des fichiers Excel non centralisés.
+Ces pratiques présentent de nombreuses limites : lenteur dans le traitement des informations, difficultés de suivi des réparations, pertes ou duplications de données, manque de coordination entre les différents services et faible traçabilité des opérations réalisées. De plus, l’absence d’un système informatisé complique la gestion des rendez-vous, le suivi des clients, l’établissement des factures ainsi que le contrôle des activités financières du garage. Cette situation entraîne souvent des retards, des erreurs administratives et une baisse de la satisfaction client.
+Par ailleurs, dans un contexte marqué par la transformation numérique et l’évolution des attentes des consommateurs, les clients recherchent davantage de rapidité, de transparence et d’accessibilité dans les services automobiles. Ils souhaitent pouvoir obtenir des informations fiables sur leurs véhicules, prendre des rendez-vous facilement et bénéficier d’un meilleur suivi de leurs interventions. L’absence d’une plateforme numérique adaptée constitue donc un frein à la modernisation et à la compétitivité du garage.
+Face à ces insuffisances, il devient nécessaire de mettre en place une solution informatique capable de centraliser et d’automatiser les différentes opérations du garage, tout en facilitant les interactions avec les clients.
+Dès lors, la problématique de cette étude peut être formulée comme suit : comment la conception et le développement d’un système de gestion des interventions, du suivi client et de prise de rendez-vous en ligne peuvent-ils contribuer à améliorer l’organisation interne, optimiser le suivi administratif et financier, et renforcer la satisfaction ainsi que la fidélisation des clients du Luxury Élégance Garage de Parakou ?
+Objectifs et défis du projet
+Objectif général
+L'objectif principal de ce projet est de concevoir et de développer un système informatisé et centralisé de gestion des interventions, du suivi client et de prise de rendez-vous en ligne, dans le but de dématérialiser l'organisation interne, de fiabiliser le suivi de la caisse et d'optimiser la relation client au sein du garage automobile spécialisé Luxury Élégance Garage de Parakou.
+Objectifs spécifiques
+Développer un module permettant au réceptionniste de créer, suivre et gérer les Ordres de Réparation (OR), ainsi que de générer les devis, factures et paiements associés.
+Mettre en place un module de gestion financière et de stock permettant au réceptionniste et au gérant de suivre les recettes, les dépenses et l’état des pièces de rechange en temps réel.
+Concevoir un espace client interactif permettant aux clients de consulter leurs informations, suivre les réparations de leurs véhicules et effectuer des demandes de rendez-vous en ligne.
+Automatiser l’envoi des notifications et alertes de maintenance afin d’améliorer la communication entre le garage et les clients
+Défis du projet
+Le développement et la mise en œuvre de cette application de gestion de garage automobile présentent plusieurs défis :
+Adaptation aux réalités du terrain : Concevoir une application dotée d'une interface simple, ergonomique et intuitive, garantissant une prise en main rapide par l'ensemble du personnel du garage, indépendamment de leur niveau de compétence en informatique.
+Sécurité et fiabilité des données : Assurer la confidentialité, l'intégrité et la sauvegarde continue des informations critiques relatives à la clientèle, à l'historique des véhicules et aux opérations financières de la caisse.
+Organisation et automatisation : Structurer efficacement les processus métier en dématérialisant le suivi du cycle de vie des réparations et en automatisant la génération des documents administratifs et comptables (devis, factures, ordres de réparation).
+Conduite du changement et adoption par les utilisateurs : Faciliter la transition des méthodes de travail traditionnelles et manuelles vers le nouveau système informatisé, afin de lever les éventuelles résistances et d'assurer une adhésion totale des équipes.
+Etat de l’art
+Revue de littérature
+La transformation numérique occupe aujourd’hui une place importante dans le fonctionnement des entreprises modernes. Selon les travaux de Kenneth Laudon et Jane Laudon (2020), les systèmes d’information permettent de collecter, traiter, stocker et diffuser des informations afin d’améliorer la gestion des activités et la prise de décision au sein des organisations. Dans le domaine de la maintenance automobile, ces systèmes contribuent à moderniser les méthodes de gestion utilisées dans les garages.
+Plusieurs auteurs montrent que la digitalisation des ateliers automobiles améliore considérablement l’organisation des opérations quotidiennes. Les logiciels de gestion de garage permettent notamment de centraliser les informations relatives aux clients, aux véhicules, aux réparations, aux devis et aux factures. Selon certaines études portant sur les systèmes de gestion automobile, l’utilisation des outils numériques réduit les erreurs liées aux traitements manuels et facilite le suivi des interventions techniques.
+Par ailleurs, la gestion de la relation client est devenue un élément essentiel dans le secteur automobile. Plusieurs recherches soulignent que les plateformes numériques et les sites vitrines améliorent la communication entre les garages et leurs clients. Les fonctionnalités telles que la prise de rendez-vous en ligne, les notifications automatiques et le suivi des réparations permettent d’offrir un meilleur service aux clients et de renforcer leur satisfaction.
+Aujourd’hui, plusieurs solutions logicielles existent dans le domaine de la gestion des garages automobiles, notamment EBP MéCa, MCA Garage ou encore Dolibarr. Ces systèmes proposent des fonctionnalités avancées permettant de gérer les réparations, les devis, les factures et les stocks. Toutefois, la majorité de ces solutions ont été développées dans des contextes européens et présentent certaines limites dans les garages africains, notamment le coût élevé, la complexité d’utilisation et le manque d’adaptation aux réalités locales.
+Au Bénin, plusieurs garages automobiles utilisent encore des méthodes de gestion manuelles basées sur des cahiers ou des fichiers Excel. Cette situation entraîne des difficultés de suivi des réparations, des pertes d’informations et une mauvaise organisation des données. De plus, l’absence d’une plateforme numérique limite les interactions entre le garage et les clients.
+ Dans le cadre du garage Luxury Elegance Garage, ces différentes limites justifient la mise en place d’un système informatique capable d’améliorer la gestion des activités du garage, d’automatiser certaines tâches administratives et de faciliter la relation avec les clients à travers une plateforme vitrine intégrant la prise de rendez-vous en ligne.
+Sources :
+1- Laudon, K. C., & Laudon, J. P. (2020). Management Information Systems. Pearson Education.2- https://www.ebp.com/logiciel-garage-automobile/3- https://mca-concept.com/en/business-software/mca-garage/4- https://www.dolibarr.org/5- https://scholar.google.com/
+Clarification conceptuelle
+La clarification conceptuelle consiste à mettre en lumière les mots-clés de notre thème tout en précisant leur contexte d'utilisation, afin d'éviter toute ambiguïté ou écart de compréhension tout au long de notre étude. 
+Conception et Développement
+Dans le cadre de ce mémoire, la conception désigne la phase d'ingénierie logicielle au cours de laquelle nous modélisons l'architecture du système, les bases de données et les interfaces utilisateurs, avant toute écriture de code. Le développement fait référence à la phase de réalisation technique, c'est-à-dire l'écriture du code source (backend et frontend) aboutissant à la création d'une application fonctionnelle et déployable. Il s'agit ici d'un développement purement technologique et logiciel.
+Système de gestion
+Un système de gestion, dans le contexte de l'informatique de gestion, désigne un ensemble structuré de ressources matérielles, logicielles et humaines permettant de collecter, stocker, traiter et diffuser l'information. Pour notre projet, il s'agit d'une application logicielle centralisée permettant au garage d'automatiser et d'optimiser ses processus administratifs, financiers (caisse, facturation) et logistiques (stock de pièces). 
+Interventions (mécaniques)
+Une intervention désigne l'ensemble des opérations techniques réalisées sur un véhicule par les professionnels du garage. Cela commence par le diagnostic et l'ouverture d'un Ordre de Réparation (OR), inclut le remplacement de pièces ou l'entretien préventif (vidange, révision), et s'achève par la validation des travaux. Notre système vise à dématérialiser le suivi de ce cycle de vie technique.
+Suivi client (CRM - Customer Relationship Management)
+Le suivi client englobe toutes les stratégies et les outils numériques mis en place pour gérer et analyser les interactions avec la clientèle. Dans notre contexte, il ne s'agit pas seulement d'enregistrer les coordonnées d'un propriétaire de véhicule, mais de maintenir un carnet d'entretien numérique précis, d'anticiper ses besoins (alertes de maintenance) et de lui offrir de la transparence sur les prestations en cours, dans le but de le fidéliser.
+Prise de rendez-vous en ligne
+Il s'agit d'une fonctionnalité offerte par un portail web ou mobile permettant à un client, de manière autonome et à distance, de réserver un créneau horaire pour une prestation spécifique sur son véhicule. Ce module se synchronise en temps réel avec le planning de l'atelier pour éviter les conflits et optimiser la charge de travail des mécaniciens.
+Garage automobile spécialisé
+Un garage automobile spécialisé est une structure de maintenance qui, contrairement à un garage généraliste, concentre son expertise sur des catégories spécifiques de véhicules (véhicules de luxe, marques précises) ou sur des services ciblés de haute technicité (mécanique de précision, diagnostic électronique de pointe). Le Luxury Élégance Garage s'inscrit dans cette définition, ce qui exige un système de gestion capable de refléter ce niveau d'exigence et de professionnalisme auprès de sa clientèle.
+Etude existant
+EBP MéCa
+EBP MéCa est un logiciel professionnel destiné aux garages automobiles. Il permet de gérer les devis, les factures, les réparations, les rendez-vous ainsi que les informations des clients et des véhicules. 
+Sources : https://www.ebp.com/logiciel-garage-automobile/
+Forces
+Limites
+Gestion complète des activités du garage 
+Génération automatique des devis et factures 
+Tableau de bord et statistiques 
+Gestion des rendez-vous 
+Coût élevé 
+Logiciel complexe pour certaines petites structures 
+Nécessite une formation pour une bonne prise en main
+MCA Garage
+MCA Garage est une solution de gestion automobile permettant de gérer les réparations, la relation client, les devis, les factures ainsi que le planning des interventions.
+ Sources :  https://mca-concept.com/logiciels-metiers/mca-garage/
+Forces
+Limites
+Solution complète et professionnelle 
+Gestion centralisée des informations 
+Planification des rendez-vous 
+Interface moderne
+Solution coûteuse 
+Complexité d’utilisation 
+Certaines fonctionnalités inutiles pour de petits garages
+JYL Garage
+JYL Garage Windows est un logiciel de gestion destiné aux garages automobiles et motos. Il permet principalement la gestion des ordres de réparation, le suivi des interventions et l’organisation des activités de l’atelier.
+Sources : https://apps.microsoft.com/search?query=JYL+Garage&hl=fr-FR&gl=BJ
+Forces
+Limites
+Gestion des ordres de réparation 
+Interface simple et orientée atelier automobile 
+Permet le suivi des véhicules en réparation 
+Adapté à la gestion quotidienne d’un garage 
+Disponible sous Windows 
+Interface graphique ancienne et peu moderne 
+Fonctionnalités limitées pour la relation client 
+Absence d’une véritable plateforme web ou mobile 
+Peu adapté aux besoins spécifiques des garages africains 
+Informations limitées sur l’évolution et le support du logiciel 
+MyGarageApp
+MyGarageApp est une application légère de gestion automobile conçue sous forme de Progressive Web App (PWA). Elle permet principalement le suivi des véhicules et certaines opérations de maintenance.
+Sources : https://apps.microsoft.com/search?query=MyGarageApp&hl=fr-FR&gl=BJ
+Forces
+Limites
+Application légère et simple d’utilisation 
+Fonctionnement possible hors ligne 
+Interface moderne et épurée 
+Facilité de prise en main 
+Accessible sur plusieurs appareils grâce à la technologie PWA 
+Fonctionnalités limitées pour une gestion complète de garage 
+Peu d’outils avancés pour la facturation et les devis 
+Pas spécialement adaptée aux réalités des garages africains 
+Dépendance à certaines technologies web modernes 
+Support et évolutivité limités
+Bilan de l’étude de l’existant
+L’analyse des solutions existantes met en exergue une offre logicielle variée pour la gestion de la réparation automobile. Des solutions robustes telles qu'EBP MéCa et MCA Garage couvrent amplement la gestion de l'atelier (devis, facturation, ordres de réparation). En parallèle, des outils comme JYL Garage ou MyGarageApp tentent d'apporter des réponses plus ciblées ou plus légères.
+Cependant, la confrontation de ces solutions aux réalités d'un garage moderne implanté au Bénin révèle des lacunes fonctionnelles et ergonomiques majeures. Les solutions complètes sont onéreuses, nécessitent une infrastructure lourde et une formation pointue, tandis que les applications plus accessibles souffrent d'interfaces vieillissantes ou de fonctionnalités tronquées. Plus important encore, aucune de ces solutions n'intègre nativement une véritable dimension de fidélisation client adaptée au contexte local.
+C'est à ce niveau précis que notre projet se démarque. Contrairement aux solutions étudiées, le système que nous proposons de concevoir pour le Luxury Élégance Garage intégrera les fonctionnalités spécifiques suivantes, actuellement absentes ou inadaptées chez les concurrents :
+Un Espace Client interactif et autonome : Là où les logiciels existants (comme JYL ou EBP) cantonnent le client à un simple nom sur une facture, notre système offrira un portail web permettant au client de consulter l'historique d'entretien de son véhicule et de suivre l'état de ses réparations en temps réel.
+La prise de rendez-vous en ligne intégrée : Le système permettra aux clients de réserver directement leurs créneaux d'intervention depuis leur smartphone, avec une synchronisation automatique sur le planning de l'administrateur, comblant ainsi le déficit de relation client observé dans les solutions étudiées.
+L'adaptation aux réalités financières locales : Contrairement aux logiciels européens, notre solution prendra en compte les spécificités de paiement locales (possibilité d'intégration future du Mobile Money, gestion souple des acomptes en espèces).
+Une ergonomie "Full Web" équilibrée : Le système combinera la légèreté d'accès d'une application web (à l'image de MyGarageApp) avec la rigueur d'un outil de gestion complet (Ordres de réparation, caisse), le tout sans nécessiter de lourdes formations pour les mécaniciens.
+En conclusion, les limites observées dans l'existant justifient pleinement le développement d'une solution sur-mesure. Notre système ne se contentera pas de numériser l'administration du garage, mais agira comme un véritable outil de communication et de gestion de la relation client, indispensable au positionnement haut de gamme du Luxury Élégance Garage.
+PARTIE II : ANALYSE DU SYSTEMEPARTIE II : ANALYSE DU SYSTEMEPARTIE II : ANALYSE DU SYSTEMEPARTIE II : ANALYSE DU SYSTEME
+PARTIE II : ANALYSE DU SYSTEME
+PARTIE II : ANALYSE DU SYSTEME
+Chapitre 1 : Les méthodes de modélisation
+Dans ce chapitre, nous allons présenter les principales méthodes de modélisation utilisées dans la conception des systèmes d’information, notamment Merise et UML. Il s’agira de mettre en lumière leurs spécificités, leurs domaines d’application ainsi que leurs avantages respectifs. Cette analyse comparative nous permettra de justifier le choix de la méthode la plus appropriée pour le développement de notre système de gestion de garage automobile 
+La méthodes MERISE
+1. Présentation de la méthode MERISE 
+La méthode Merise est une méthode d’analyse et de conception des systèmes d’information développée en France dans les années 1970. Elle repose sur une structuration rigoureuse et hiérarchisée du développement des systèmes, en distinguant trois niveaux essentiels : le niveau conceptuel, le niveau logique et le niveau physique. Cette approche est centrée sur une séparation claire entre les données, les traitements et le temps, ce qui permet une modélisation méthodique des besoins d’un système. Elle est particulièrement utilisée dans des projets où les flux de gestion sont bien définis, notamment dans les systèmes d’information traditionnels.
+2. Avantages de la méthode MERISE 
+L’un des principaux avantages de la méthode Merise réside dans sa rigueur. Elle impose une logique de développement très structurée qui permet de bien comprendre les données, les flux d'information et les traitements. Grâce à cette structuration, Merise permet une bonne lisibilité des modèles produits et une facilité de documentation. Elle s’avère donc adaptée aux systèmes d’information de type gestion, dans lesquels les données sont fortement liées aux processus métier. En outre, elle favorise une bonne traçabilité entre les différentes phases de développement, depuis l’analyse des besoins jusqu’à la conception physique
+II- Le langage UML 
+1. Présentation du langage UML 
+UML, ou Unified Modeling Language, est un langage de modélisation orienté objet qui s’est imposé comme une norme dans la conception logicielle à partir des années 1990. Il propose une approche plus souple et modulaire, grâce à une panoplie de diagrammes permettant de représenter aussi bien la structure que le comportement d’un système. UML est largement utilisé dans les environnements de développement modernes, en particulier pour les projets orientés objet, les applications web et mobiles, ainsi que les systèmes nécessitant une interaction complexe entre les composants. 
+2. Avantages du langage UML 
+La richesse et la diversité des diagrammes proposés par UML constituent un atout majeur. Cette méthode permet de représenter plusieurs dimensions du système à travers des diagrammes adaptés : les cas d’utilisation pour identifier les interactions utilisateur, les diagrammes de classes pour la structure, ou encore les diagrammes de séquences et d’activités pour le comportement dynamique. Elle facilite ainsi la compréhension du système par l’ensemble des parties prenantes, tout en permettant une bonne modularité dans la conception. Par ailleurs, UML est compatible avec les méthodes de développement agile et les technologies orientées objet, ce qui en fait une méthode souple et moderne.
+Le tableau suivant présente une comparaison des deux Méthodes :
+Critère 
+Merise 
+UML 
+Définition 
+Méthode d’analyse et de conception des systèmes d'information, centrée sur les données, les traitements et l'organisation. 
+Langage de modélisation standard orienté objet utilisé pour spécifier, visualiser, construire et documenter des systèmes logiciels. 
+Origine 
+Développée en France dans les années 1970, principalement pour les besoins administratifs et informatiques des entreprises. 
+Créée aux États-Unis dans les années 1990 par Grady Booch, James Rumbaugh et Ivar Jacobson, puis standardisée par l’OMG (Object Management Group). 
+Objectif 
+Structurer le développement des systèmes d’information de manière rigoureuse et séquentielle. 
+Fournir une représentation graphique unifiée du système pour faciliter sa compréhension et sa conception collaborative. 
+Modèles 
+Modèle conceptuel de données (MCD), Modèle logique de données (MLD), Modèle physique de données (MPD). 
+Modèle unifié orienté objet : diagrammes de cas d’utilisation, de classes, d’activités, de séquence, etc. 
+Adoption 
+Principalement utilisée dans les pays francophones, notamment dans les administrations et grandes entreprises traditionnelles. 
+Adoption mondiale, largement utilisée dans les projets informatiques modernes, industriels, universitaires et startups. 
+Flexibilité 
+Méthode rigide, structurée en étapes fixes (conceptuelle, logique, physique). Peu adaptée aux projets agiles ou évolutifs. 
+Flexible et modulaire. Convient aux méthodes agiles, itératives ou incrémentales. 
+Domaines d’application 
+Systèmes d’information classiques (gestion de bases de données, gestion administrative, comptabilité, etc.). 
+Tous types de systèmes logiciels : applications web, mobiles, embarquées, systèmes complexes, etc. 
+Choix de la méthode
+Dans notre projet, nous avons choisi UML pour la modélisation. Ce choix s’appuie sur plusieurs raisons : 
+Modélisation complète : UML permet de représenter à la fois la structure (données, classes) et le comportement (processus, interactions) du système, ce qui est essentiel pour un système dynamique comme la gestion des activités d’un garage automobile. 
+Facilité de communication : Les diagrammes UML sont visuels et compréhensibles aussi bien par les développeurs que par les utilisateurs ou les parties prenantes non techniques, facilitant ainsi la collaboration.
+Souplesse et évolutivité : UML s’adapte bien aux méthodes de développement agiles, permettant d’ajuster et d’améliorer le système au fil du projet selon les retours des utilisateurs. 
+Support des systèmes modernes : UML est largement utilisé dans le développement d’applications web et mobiles, ce qui correspond au type de solution numérique que nous souhaitons développer. 
+Large adoption et outils : UML bénéficie d’un large soutien avec de nombreux outils logiciels qui facilitent la création, la gestion et la maintenance des modèles tout au long du cycle de vie du projet
+Chapitre 2 : analyse et modélisation du système
+Identifications des acteurs
+Un acteur désigne un rôle rempli par une entité externe (tel qu’un utilisateur humain, un appareil physique ou un autre système) qui interagit directement avec le système examiné. Un acteur est extérieur au système. Il existe deux types d’acteurs : les acteurs primaires et les acteurs secondaires. Ici nous avons trois acteurs primaires : La réceptionniste, le client, l’administrateur. Et un acteur secondaire : le Système (Acteur non-humain)
+Client : Propriétaire d'un ou plusieurs véhicules, accédant à l'Espace Client.
+Le Réceptionniste : Employé à l'accueil du garage, gère la relation client et les entrées/sorties.
+Le Gérant (Administrateur) : Supervise l'activité, gère les finances, les stocks et les accès.
+Le Système (Acteur non-humain) : Exécute les tâches automatisées en arrière-plan (cron jobs)
+ Définition des exigences
+1. Exigences fonctionnelles 
+Les exigences fonctionnelles du système, qui définissent les principales actions que le système doit permettre, sont présentées dans le tableau ci-dessous
+Acteurs
+Fonctionnalité
+Description
+Client / Réceptionniste / Gérant
+- Authentification
+- Le système doit permettre aux utilisateurs de se connecter de manière sécurisée
+Client
+- Gestion du profil client
+- Consultation des véhicules
+- Prise de rendez-vous
+- Suivi des réparations
+- Consultation de l’historique
+- Le client doit pouvoir consulter et modifier ses informations personnelles
+- Le client doit pouvoir consulter les véhicules enregistrés à son nom
+- Le client doit pouvoir effectuer une demande de rendez-vous en ligne
+- Le client doit pouvoir consulter l’état d’avancement des réparations
+- Le client doit pouvoir consulter ses anciennes réparations et factures
+Réceptionniste / Gérant
+- Gestion des clients
+- Gestion des véhicules
+- Gestion des ordres de réparation
+- Gestion du planning
+- Gestion des devis, factures et paiements
+- Gestion de la caisse
+- Gestion des stocks
+- Le système doit permettre d’ajouter, modifier et rechercher des clients
+- Le système doit permettre d’enregistrer et gérer les véhicules des clients
+- Le système doit permettre de créer et suivre les ordres de réparation
+- Le système doit permettre de gérer les rendez-vous
+- Le système doit permettre de créer des devis, générer des factures et enregistrer les paiements
+- Le système doit permettre d’enregistrer les recettes et dépenses
+- Le système doit permettre de gérer les pièces de rechange
+Gérant
+- Suivi des activités
+- Gestion des accès
+- Le système doit permettre de consulter les statistiques et activités du garage
+- Le système doit permettre de créer et gérer les comptes utilisateurs
+Système
+- Notification des rendez-vous
+- Alertes de maintenance
+- Mise à jour automatique du stock
+- Le système doit envoyer automatiquement des rappels de rendez-vous
+- Le système doit envoyer des alertes de maintenance aux clients
+- Le système doit décrémenter automatiquement le stock après utilisation d’une pièce
+2. Exigences non fonctionnelles 
+Les exigences non fonctionnelles représentent les contraintes techniques et qualitatives que le système doit respecter sans pour autant définir des fonctionnalités spécifiques. 
+Performance 
+Le système doit répondre rapidement aux requêtes des utilisateurs
+Disponibilité 
+Le système doit être accessible à tout moment pour les utilisateurs autorisés.
+Sécurité
+Le système doit sécuriser les données et accès des utilisateurs.
+Fiabilité
+Le système doit garantir l’exactitude et la cohérence des données
+Notifications obligatoires
+Le système doit être capable d’envoyer automatiquement des notifications et rappels aux clients
+Sauvegarde des données
+Le système doit permettre la sauvegarde régulière des données
+Maintenance
+Le code doit être bien documenté et testé, avec un système de mise à jour sans interruption et un suivi en temps réel des performances
+Diagramme de conception
+Le diagramme de cas d’utilisation permet de représenter les différentes actions que les acteurs peuvent effectuer dans le système. Il met en évidence les relations entre les acteurs et les cas d’utilisation qui traduisent les besoins fonctionnels du système
+Descriptions textuelles de quelques cas d’utilisation
+« Authentification » 
+Objectif : Permettre aux utilisateurs de se connecter de manière sécurisée au système.
+Acteurs concernés : Client, Réceptionniste, Gérant
+Auteur : BONI Eddy & DOHOU Stéphane
+Date de création :  Mai 2026
+Version : 1.0
+Préconditions :  L'utilisateur doit disposer d'un compte actif dans le système
+Scénario principale :
+L'utilisateur accède à la page de connexion 
+Il saisit son identifiant et son mot de passe 
+Le système vérifie les informations 
+Le système redirige l'utilisateur vers son espace selon son rôle
+Scénario Alternative : 
+1a. Mot de passe incorrect : le système affiche un message d'erreur retour à l'étape 2 
+3b. Compte inexistant : le système affiche « compte introuvable » retour à l'étape 2 
+3c. Compte bloqué : le système informe l'utilisateur de contacter l'administrateur
+Postcondition : L'utilisateur est connecté et accède à son tableau de bord.
+« Prendre rendez-vous » 
+Objectif : Permettre au client de demander un rendez-vous en ligne pour son véhicule.
+Acteurs concernés : Clients
+Auteur : BONI Eddy & DOHOU Stéphane
+Date de création :  Mai 2026
+Version : 1.0
+Préconditions : Le client possède un compte et est connecté au système 
+Scénario principale :
+Le client accède au module de prise de rendez-vous 
+Il choisit le type de service souhaité 
+Il sélectionne une date et un créneau horaire disponible 
+Il décrit le problème ou les travaux souhaités 
+Il soumet sa demande 
+Le système enregistre le rendez-vous avec statut (En attente)
+Le système envoie une confirmation par SMS
+Scénario Alternative : 
+3a. Aucun créneau disponible : le système propose les prochaines dates disponibles 
+5b. Informations incomplètes : le système affiche un message d'erreur retour à l'étape 4
+Postcondition : Le rendez-vous est enregistré dans le système et une notification est envoyée au client.
+« Gérer un ordre de réparation » 
+Objectif : Permettre au réceptionniste d’enregistrer et de suivre les réparations des véhicules.
+Acteurs concernés : Gérant ; Réceptionniste
+Auteur : BONI Eddy & DOHOU Stéphane 
+Date de création : Mai 2026
+Version : 1.0
+Préconditions : Le client doit être enregistré et véhicule doit exister dans le système.
+Scénario principale :
+Le réceptionniste accède au module des ordres de réparation
+Il sélectionne le client et le véhicule
+Il saisit les symptômes et les travaux à effectuer
+Le système crée l’ordre de réparation
+ Le réceptionniste peut suivre l’évolution des travaux
+Scénario Alternative :
+2a. Véhicule inexistant :
+Le système demande l’enregistrement du véhicule 
+Retour à l’étape 2 
+3b. Informations obligatoires manquantes :
+Le système affiche un message d’erreur 
+Retour à l’étape 3
+Postcondition : L’ordre de réparation est enregistré et disponible pour le suivi des interventions.
+« Gérer devis, factures et paiements »  
+Objectif : Permettre au réceptionniste de générer les devis, factures et paiements liés aux réparations.
+Acteurs concernés :
+Auteurs :  BONI Eddy & DOHOU Stéphane
+Date de création : Mai 2026
+Version : 1.0
+Préconditions : Un ordre de réparation doit exister
+Scénario principale :
+Le réceptionniste sélectionne un ordre de réparation
+Il ajoute les prestations et pièces utilisées
+ Le système calcule automatiquement le montant total
+ Le réceptionniste génère le devis ou la facture
+ Le paiement est enregistré dans le système
+Scénario Alternative :
+2a. Pièce non disponible en stock :
+Le système affiche une alerte 
+Retour à l’étape 2 
+5b. Paiement incomplet :
+Le système enregistre le montant partiel 
+ La facture reste en attente
+Postcondition : Le devis, la facture et le paiement sont enregistrés dans le système.
+« Envoyer des notification » 
+Objectif : Permettre au système d’envoyer les notifications automatiquement et des rappels et alerte aux clients 
+Acteurs concernés : Système
+Auteur : BONI Eddy & DOHOU Stéphane  
+Date de création : Mai 2026
+Version : 1.0 
+Préconditions : Les informations du client doivent être disponibles.
+Scénario principale : 
+Le système détecte un rendez-vous ou une maintenance à venir
+Il génère automatiquement un message de rappel
+Le message est envoyé au client par notification ou SMS
+Scénario Alternative :
+3a. Échec d’envoi du message :
+Le système enregistre l’erreur 
+Une nouvelle tentative d’envoi est effectuée
+Postcondition : Le client reçoit une notification concernant son rendez-vous ou sa maintenance.
