@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Wrench,
-  Bolt,
   CircleDot,
   Droplets,
-  Settings,
   CalendarCheck,
   ArrowRight,
   ArrowLeft,
@@ -159,7 +157,7 @@ const PublicPortal: React.FC = () => {
         telephone_client_public: bookingData.telephone,
         vehicule_client_public: bookingData.vehicule,
         service_demande: bookingData.service,
-        date_rdv: `${bookingData.date}T${bookingData.heure.split(' ')[0] || '08'}:00Z`,
+        date_rdv: `${bookingData.date}T${bookingData.heure.split(' ')[0] || '08'}:00+01:00`,
         notes: bookingData.notes
       };
       await api.post('appointments/', payload);
@@ -216,7 +214,7 @@ const PublicPortal: React.FC = () => {
             <div className="hs-content">
               <div>
                 <div className="hs-tag">Garage Auto · Parakou</div>
-                <h2>VOTRE VÉHICULE<br/>ENTRE <span>BONNES</span><br/>MAINS.</h2>
+                <h1>VOTRE VÉHICULE<br/>ENTRE <span>BONNES</span><br/>MAINS.</h1>
                 <p>Expertise, rigueur et professionnalisme depuis plus de 10 ans.</p>
                 <div className="hero-ctas">
                   <button className="btn-white" onClick={() => goTo('rdv')}><CalendarCheck className="w-4 h-4 mr-2 inline" />Réserver maintenant</button>

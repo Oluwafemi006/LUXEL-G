@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Lock, 
-  UserPlus, 
   CheckCircle2, 
   Car, 
   Star, 

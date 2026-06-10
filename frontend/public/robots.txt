@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /espace-client
+Disallow: /staff
+Disallow: /login
+
+# Sitemaps can be added here in the future
+# Sitemap: https://luxel-g.com/sitemap.xml

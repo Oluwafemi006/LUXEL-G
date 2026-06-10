@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom';
 import { Phone, Home, Wrench, CalendarCheck, UserCircle, Images } from 'lucide-react';
 import logoImg from '../assets/logo.png';
-import api from '../services/api';
 import '../pages/PublicPortal.css'; // S'assurer que les styles globaux du portal sont chargés
 import '../pages/PublicPortal.css'; // S'assurer que les styles globaux du portal sont chargés
 
