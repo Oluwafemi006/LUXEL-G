@@ -49,7 +49,7 @@ const Notifications: React.FC = () => {
           message: `Niveau de stock alarmant (${s.quantite} unités). Veuillez approvisionner dès que possible pour éviter tout arrêt de service.`,
           date: new Date().toISOString(),
           priority: 'HAUTE',
-          link: '/stock'
+          link: '/staff/stock'
         });
       });
 
@@ -62,7 +62,7 @@ const Notifications: React.FC = () => {
           message: `Maintenance préventive (${m.type_maintenance.toLowerCase()}) rattachée au dossier technique, prévue pour le ${new Date(m.date_prochaine_prevue).toLocaleDateString('fr-FR')}.`,
           date: new Date().toISOString(),
           priority: 'BASSE',
-          link: '/reparations'
+          link: '/staff/reparations'
         });
       });
 

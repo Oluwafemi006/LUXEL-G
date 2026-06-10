@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom';
-import { Phone, Home, Wrench, CalendarCheck, UserCircle, Images } from 'lucide-react';
+import { Home, Wrench, CalendarCheck, UserCircle, Images } from 'lucide-react';
 import logoImg from '../assets/logo.png';
-import '../pages/PublicPortal.css'; // S'assurer que les styles globaux du portal sont chargés
-import '../pages/PublicPortal.css'; // S'assurer que les styles globaux du portal sont chargés
+import '../pages/PublicPortal.css';
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -86,8 +85,8 @@ const PublicLayout: React.FC = () => {
         <div className="mh-logo" onClick={() => handleNavClick('accueil')}>
           <img src={logoImg} alt="LEG Parakou" className="mobile-logo" />
         </div>
-        <a href="tel:+2290155119999" className="mh-call flex items-center gap-2">
-          <Phone className="w-3 h-3" /> Appeler
+        <a href="https://wa.me/2290155119999" target="_blank" rel="noopener noreferrer" className="mh-call flex items-center gap-2">
+          <WhatsAppIcon className="w-3 h-3" /> WhatsApp
         </a>
       </header>
 
@@ -137,11 +136,6 @@ const PublicLayout: React.FC = () => {
           <span className="bn-label">Client</span>
         </Link>
       </nav>
-
-      {/* ─── FLOATING CALL BUTTON (Mobile) ─── */}
-      <a href="tel:+2290155119999" className="fab-call" aria-label="Appeler le garage">
-        <Phone className="w-5 h-5" />
-      </a>
 
       {/* ─── FOOTER ─── */}
       <footer className="footer bg-white border-t border-emerald-100">

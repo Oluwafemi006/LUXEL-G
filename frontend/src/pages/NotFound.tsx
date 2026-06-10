@@ -1,8 +1,30 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { Home, Search, Car } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const NotFound: React.FC = () => {
+  const location = useLocation();
+  const { isAuthenticated, user } = useAuth();
+
+  // Déterminer si l'utilisateur est dans l'espace interne (/staff/...)
+  const isInStaffArea = location.pathname.startsWith('/staff');
+
+  // Redirection intelligente selon le rôle
+  const getHomePath = () => {
+    if (isInStaffArea && isAuthenticated) {
+      return user?.role === 'DIRECTEUR' ? '/staff' : '/staff/reception';
+    }
+    return '/';
+  };
+
+  const getHomeLabel = () => {
+    if (isInStaffArea && isAuthenticated) {
+      return user?.role === 'DIRECTEUR' ? 'Tableau de bord' : 'Réception';
+    }
+    return "Retour à l'accueil";
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-oswald relative overflow-hidden">
       {/* Background decorations */}
@@ -41,19 +63,21 @@ const NotFound: React.FC = () => {
         {/* Actions */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
           <NavLink
-            to="/"
+            to={getHomePath()}
             className="flex items-center gap-2 px-8 py-3.5 bg-emerald-600 text-white rounded-lg font-bebas tracking-widest uppercase text-sm hover:bg-emerald-700 hover:-translate-y-0.5 transition-all w-full sm:w-auto justify-center shadow-lg shadow-emerald-600/30"
           >
             <Home className="w-4 h-4" />
-            Retour à l'accueil
+            {getHomeLabel()}
           </NavLink>
-          <NavLink
-            to="/espace-client"
-            className="flex items-center gap-2 px-8 py-3.5 bg-white text-slate-700 border border-slate-200 rounded-lg font-bebas tracking-widest uppercase text-sm hover:bg-slate-50 hover:border-slate-300 transition-all w-full sm:w-auto justify-center"
-          >
-            <Search className="w-4 h-4" />
-            Espace Client
-          </NavLink>
+          {!isInStaffArea && (
+            <NavLink
+              to="/espace-client"
+              className="flex items-center gap-2 px-8 py-3.5 bg-white text-slate-700 border border-slate-200 rounded-lg font-bebas tracking-widest uppercase text-sm hover:bg-slate-50 hover:border-slate-300 transition-all w-full sm:w-auto justify-center"
+            >
+              <Search className="w-4 h-4" />
+              Espace Client
+            </NavLink>
+          )}
         </div>
 
       </div>
