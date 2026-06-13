@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Search, 
   PlusCircle, 
@@ -45,13 +45,13 @@ interface Repair {
 
 const Vehicles: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [vehicleHistory, setVehicleHistory] = useState<Repair[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
+  // AI summary removed: endpoint unavailable
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +65,11 @@ const Vehicles: React.FC = () => {
       setVehicles(data);
       
       setSelectedVehicle(prev => {
+        const stateId = (location.state as any)?.selectedId;
+        if (stateId) {
+          const found = data.find((v: any) => v.id === stateId);
+          if (found) return found;
+        }
         if (!prev && data.length > 0) return data[0];
         if (prev) {
           const updated = data.find((v: any) => v.id === prev.id);
@@ -83,20 +88,7 @@ const Vehicles: React.FC = () => {
     fetchVehicles();
   }, []);
 
-  const handleGenerateAISummary = async () => {
-    if (!selectedVehicle) return;
-    try {
-      setAiLoading(true);
-      setAiSummary(null);
-      const response = await api.post('ai/repair_summary/', { vehicule_id: selectedVehicle.id });
-      setAiSummary(response.data.summary);
-    } catch (error) {
-      console.error('Erreur IA:', error);
-      alert('Impossible de générer le résumé IA pour le moment.');
-    } finally {
-      setAiLoading(false);
-    }
-  };
+  // AI repair summary removed: endpoint no longer available
 
   useEffect(() => {
     if (selectedVehicle) {

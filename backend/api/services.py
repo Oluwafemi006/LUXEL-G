@@ -7,11 +7,11 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 # --- SERVICES SMS ---
-def send_otp_sms(phone_number, code):
+def send_sms(phone_number, message):
     """
-    Service d'envoi de SMS OTP via Brevo (Sendinblue).
+    Service d'envoi de SMS via Brevo (Sendinblue).
     """
-    logger.debug("[SMS] Tentative d'envoi du code %s au numéro %s", code, phone_number)
+    logger.debug("[SMS] Tentative d'envoi à %s : %s", phone_number, message)
 
     api_key = getattr(settings, 'BREVO_API_KEY', os.getenv('BREVO_API_KEY'))
     
@@ -27,8 +27,6 @@ def send_otp_sms(phone_number, code):
 
     api_instance = sib_api_v3_sdk.TransactionalSMSApi(sib_api_v3_sdk.ApiClient(configuration))
     
-    # Formatage du numéro (doit inclure l'indicatif sans + pour Brevo parfois, mais + est supporté)
-    # Pour le Bénin, on s'assure d'avoir 229
     clean_phone = phone_number.replace(' ', '').replace('+', '')
     if not clean_phone.startswith('229'):
         clean_phone = '229' + clean_phone
@@ -36,207 +34,31 @@ def send_otp_sms(phone_number, code):
     send_transac_sms = sib_api_v3_sdk.SendTransacSms(
         sender="LUXEL-G",
         recipient=clean_phone,
-        content=f"LUXEL-G : Votre code de connexion est {code}. Valide 10 min.",
+        content=message,
         type="transactional"
     )
 
     try:
-        api_response = api_instance.send_transac_sms(send_transac_sms)
+        api_instance.send_transac_sms(send_transac_sms)
         logger.info("[SMS] SMS envoyé via Brevo à %s", clean_phone)
         return True
     except ApiException as e:
         logger.error("[SMS] Erreur Brevo SMS: %s", e)
         return False
     except Exception as e:
+        logger.error("[SMS] Erreur critique SMS: %s", e)
+        return False
+
+def send_otp_sms(phone_number, code):
+    """Compatibilité pour les codes OTP."""
+    return send_sms(phone_number, f"LUXEL-G : Votre code de connexion est {code}. Valide 10 min.")
         logger.error("[SMS] Erreur critique SMS: %s", str(e))
         return False
 
-# --- SERVICES IA (GOOGLE GEMINI) ---
-
-def call_gemini_api(prompt, max_tokens=1024):
-    """
-    Appelle l'API Google Gemini avec un prompt spécifique.
-    """
-    api_key = getattr(settings, 'GEMINI_API_KEY', os.getenv('GEMINI_API_KEY'))
-    if not api_key:
-        logger.warning("[AI] Clé API Gemini manquante.")
-        return None
-
-    # Utilisation de gemini-2.0-flash sur v1beta (plus récent)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-    headers = {'Content-Type': 'application/json'}
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }],
-        "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": max_tokens,
-        }
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=15)
-        if response.status_code == 200:
-            result = response.json()
-            return result['candidates'][0]['content']['parts'][0]['text']
-        else:
-            logger.warning("[AI] Erreur API Gemini (%s): %s", response.status_code, response.text)
-            return None
-    except Exception as e:
-        logger.error("[AI] Erreur critique lors de l'appel Gemini: %s", str(e))
-        return None
-
-def generate_repair_summary(repair_data):
-    """
-    Génère un résumé en langage naturel de l'historique d'un véhicule.
-    """
-    prompt = f"""
-    En tant qu'expert mécanicien du garage LUXEL-G à Parakou, résume l'historique de réparation suivant pour un client. 
-    Sois professionnel, rassurant et concis. Mentionne les points clés et les éventuelles alertes de maintenance.
-    
-    DONNÉES DE L'HISTORIQUE :
-    {json.dumps(repair_data, indent=2)}
-    
-    RÉPONSE (en français, maximum 4-5 phrases) :
-    """
-    return call_gemini_api(prompt, max_tokens=500)
-
-def suggest_parts_ai(query, context=""):
-    """
-    Aide la secrétaire à trouver le nom technique d'une pièce automobile.
-    """
-    prompt = f"""
-    En tant qu'expert en pièces détachées automobiles et mécanique pour le garage LUXEL-G à Parakou, aide la secrétaire à identifier et catégoriser une pièce.
-    Elle a saisi : "{query}"
-    Contexte (véhicule/réparation) : "{context}"
-    
-    Propose 3 suggestions de noms techniques exacts. Pour chaque suggestion, fournis :
-    1. 'nom': Le nom officiel et technique de la pièce.
-    2. 'role': Une explication très courte (10 mots max) de son utilité.
-    3. 'categorie': La catégorie (ex: Direction, Suspension, Freinage, Moteur, Électricité, Filtration, Échappement).
-    4. 'reference_standard': Une référence type ou un code standard.
-    5. 'prix_indicatif': Un prix moyen estimé en FCFA (sans virgule).
-    
-    Réponds UNIQUEMENT avec un objet JSON valide sous cette forme :
-    {{
-      "suggestions": [
-        {{
-          "nom": "...",
-          "role": "...",
-          "categorie": "...",
-          "reference_standard": "...",
-          "prix_indicatif": 15000
-        }}
-      ]
-    }}
-    """
-    response_text = call_gemini_api(prompt)
-    if response_text:
-        # Nettoyage si l'IA ajoute des balises ```json
-        clean_json = response_text.replace('```json', '').replace('```', '').strip()
-        try:
-            return json.loads(clean_json)
-        except:
-            return {"error": "Format JSON invalide", "raw": response_text}
-    return None
-
-
-# --- F1 : CHATBOT PUBLIC IA (Gemini) ---
-
-GARAGE_CONTEXT = """
-Tu es l'assistant virtuel du garage LUXURY ÉLÉGANCE GARAGE à Parakou, Bénin.
-Tu réponds en français, de manière professionnelle, chaleureuse et concise (3-4 phrases maximum).
-
-Informations importantes sur le garage :
-- Nom : Luxury Élégance Garage (LUXEL-G)
-- Adresse : Quartier Okedama, von Hôpital Ahmadiyya, Parakou, Bénin
-- Téléphone : +229 01 92 62 98 60
-- Horaires : Lundi–Vendredi 08h00–18h30 | Samedi 09h00–14h00
-- Services : Mécanique générale, Électricité auto, Pneumatique, Lavage complet, Entretien général
-- IFU : 3202487942483 | RCCM : RB/PKO/24B 1195
-
-Règles :
-- Pour prendre RDV, oriente vers le formulaire sur la page ou le numéro de téléphone.
-- Pour le suivi de réparation, oriente vers l'espace client (connexion avec numéro de téléphone).
-- Pour les prix, dis que les tarifs sont établis après diagnostic et devis, et invite à appeler.
-- Ne donne jamais de prix précis non validés.
-- Reste dans le contexte du garage. Si la question est hors sujet, redirige poliment.
-"""
-
-
-def chatbot_garage_response(user_message: str, conversation_history: list = None) -> str:
-    """
-    F1 — Génère une réponse de l'assistant IA du garage LUXEL-G.
-    conversation_history : liste de dicts [{role: 'user'|'model', text: '...'}]
-    """
-    history = conversation_history or []
-
-    # Construction du prompt avec historique
-    prompt_parts = [GARAGE_CONTEXT.strip(), "\n\n--- CONVERSATION ---"]
-    for msg in history[-6:]:  # max 6 messages d'historique
-        role = "Client" if msg.get('role') == 'user' else "Assistant"
-        prompt_parts.append(f"{role} : {msg.get('text', '')}")
-    prompt_parts.append(f"Client : {user_message}")
-    prompt_parts.append("Assistant :")
-
-    full_prompt = "\n".join(prompt_parts)
-    
-    response_text = call_gemini_api(full_prompt, max_tokens=300)
-    if response_text:
-        return response_text.strip()
-
-    return "Désolé, je rencontre un problème technique. Contactez-nous au +229 01 92 62 98 60."
-
-
-# --- F2 : ANALYSE SENTIMENT DES AVIS ---
-
-def analyze_avis_sentiments(avis_list: list) -> dict:
-    """
-    F2 — Analyse le sentiment de chaque avis client et retourne un rapport global.
-    avis_list : liste de dicts {id, note, commentaire}
-    """
-    if not avis_list:
-        return {"global": "NEUTRE", "positif": 0, "neutre": 0, "negatif": 0, "details": []}
-
-    avis_json = json.dumps(avis_list, ensure_ascii=False, indent=2)
-    prompt = f"""
-Analyse le sentiment de chaque avis client du garage LUXEL-G.
-Pour chaque avis, détermine : POSITIF, NEUTRE, ou NEGATIF.
-Retourne UNIQUEMENT un JSON valide avec ce format exact :
-{{
-  "global": "POSITIF|NEUTRE|NEGATIF",
-  "positif": <nombre>,
-  "neutre": <nombre>,
-  "negatif": <nombre>,
-  "details": [
-    {{"id": <id>, "sentiment": "POSITIF|NEUTRE|NEGATIF", "resume": "<1 phrase courte>"}}
-  ]
-}}
-
-AVIS :
-{avis_json}
-"""
-    response = call_gemini_api(prompt)
-    if response:
-        clean = response.replace('```json', '').replace('```', '').strip()
-        try:
-            return json.loads(clean)
-        except Exception as e:
-            logger.warning("[SENTIMENT] Parsing JSON échoué : %s", e)
-
-    # Fallback heuristique basé sur les notes
-    positif = sum(1 for a in avis_list if a.get('note', 3) >= 4)
-    negatif = sum(1 for a in avis_list if a.get('note', 3) <= 2)
-    neutre = len(avis_list) - positif - negatif
-    global_sent = "POSITIF" if positif > negatif else ("NEGATIF" if negatif > positif else "NEUTRE")
-    return {
-        "global": global_sent, "positif": positif, "neutre": neutre, "negatif": negatif,
-        "details": [{"id": a.get('id'), "sentiment": ("POSITIF" if a.get('note', 3) >= 4 else "NEGATIF" if a.get('note', 3) <= 2 else "NEUTRE"), "resume": a.get('commentaire', '')[:60]} for a in avis_list]
-    }
-
-
-# --- F3 : PRÉDICTION RISQUE IMPAYÉ (heuristique) ---
+# --- SERVICES IA (REMOVED) ---
+# Les helpers d'IA (Google Gemini, chatbot, suggestions, analyse de sentiment)
+# ont été retirés du projet sur demande. Pour garder la compatibilité,
+# conservez uniquement les fonctions non-AI ci-dessous (ex: predict_payment_risk).
 
 def predict_payment_risk(client_data: dict) -> dict:
     """
@@ -464,17 +286,8 @@ def valider_et_normaliser_facture(facture, request_user=None):
         facture.type = 'DEFINITIVE'
         facture.date_validation = timezone.now()
         
-        # Décrémenter les stocks physiques
-        for piece in facture.reparation.pieces.select_related('article_stock').all():
-            if piece.article_stock:
-                stock_item = piece.article_stock
-                stock_item.quantite = max(0, stock_item.quantite - piece.quantite)
-                stock_item.save()
-                MouvementStock.objects.create(
-                    article=stock_item, type_mouvement='SORTIE', quantite=piece.quantite,
-                    description=f"Sortie auto — Facture {facture.numero_facture}",
-                    utilisateur=request_user
-                )
+        # NOTE : La décrémentation des stocks est désormais gérée automatiquement 
+        # par les signaux post_save sur le modèle LignePiece pour une gestion en temps réel.
 
         # Normalisation e-MECeF uniquement si le client l'a demandée
         if facture.demande_normalisation and not facture.is_normalised:

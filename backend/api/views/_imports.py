@@ -22,7 +22,7 @@ from django.conf import settings
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 
-from api.services import send_otp_sms, generate_repair_summary, suggest_parts_ai
+from api.services import send_otp_sms
 from api.utils import generate_document_pdf, generate_fiche_reception_pdf
 from api.models import (
     Client, Vehicule, Reparation, Stock, Facture, LigneTravail, LignePiece,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Phone, Mail, MapPin, X, CheckCircle2 } from 'lucide-react';
+import { User, Phone, Mail, MapPin, X, CheckCircle2, FileText } from 'lucide-react';
 
 interface ClientFormProps {
   onSubmit: (data: Record<string, any>) => void;
@@ -74,17 +74,34 @@ const ClientForm: React.FC<ClientFormProps> = ({ onSubmit, onCancel, initialData
         </div>
       </div>
 
-      <div className="space-y-3">
-        <label className="text-[10px] font-black uppercase text-emerald-600 tracking-[0.2em] ml-2">Adresse Messagerie</label>
-        <div className="relative group">
-          <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
-          <input 
-            name="email"
-            type="email"
-            defaultValue={initialData?.email || ''}
-            className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
-            placeholder="client@luxury-garage.com"
-          />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-3">
+          <label className="text-[10px] font-black uppercase text-emerald-600 tracking-[0.2em] ml-2">Adresse Messagerie</label>
+          <div className="relative group">
+            <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+            <input 
+              name="email"
+              type="email"
+              defaultValue={initialData?.email || ''}
+              className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
+              placeholder="client@luxury-garage.com"
+            />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <label className="text-[10px] font-black uppercase text-emerald-600 tracking-[0.2em] ml-2">Numéro IFU (Optionnel)</label>
+          <div className="relative group">
+            <FileText className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+            <input
+              name="ifu"
+              inputMode="numeric"
+              maxLength={13}
+              pattern="[0-9]{13}"
+              defaultValue={initialData?.ifu || ''}
+              className="w-full pl-16 pr-8 py-5 rounded-2xl bg-emerald-50/20 border border-emerald-100/50 focus:border-emerald-500 focus:bg-white outline-none font-bold text-slate-900 shadow-inner transition-all"
+              placeholder="13 chiffres si disponible"
+            />
+          </div>
         </div>
       </div>
 

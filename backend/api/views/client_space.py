@@ -3,6 +3,7 @@ import logging
 import secrets
 from django.db.models import Sum, F, ExpressionWrapper, DecimalField as DjangoDecimalField
 from ._imports import *
+from api.throttling import ClientOTPThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -31,41 +32,48 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'], throttle_classes=[ClientOTPThrottle])
     def request_otp(self, request):
-        identifier = request.data.get('identifier') or request.data.get('phone')
+        identifier = (request.data.get('identifier') or request.data.get('phone') or '').strip()
         if not identifier:
             return Response({'error': 'Email ou numéro de téléphone requis'}, status=status.HTTP_400_BAD_REQUEST)
 
         client = _find_client_by_identifier(identifier)
         if not client:
             return Response({'error': 'Client non trouvé. Veuillez contacter le garage.'}, status=status.HTTP_404_NOT_FOUND)
-        if not client.email:
-            return Response(
-                {'error': 'Aucune adresse email associée. Veuillez contacter le garage.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
         # S4 — Invalider les OTP précédents
         ClientOTP.objects.filter(client=client, is_used=False).update(is_used=True)
         code = f"{secrets.randbelow(1000000):06d}"
         logger.debug("[OTP] Code pour %s %s (%s) : %s", client.prenoms, client.nom, identifier, code)
         ClientOTP.objects.create(client=client, code=code)
-        dev_otp_suffix = f" Code test : {code}" if settings.DEV_EXPOSE_OTP else ""
+
+        is_email = '@' in identifier
+        sent_method = ""
 
         try:
-            EmailMessage(
-                f"Votre code de connexion Luxury Elegance Garage : {code}",
-                f"Bonjour {client.nom} {client.prenoms},\n\nCode : {code}\n\nValide 10 minutes.\n\nLuxury Elegance Garage",
-                to=[client.email]
-            ).send()
-            send_otp_sms(client.contact, code)
-            return Response({'message': f'Code envoyé par email et SMS.{dev_otp_suffix}'})
+            if is_email:
+                if not client.email:
+                    return Response({'error': 'Aucune adresse email associée.'}, status=status.HTTP_400_BAD_REQUEST)
+                EmailMessage(
+                    f"Votre code de connexion Luxury Elegance Garage : {code}",
+                    f"Bonjour {client.nom} {client.prenoms},\n\nCode : {code}\n\nValide 10 minutes.\n\nLuxury Elegance Garage",
+                    to=[client.email]
+                ).send()
+                sent_method = "email"
+            else:
+                if not client.contact:
+                    return Response({'error': 'Aucun numéro de téléphone associé.'}, status=status.HTTP_400_BAD_REQUEST)
+                from api.services import send_otp_sms
+                send_otp_sms(client.contact, code)
+                sent_method = "SMS"
+
+            return Response({'message': f'Code de connexion envoyé par {sent_method}.'})
         except Exception as e:
-            logger.warning("[OTP] Échec envoi email : %s", e)
+            logger.error("[OTP] Échec envoi %s : %s", sent_method, e)
             return Response({
-                'message': f"Code généré ! L'envoi email a échoué.{dev_otp_suffix or ' Récupérez le code dans les logs.'}"
-            }, status=status.HTTP_200_OK)
+                'error': f"Échec de l'envoi du code par {sent_method}. Veuillez réessayer."
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=['post'])
     def verify_otp(self, request):

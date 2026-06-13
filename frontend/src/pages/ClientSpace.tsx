@@ -98,7 +98,26 @@ const ClientSpace: React.FC = () => {
   const [loginMethod, setLoginMethod] = useState<'PHONE' | 'EMAIL'>('PHONE');
   const [otp, setOtp] = useState('');
 
-  const [otpStep, setOtpStep] = useState<'PHONE' | 'OTP'>('PHONE');
+  const [otpStep, setOtpStep] = useState<'PHONE' | 'OTP' | 'REGISTER'>('PHONE');
+  const [registerData, setRegisterData] = useState({
+    nom: '',
+    prenoms: '',
+    contact: '',
+    email: '',
+    adresse: ''
+  });
+  const [resendTimer, setResendTimer] = useState(0);
+
+  // Timer pour le renvoi d'OTP
+  useEffect(() => {
+    let interval: any;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -135,7 +154,8 @@ const ClientSpace: React.FC = () => {
     prenoms: '',
     contact: '',
     adresse: '',
-    email: ''
+    email: '',
+    ifu: ''
   });
 
 
@@ -182,7 +202,8 @@ const ClientSpace: React.FC = () => {
         prenoms: clientData.client.prenoms || '',
         contact: clientData.client.contact || '',
         adresse: clientData.client.adresse || '',
-        email: clientData.client.email || ''
+        email: clientData.client.email || '',
+        ifu: clientData.client.ifu || ''
       });
     }
   }, [clientData]);
@@ -202,6 +223,28 @@ const ClientSpace: React.FC = () => {
     }
   };
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      await api.post('client-space/register/', registerData);
+      alert('Inscription réussie ! Vous pouvez maintenant vous connecter.');
+      setOtpStep('PHONE');
+      if (registerData.email) {
+        setEmail(registerData.email);
+        setLoginMethod('EMAIL');
+      } else {
+        setPhone(registerData.contact);
+        setLoginMethod('PHONE');
+      }
+    } catch (err: any) {
+      setError('Erreur lors de l\'inscription. Vérifiez que le numéro ou l\'email n\'est pas déjà utilisé.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!identifier) return;
@@ -211,6 +254,7 @@ const ClientSpace: React.FC = () => {
     try {
       const response = await api.post('client-space/request_otp/', { identifier });
       setOtpStep('OTP');
+      setResendTimer(60);
       alert(response.data.message);
     } catch (err: any) {
       if (err.response?.status === 404) {
@@ -299,6 +343,7 @@ const ClientSpace: React.FC = () => {
       formData.append('contact', editData.contact);
       formData.append('adresse', editData.adresse);
       formData.append('email', editData.email);
+      formData.append('ifu', editData.ifu);
       if (selectedPhoto) {
         formData.append('photo', selectedPhoto);
       }
@@ -403,6 +448,14 @@ const ClientSpace: React.FC = () => {
     const reste = Number(invoice.total_ttc) - Number(invoice.montant_paye);
     setPayingInvoice(invoice);
 
+    const publicKey = import.meta.env.VITE_KKIAPAY_PUBLIC_KEY;
+    if (!publicKey) {
+      console.error("[KKIAPAY] Clé publique manquante dans l'environnement.");
+      alert("Erreur de configuration du paiement. Veuillez contacter l'administrateur.");
+      setPayingInvoice(null);
+      return;
+    }
+
     const onSuccess = async (response: any) => {
       window.removeKkiapayListener?.('success', onSuccess);
       try {
@@ -424,12 +477,27 @@ const ClientSpace: React.FC = () => {
       }
     };
 
+    // Gestion de la fermeture ou de l'échec pour débloquer le bouton
+    const onFailed = (err: any) => {
+      window.removeKkiapayListener?.('failed', onFailed);
+      console.error("[KKIAPAY] Échec :", err);
+      setPayingInvoice(null);
+    };
+
+    // Note: Kkiapay peut utiliser 'dismissed' ou 'closed' selon la version
+    const onDismissed = () => {
+      window.removeKkiapayListener?.('dismissed', onDismissed);
+      setPayingInvoice(null);
+    };
+
     window.addKkiapayListener('success', onSuccess);
+    window.addKkiapayListener('failed', onFailed);
+    window.addKkiapayListener('dismissed', onDismissed);
 
     window.openKkiapayWidget({
       amount: Math.round(reste),
       position: 'right',
-      key: import.meta.env.VITE_KKIAPAY_PUBLIC_KEY,
+      key: publicKey,
       sandbox: import.meta.env.VITE_KKIAPAY_SANDBOX === 'true',
       name: `${clientData?.client?.nom || ''} ${clientData?.client?.prenoms || ''}`.trim(),
       email: clientData?.client?.email || '',
@@ -514,6 +582,55 @@ const ClientSpace: React.FC = () => {
                 {loading ? <Clock className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
                 <span>{loading ? 'Recherche...' : 'Recevoir le code'}</span>
               </button>
+
+              <div className="text-center pt-2">
+                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2">Pas encore de compte ?</p>
+                 <button 
+                  type="button" 
+                  onClick={() => { setOtpStep('REGISTER'); setError(''); }}
+                  className="px-6 py-2 border-2 border-slate-900 text-slate-900 rounded-md font-bebas tracking-widest uppercase text-xs hover:bg-slate-900 hover:text-white transition-all"
+                 >
+                   S'inscrire au garage
+                 </button>
+              </div>
+            </form>
+          ) : otpStep === 'REGISTER' ? (
+            <form onSubmit={handleRegister} className="space-y-4">
+               <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom</label>
+                    <input required value={registerData.nom} onChange={e => setRegisterData({...registerData, nom: e.target.value})} className="w-full px-4 py-2.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none font-bold text-xs" placeholder="Ex: Sounon" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Prénoms</label>
+                    <input required value={registerData.prenoms} onChange={e => setRegisterData({...registerData, prenoms: e.target.value})} className="w-full px-4 py-2.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none font-bold text-xs" placeholder="Ex: Jean" />
+                  </div>
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Téléphone (Bénin)</label>
+                  <input required type="tel" value={registerData.contact} onChange={e => setRegisterData({...registerData, contact: e.target.value})} className="w-full px-4 py-2.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none font-bold text-xs" placeholder="0100000000" />
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Email</label>
+                  <input required type="email" value={registerData.email} onChange={e => setRegisterData({...registerData, email: e.target.value})} className="w-full px-4 py-2.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none font-bold text-xs" placeholder="jean.sounon@gmail.com" />
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Adresse (Parakou)</label>
+                  <input required value={registerData.adresse} onChange={e => setRegisterData({...registerData, adresse: e.target.value})} className="w-full px-4 py-2.5 rounded-md bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none font-bold text-xs" placeholder="Ex: Okedama" />
+               </div>
+
+               {error && (
+                 <div className="p-3 bg-rose-50 border border-rose-100 rounded-md flex items-center gap-2">
+                    <Info className="w-3.5 h-3.5 text-rose-600" />
+                    <p className="text-rose-600 text-[9px] font-bold uppercase tracking-tight">{error}</p>
+                 </div>
+               )}
+
+               <button disabled={loading} className="w-full py-4 bg-emerald-600 text-white rounded-md font-bebas tracking-widest text-lg hover:bg-slate-900 transition-all shadow-lg">
+                  {loading ? 'Inscription...' : "Créer mon compte"}
+               </button>
+
+               <button type="button" onClick={() => setOtpStep('PHONE')} className="w-full text-[10px] font-bold text-slate-400 hover:text-emerald-500 uppercase tracking-widest">Déjà un compte ? Se connecter</button>
             </form>
           ) : (
             <form onSubmit={handleVerifyOTP} className="space-y-6">
@@ -545,8 +662,17 @@ const ClientSpace: React.FC = () => {
                 {loading ? <Clock className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
                 <span>{loading ? 'Vérification...' : 'Se connecter'}</span>
               </button>
-              <div className="text-center">
-                 <button type="button" onClick={() => { setOtpStep('PHONE'); setOtp(''); }} className="text-[10px] font-bold text-slate-400 hover:text-emerald-500 uppercase tracking-widest">Modifier l'identifiant</button>
+              <div className="text-center space-y-4">
+                 <button 
+                  type="button" 
+                  disabled={loading || resendTimer > 0}
+                  onClick={handleRequestOTP}
+                  className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest disabled:opacity-50 disabled:text-slate-400"
+                 >
+                   {resendTimer > 0 ? `Renvoyer le code (${resendTimer}s)` : 'Recevoir un nouveau code'}
+                 </button>
+                 <br />
+                 <button type="button" onClick={() => { setOtpStep('PHONE'); setOtp(''); }} className="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest">Modifier l'identifiant</button>
               </div>
             </form>
           )}
@@ -744,9 +870,9 @@ const ClientSpace: React.FC = () => {
 
                     {/* Affichage IFU en lecture seule pour vérification */}
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Votre Numéro IFU (fourni par le garage)</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Votre numéro IFU</p>
                       <p className="text-lg font-bebas text-emerald-500 tracking-widest">{clientData?.client?.ifu}</p>
-                      <p className="text-[9px] text-slate-400 italic">Si ce numéro est incorrect, contactez le garage avant de payer.</p>
+                      <p className="text-[9px] text-slate-400 italic">Si ce numéro est incorrect, modifiez votre profil avant de payer.</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -1061,6 +1187,15 @@ const ClientSpace: React.FC = () => {
                     <div className="space-y-1">
                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Email</label>
                        <input readOnly={!editMode} type="email" value={editData.email} onChange={e => setEditData({...editData, email: e.target.value})} className={`w-full px-4 py-2.5 rounded-md font-bold text-sm outline-none transition-all ${editMode ? 'bg-slate-50 border border-emerald-100 focus:border-emerald-500 shadow-inner' : 'bg-transparent border border-transparent'}`} />
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Numéro IFU (optionnel)</label>
+                       <input readOnly={!editMode} inputMode="numeric" maxLength={13} pattern="[0-9]{13}" value={editData.ifu} onChange={e => setEditData({...editData, ifu: e.target.value})} placeholder={editMode ? '13 chiffres si disponible' : 'Non renseigné'} className={`w-full px-4 py-2.5 rounded-md font-bold text-sm outline-none transition-all ${editMode ? 'bg-slate-50 border border-emerald-100 focus:border-emerald-500 shadow-inner' : 'bg-transparent border border-transparent'}`} />
+                       {editMode && (
+                         <p className="text-[9px] text-slate-400 font-medium ml-1">
+                           Utilisé uniquement si vous souhaitez une facture normalisée après paiement.
+                         </p>
+                       )}
                     </div>
                     <div className="space-y-1 md:col-span-2">
                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Adresse</label>

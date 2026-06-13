@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Search, 
   UserPlus, 
@@ -35,6 +35,7 @@ interface Client {
   contact: string;
   contact_conducteur?: string;
   email?: string;
+  ifu?: string | null;
   adresse: string;
   date_creation: string;
   vehicule_count: number;
@@ -54,6 +55,7 @@ interface Repair {
 
 const Clients: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -77,6 +79,11 @@ const Clients: React.FC = () => {
       setClients(data);
       
       setSelectedClient(prev => {
+        const stateId = (location.state as any)?.selectedId;
+        if (stateId) {
+          const found = data.find((c: any) => c.id === stateId);
+          if (found) return found;
+        }
         if (!prev && data.length > 0) return data[0];
         if (prev) {
           const updated = data.find((c: any) => c.id === prev.id);
@@ -269,6 +276,11 @@ const Clients: React.FC = () => {
                         <Phone className="w-3 h-3" />
                         {selectedClient.contact}
                       </span>
+                      {selectedClient.ifu && (
+                        <span className="flex items-center gap-2 text-[9px] sm:text-[10px] font-black text-slate-600 bg-white border border-slate-100 px-3 sm:px-4 py-2 rounded-2xl shadow-sm">
+                          IFU {selectedClient.ifu}
+                        </span>
+                      )}
                       <a 
                         href={`https://wa.me/229${selectedClient.contact.replace(/\D/g, '').startsWith('229') ? selectedClient.contact.replace(/\D/g, '').substring(3) : selectedClient.contact.replace(/\D/g, '')}`}
                         target="_blank"

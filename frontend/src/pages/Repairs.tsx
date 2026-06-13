@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Search, 
   PlusCircle, 
@@ -41,6 +41,7 @@ interface Quote {
 
 const Repairs: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [repairs, setRepairs] = useState<Repair[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +57,11 @@ const Repairs: React.FC = () => {
       setRepairs(data);
       
       setSelectedRepair(prev => {
+        const stateId = (location.state as any)?.selectedId;
+        if (stateId) {
+          const found = data.find((r: any) => r.id === stateId);
+          if (found) return found;
+        }
         if (!prev && data.length > 0) return data[0];
         if (prev) {
           const updated = data.find((r: any) => r.id === prev.id);

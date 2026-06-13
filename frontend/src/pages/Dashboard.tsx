@@ -72,11 +72,11 @@ const Dashboard: React.FC = () => {
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // F2 & F3 States
-  const [riskClients, setRiskClients] = useState<any[]>([]);
-  const [analyzingSentiment, setAnalyzingSentiment] = useState(false);
-  const [sentimentResult, setSentimentResult] = useState<any>(null);
-  
+  // AI features removed: riskClients and sentiment analysis disabled
+  const analyzingSentiment = false;
+  const sentimentResult: any = null;
+  const handleAnalyzeSentiment = async () => { /* disabled */ };
+
   const [recentRepairs, setRecentRepairs] = useState<RecentIntervention[]>([]);
 
   useEffect(() => {
@@ -88,7 +88,7 @@ const Dashboard: React.FC = () => {
           api.get('maintenance-predictive/alertes/'),
           api.get('caisse/synthese/'),
           fetchAllPages<any>('caisse/'),
-          api.get('ai/risque_impayes/'),
+          // AI endpoints removed: risque_impayes removed
           fetchAllPages<any>('reparations/')
         ]);
         // Note: stock et notifications-staff ont un polling dédié dans MainLayout
@@ -102,7 +102,7 @@ const Dashboard: React.FC = () => {
 
         setMaintenanceAlerts(m.data);
         setFinance(f.data);
-        setRiskClients(rc.data.slice(0, 3)); // Top 3 risques
+        // AI risk clients removed
         
         setRecentRepairs(repairsList.slice(0, 5).map((r: any) => ({
           id: r.id,
@@ -155,17 +155,7 @@ const Dashboard: React.FC = () => {
     fetchData();
   }, []);
 
-  const handleAnalyzeSentiment = async () => {
-    setAnalyzingSentiment(true);
-    try {
-      const res = await api.post('ai/analyze_avis/');
-      setSentimentResult(res.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setAnalyzingSentiment(false);
-    }
-  };
+  // Sentiment analysis removed (AI endpoints no longer available)
 
   // Format numbers with spaces as thousand separators
   const formatNumber = (num: number) => {

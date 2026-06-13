@@ -13,13 +13,19 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutList,
-  CalendarDays
+  CalendarDays,
+  UserPlus
 } from 'lucide-react';
 import api, { fetchAllPages } from '../services/api';
+import Modal from '../components/Modal';
+import ClientForm from '../components/forms/ClientForm';
 
 interface Appointment {
   id: number;
+  client?: number;
   client_name: string;
+  nom_client_public?: string;
+  telephone_client_public?: string;
   vehicule_plate: string;
   date_rdv: string;
   service_demande: string;
@@ -32,6 +38,9 @@ const Appointments: React.FC = () => {
   const [viewMode, setViewMode] = useState<'LIST' | 'CALENDAR'>('CALENDAR');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  // État pour conversion en client
+  const [conversionModal, setConversionModal] = useState<Appointment | null>(null);
 
   const fetchAppointments = async (silent = false) => {
     try {
@@ -54,6 +63,18 @@ const Appointments: React.FC = () => {
       fetchAppointments(true);
     } catch (error) {
       alert('Erreur mise à jour statut.');
+    }
+  };
+
+  const handleConvertSuccess = async (newClient: any) => {
+    if (!conversionModal) return;
+    try {
+      // Lier le RDV au nouveau client
+      await api.patch(`appointments/${conversionModal.id}/`, { client: newClient.id });
+      setConversionModal(null);
+      fetchAppointments(true);
+    } catch (error) {
+      alert('Erreur lors de la liaison du client au rendez-vous.');
     }
   };
 
@@ -192,10 +213,24 @@ const Appointments: React.FC = () => {
                                 {appt.statut}
                              </span>
                           </div>
-                          <p className="font-black text-slate-900 uppercase tracking-tight mb-2 truncate">{appt.client_name}</p>
+                          <p className="font-black text-slate-900 uppercase tracking-tight mb-2 truncate">
+                             {appt.client_name}
+                             {!appt.client && (
+                               <span className="ml-2 px-2 py-0.5 bg-rose-500 text-white text-[7px] font-black rounded-full animate-pulse">NOUVEAU</span>
+                             )}
+                          </p>
                           <div className="flex items-center justify-between">
                              <span className="text-[10px] font-bold text-slate-400 truncate max-w-[150px]">{appt.service_demande}</span>
                              <div className="flex gap-2">
+                                {!appt.client && (
+                                  <button 
+                                    onClick={() => setConversionModal(appt)} 
+                                    className="p-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-all"
+                                    title="Enregistrer comme client"
+                                  >
+                                    <UserPlus className="w-4 h-4" />
+                                  </button>
+                                )}
                                 <button onClick={() => handleUpdateStatus(appt.id, 'CONFIRME')} className="p-2 hover:bg-emerald-50 rounded-lg text-emerald-600 transition-colors"><CheckCircle2 className="w-4 h-4" /></button>
                                 <button onClick={() => handleUpdateStatus(appt.id, 'ANNULE')} className="p-2 hover:bg-rose-50 rounded-lg text-rose-600 transition-colors"><XCircle className="w-4 h-4" /></button>
                              </div>
@@ -258,7 +293,12 @@ const Appointments: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-10 py-6">
-                      <p className="font-black text-slate-900 uppercase tracking-tight text-sm group-hover:text-emerald-700 transition-colors duration-500">{rdv.client_name}</p>
+                      <p className="font-black text-slate-900 uppercase tracking-tight text-sm group-hover:text-emerald-700 transition-colors duration-500">
+                        {rdv.client_name}
+                        {!rdv.client && (
+                          <span className="ml-2 px-2 py-0.5 bg-rose-500 text-white text-[8px] font-black rounded-full uppercase tracking-widest">Nouveau</span>
+                        )}
+                      </p>
                       <div className="flex items-center gap-2 mt-1">
                          <Car className="w-3 h-3 text-emerald-500" />
                          <span className="text-[10px] font-black bg-slate-900 text-emerald-400 px-2.5 py-0.5 rounded-full uppercase tracking-widest shadow-lg">
@@ -286,6 +326,15 @@ const Appointments: React.FC = () => {
                     </td>
                     <td className="px-10 py-6 text-right">
                       <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-x-4 group-hover:translate-x-0">
+                        {!rdv.client && (
+                          <button 
+                            onClick={() => setConversionModal(rdv)} 
+                            className="p-3 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg border border-rose-100 transition-all duration-500 shadow-sm"
+                            title="Convertir en Client officiel"
+                          >
+                            <UserPlus className="w-5 h-5" />
+                          </button>
+                        )}
                         <button 
                           onClick={() => handleUpdateStatus(rdv.id, 'CONFIRME')} 
                           className="p-3 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-100 transition-all duration-500 shadow-sm hover:shadow-emerald-200 active:scale-90"
@@ -348,6 +397,21 @@ const Appointments: React.FC = () => {
             <Wrench className="absolute -right-6 -bottom-6 w-24 h-24 text-white/10 -rotate-12 group-hover:rotate-0 transition-transform duration-1000" />
          </div>
       </div>
+
+      <Modal
+        isOpen={!!conversionModal}
+        onClose={() => setConversionModal(null)}
+        title="Enregistrer le Nouveau Client"
+      >
+        <ClientForm 
+          onSubmit={handleConvertSuccess}
+          onCancel={() => setConversionModal(null)}
+          initialData={conversionModal ? {
+            nom: conversionModal.nom_client_public || conversionModal.client_name,
+            contact: conversionModal.telephone_client_public || ''
+          } : undefined}
+        />
+      </Modal>
     </div>
   );
 };

@@ -85,8 +85,7 @@ class ClientSerializer(serializers.ModelSerializer):
     vehicule_count = serializers.SerializerMethodField()
     vehicules_list = MiniVehiculeSerializer(source='vehicules', many=True, read_only=True)
     photo = serializers.ImageField(required=False, allow_null=True)
-    # IFU : visible par le client mais modifiable uniquement par le staff (via l'Admin)
-    ifu = serializers.CharField(read_only=True, allow_null=True)
+    ifu = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=13)
 
     class Meta:
         model = Client
@@ -94,6 +93,16 @@ class ClientSerializer(serializers.ModelSerializer):
 
     def get_vehicule_count(self, obj):
         return obj.vehicules.count()
+
+    def validate_ifu(self, value):
+        if value in [None, '']:
+            return None
+        value = ''.join(str(value).split())
+        if not value.isdigit():
+            raise serializers.ValidationError("Le numéro IFU doit contenir uniquement des chiffres.")
+        if len(value) != 13:
+            raise serializers.ValidationError("Le numéro IFU doit contenir exactement 13 chiffres.")
+        return value
 
 class MouvementStockSerializer(serializers.ModelSerializer):
     utilisateur_name = serializers.ReadOnlyField(source='utilisateur.username')

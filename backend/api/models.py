@@ -2,6 +2,9 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.validators import MinValueValidator
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+
 class UserProfile(models.Model):
     ROLE_CHOICES = [
         ('DIRECTEUR', 'Directeur'),
@@ -379,3 +382,35 @@ class LogNormalisationEmecef(models.Model):
 
     def __str__(self):
         return f"[{self.statut}] Facture #{self.facture_id} — {self.date_tentative.strftime('%d/%m/%Y %H:%M')}"
+
+# --- SIGNALS POUR L'AUTOMATISATION DU STOCK (REQUIS PAR LE MÉMOIRE) ---
+
+@receiver(post_save, sender=LignePiece)
+def update_stock_on_piece_added(sender, instance, created, **kwargs):
+    """Décrémente automatiquement le stock physique lorsqu'une pièce est ajoutée à une réparation."""
+    if created and instance.article_stock:
+        article = instance.article_stock
+        if article.quantite >= instance.quantite:
+            article.quantite -= instance.quantite
+            article.save()
+            # Enregistrement du mouvement de stock pour la traçabilité
+            MouvementStock.objects.create(
+                article=article,
+                type_mouvement='SORTIE',
+                quantite=instance.quantite,
+                description=f"Sortie auto : Réparation {instance.reparation.numero_or or f'OR-{instance.reparation.id}'}"
+            )
+
+@receiver(post_delete, sender=LignePiece)
+def update_stock_on_piece_deleted(sender, instance, **kwargs):
+    """Réincrémente le stock si une pièce est retirée de l'ordre de réparation avant facturation."""
+    if instance.article_stock:
+        article = instance.article_stock
+        article.quantite += instance.quantite
+        article.save()
+        MouvementStock.objects.create(
+            article=article,
+            type_mouvement='ENTREE',
+            quantite=instance.quantite,
+            description=f"Retour auto : Suppression de ligne sur {instance.reparation.numero_or or f'OR-{instance.reparation.id}'}"
+        )

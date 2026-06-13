@@ -68,11 +68,11 @@ const GlobalSearch: React.FC = () => {
     inputRef.current?.focus();
   };
 
-  const handleNavigate = (path: string) => {
+  const handleNavigate = (path: string, state?: any) => {
     setOpen(false);
     setQuery('');
     setResults(null);
-    navigate(path);
+    navigate(path, { state });
   };
 
   // Close on outside click
@@ -156,7 +156,7 @@ const GlobalSearch: React.FC = () => {
                   {results.clients.map(c => (
                     <button
                       key={c.id}
-                      onClick={() => handleNavigate('/staff/clients')}
+                      onClick={() => handleNavigate('/staff/clients', { selectedId: c.id })}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 transition-colors text-left border-b border-slate-50 group"
                     >
                       <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs font-bebas flex-shrink-0 group-hover:scale-105 transition-transform">
@@ -185,7 +185,7 @@ const GlobalSearch: React.FC = () => {
                   {results.vehicules.map(v => (
                     <button
                       key={v.id}
-                      onClick={() => handleNavigate('/staff/vehicules')}
+                      onClick={() => handleNavigate('/staff/vehicules', { selectedId: v.id })}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-50 group"
                     >
                       <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
@@ -218,7 +218,7 @@ const GlobalSearch: React.FC = () => {
                     return (
                       <button
                         key={r.id}
-                        onClick={() => handleNavigate('/staff/reparations')}
+                        onClick={() => handleNavigate('/staff/reparations', { selectedId: r.id })}
                         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-orange-50 transition-colors text-left border-b border-slate-50 group"
                       >
                         <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">

@@ -9,13 +9,13 @@ from .views import (
     FactureViewSet, DevisViewSet,
     StockViewSet, MouvementCaisseViewSet, MaintenancePredictiveViewSet, StatsViewSet,
     AppointmentViewSet, NotificationClientViewSet, NotificationStaffViewSet, AvisViewSet,
-    ClientSpaceViewSet, AIViewSet, UserViewSet, kkiapay_webhook,
+    ClientSpaceViewSet, UserViewSet, kkiapay_webhook,
 )
 
 router = DefaultRouter()
 router.register(r'clients', ClientViewSet)
 router.register(r'client-space', ClientSpaceViewSet, basename='client-space')
-router.register(r'ai', AIViewSet, basename='ai')
+# AI endpoints removed: previously registered here
 router.register(r'vehicules', VehiculeViewSet)
 router.register(r'reparations', ReparationViewSet)
 router.register(r'factures', FactureViewSet)

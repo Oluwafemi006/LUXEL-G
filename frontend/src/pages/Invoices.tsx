@@ -105,10 +105,7 @@ const Invoices: React.FC = () => {
   const [kmsEntree, setKmsEntree] = useState('');
   const [laborLines, setLaborLines] = useState<LaborLine[]>([]);
   const [partLines, setPartLines] = useState<PartLine[]>([]);
-  const [aiPartLoading, setAiPartLoading] = useState<string | number | null>(null);
-  const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
-  const [isAISuggestionModalOpen, setIsAISuggestionModalOpen] = useState(false);
-  const [activePartLineId, setActivePartLineId] = useState<string | number | null>(null);
+  // AI part suggestion feature removed
 
   const openPaymentModal = (invoice: Invoice) => {
     // Règle des 75% : si premier paiement, proposer 75%
@@ -120,46 +117,7 @@ const Invoices: React.FC = () => {
     setIsPaymentModalOpen(true);
   };
 
-  const handleAISuggestPart = async (lineId: string | number) => {
-    const line = partLines.find(p => p.id === lineId);
-    if (!line || !line.description) {
-        alert('Veuillez saisir une description partielle avant de demander l\'aide de l\'IA.');
-        return;
-    }
-
-    try {
-      setAiPartLoading(lineId);
-      setActivePartLineId(lineId);
-      const response = await api.post('ai/suggest_parts/', { 
-        query: line.description,
-        context: selectedRepair?.categorie || ''
-      });
-      
-      const suggestions = response.data.suggestions;
-      if (suggestions && suggestions.length > 0) {
-        setAiSuggestions(suggestions);
-        setIsAISuggestionModalOpen(true);
-      } else {
-        alert('L\'IA n\'a pas trouvé de suggestion pertinente.');
-      }
-    } catch (error) {
-      console.error('Erreur IA pièces:', error);
-      alert('Erreur lors de la récupération des suggestions IA.');
-    } finally {
-      setAiPartLoading(null);
-    }
-  };
-
-  const selectAISuggestion = (suggestion: any) => {
-    if (activePartLineId) {
-        updatePart(activePartLineId, 'description', suggestion.nom);
-        if (suggestion.reference_standard) updatePart(activePartLineId, 'reference', suggestion.reference_standard);
-        if (suggestion.prix_indicatif) updatePart(activePartLineId, 'prix_unitaire', suggestion.prix_indicatif);
-    }
-    setIsAISuggestionModalOpen(false);
-    setAiSuggestions([]);
-    setActivePartLineId(null);
-  };
+  // AI part suggestion functions removed (endpoint unavailable)
 
   const fetchRepairs = async () => {
     try {

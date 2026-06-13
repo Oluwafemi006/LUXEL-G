@@ -31,6 +31,13 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 message=f"Votre demande de rendez-vous pour le {appointment.date_rdv.strftime('%d/%m/%Y à %H:%M')} "
                         f"a été enregistrée. Nous vous contacterons pour confirmation."
             )
+        elif appointment.telephone_client_public:
+            # Envoi SMS automatique aux anonymes (Lead Management)
+            from api.services import send_sms
+            msg = (f"Bonjour {appointment.nom_client_public}, votre demande de RDV à Luxury Elegance Garage "
+                   f"pour le {appointment.date_rdv.strftime('%d/%m/%Y à %H:%M')} a bien été reçue. "
+                   f"Nous vous rappellerons pour confirmer.")
+            send_sms(appointment.telephone_client_public, msg)
 
 
 class NotificationClientViewSet(viewsets.ModelViewSet):
