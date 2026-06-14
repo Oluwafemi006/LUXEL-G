@@ -99,13 +99,28 @@ const Invoices: React.FC = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMode, setPaymentMode] = useState('ESPECE');
   const [isNormalizing, setIsNormalizing] = useState(false);
-  
+  const [aiPartLoading, setAiPartLoading] = useState<string | number | null>(null);
+  const [isAISuggestionModalOpen, setIsAISuggestionModalOpen] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
+
   // États de saisie
   const [isDefinitive, setIsDefinitive] = useState(false);
   const [kmsEntree, setKmsEntree] = useState('');
   const [laborLines, setLaborLines] = useState<LaborLine[]>([]);
   const [partLines, setPartLines] = useState<PartLine[]>([]);
   // AI part suggestion feature removed
+
+  const selectAISuggestion = (_suggestion: any) => {
+    setAiSuggestions([]);
+    setIsAISuggestionModalOpen(false);
+  };
+
+  const handleAISuggestPart = async (lineId: string | number) => {
+    setAiPartLoading(lineId);
+    setTimeout(() => {
+      setAiPartLoading(null);
+    }, 0);
+  };
 
   const openPaymentModal = (invoice: Invoice) => {
     // Règle des 75% : si premier paiement, proposer 75%

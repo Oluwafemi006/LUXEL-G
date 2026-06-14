@@ -51,6 +51,14 @@ const Vehicles: React.FC = () => {
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [vehicleHistory, setVehicleHistory] = useState<Repair[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const handleGenerateAISummary = async () => {
+    if (aiLoading) return;
+    setAiLoading(true);
+    setAiSummary(null);
+    setAiLoading(false);
+  };
   // AI summary removed: endpoint unavailable
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);

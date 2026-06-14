@@ -71,6 +71,7 @@ const Dashboard: React.FC = () => {
   const [maintenanceAlerts, setMaintenanceAlerts] = useState<MaintenanceAlert[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const riskClients: any[] = [];
 
   // AI features removed: riskClients and sentiment analysis disabled
   const analyzingSentiment = false;
@@ -83,7 +84,7 @@ const Dashboard: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [s, m, f, movements, rc, repairsList] = await Promise.all([
+        const [s, m, f, movements, repairsList] = await Promise.all([
           api.get('stats/'),
           api.get('maintenance-predictive/alertes/'),
           api.get('caisse/synthese/'),

@@ -52,8 +52,6 @@ def send_sms(phone_number, message):
 def send_otp_sms(phone_number, code):
     """Compatibilité pour les codes OTP."""
     return send_sms(phone_number, f"LUXEL-G : Votre code de connexion est {code}. Valide 10 min.")
-        logger.error("[SMS] Erreur critique SMS: %s", str(e))
-        return False
 
 # --- SERVICES IA (REMOVED) ---
 # Les helpers d'IA (Google Gemini, chatbot, suggestions, analyse de sentiment)

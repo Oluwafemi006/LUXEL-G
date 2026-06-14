@@ -3,9 +3,8 @@ from ._imports import *
 from api.services import predict_payment_risk
 
 
-
-    from api.serializers import UserSerializer as _US
-    serializer_class = _US
+class UserViewSet(viewsets.ModelViewSet):
+    serializer_class = UserSerializer
 
     def get_queryset(self):
         from api.models import UserProfile
