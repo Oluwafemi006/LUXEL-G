@@ -76,7 +76,11 @@ class MouvementCaisseViewSet(viewsets.ModelViewSet):
         depenses = qs.filter(type_mouvement='DEPENSE').aggregate(s=models.Sum('montant'))['s'] or 0
         r_j = qs.filter(type_mouvement='RECETTE', date_mouvement=today).aggregate(s=models.Sum('montant'))['s'] or 0
         d_j = qs.filter(type_mouvement='DEPENSE', date_mouvement=today).aggregate(s=models.Sum('montant'))['s'] or 0
-        impayes = Facture.objects.filter(type='DEFINITIVE').aggregate(
+        impayes = Facture.objects.filter(
+            type='DEFINITIVE', 
+            statut_paiement__in=['EN_ATTENTE', 'PARTIEL'],
+            montant_paye__lt=models.F('total_ttc')
+        ).aggregate(
             s=models.Sum(models.F('total_ttc') - models.F('montant_paye'))
         )['s'] or 0
         return Response({'total_recettes': recettes, 'total_depenses': depenses,

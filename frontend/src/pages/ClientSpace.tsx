@@ -927,7 +927,7 @@ const ClientSpace: React.FC = () => {
               )}
 
               <div className="flex justify-between items-center mb-2">
-                 <h2 className="text-xl font-bebas text-slate-900 tracking-wider uppercase">Mes Factures</h2>
+                 <h2 className="text-xl font-bebas text-slate-900 tracking-wider uppercase">Mes Devis & Factures</h2>
                  <button 
                   onClick={() => fetchClientData(true)} 
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-500 rounded-md text-[9px] font-bold uppercase tracking-widest hover:bg-emerald-50 hover:text-emerald-600 transition-all"
@@ -961,13 +961,50 @@ const ClientSpace: React.FC = () => {
                 </div>
               </div>
 
-              {/* Liste des factures */}
-              {clientData.factures.length === 0 ? (
+              {/* Liste des Devis et Factures */}
+              {(clientData.factures.length === 0 && (!clientData.devis || clientData.devis.length === 0)) ? (
                 <div className="p-12 bg-slate-50 rounded-xl text-center border border-dashed border-slate-200 text-slate-400">
                   <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p className="text-xs font-bold uppercase tracking-widest">Aucune facture disponible.</p>
+                  <p className="text-xs font-bold uppercase tracking-widest">Aucun document disponible.</p>
                 </div>
-              ) : clientData.factures.map((inv: Invoice) => {
+              ) : (
+                <div className="space-y-4">
+                  {/* Liste des devis */}
+                  {clientData.devis && clientData.devis.map((dev: any) => (
+                    <div key={dev.id} className="p-6 bg-slate-50 rounded-xl border border-dashed border-slate-300 shadow-sm transition-all group hover:shadow-md">
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
+                        <div className="flex items-start gap-4 flex-1">
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-slate-200 text-slate-500">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mb-0.5">
+                              {new Date(dev.date_creation).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                            </p>
+                            <h3 className="font-bebas text-xl text-slate-900 tracking-wide mb-1">
+                              {dev.numero_devis || `DEVIS-${dev.id.toString().padStart(4, '0')}`}
+                            </h3>
+                            <p className="text-xs font-bold text-slate-500">Véhicule : {dev.reparation?.vehicule_plate || 'Inconnu'}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-6 w-full md:w-auto md:justify-end border-t md:border-t-0 pt-4 md:pt-0 border-slate-100">
+                          <div className="text-right">
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Total Devis</p>
+                            <p className="text-xl font-bebas text-slate-900 tracking-wider">
+                              {Number(dev.total_ttc).toLocaleString('fr-FR')} <span className="text-sm">F</span>
+                            </p>
+                          </div>
+                          <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-slate-300 text-slate-500 bg-white">
+                            {dev.statut || 'DEVIS'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Liste des factures */}
+                  {clientData.factures.map((inv: Invoice) => {
                 const reste = Math.max(0, Number(inv.total_ttc) - Number(inv.montant_paye));
                 const pct = inv.total_ttc > 0 ? Math.round((Number(inv.montant_paye) / Number(inv.total_ttc)) * 100) : 100;
                 const isSolde = inv.statut_paiement === 'SOLDE';
@@ -1051,6 +1088,8 @@ const ClientSpace: React.FC = () => {
                   </div>
                 );
               })}
+                </div>
+              )}
             </div>
           )}
 

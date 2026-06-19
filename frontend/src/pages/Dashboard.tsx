@@ -11,9 +11,6 @@ import {
   Clock,
   CheckCircle2,
   Bell,
-  BrainCircuit,
-  MessageSquare,
-  ShieldAlert,
   Loader2
 } from 'lucide-react';
 import {
@@ -71,12 +68,7 @@ const Dashboard: React.FC = () => {
   const [maintenanceAlerts, setMaintenanceAlerts] = useState<MaintenanceAlert[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const riskClients: any[] = [];
-
   // AI features removed: riskClients and sentiment analysis disabled
-  const analyzingSentiment = false;
-  const sentimentResult: any = null;
-  const handleAnalyzeSentiment = async () => { /* disabled */ };
 
   const [recentRepairs, setRecentRepairs] = useState<RecentIntervention[]>([]);
 
@@ -290,7 +282,7 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="mt-4">
             <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-              <div className="bg-rose-500 h-1.5 rounded-full progress-bar-anim" style={{ width: loading ? '0%' : (finance.total_impayes > 0 ? '90%' : '10%') }}></div>
+              <div className="bg-rose-500 h-1.5 rounded-full progress-bar-anim" style={{ width: loading ? '0%' : (finance.total_impayes > 0 ? '90%' : '0%') }}></div>
             </div>
           </div>
         </div>
@@ -330,54 +322,11 @@ const Dashboard: React.FC = () => {
               </p>
             </div>
           </div>
+            {/* Empty placeholder or removed */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col justify-center items-center opacity-50">
+          <Wrench className="w-12 h-12 text-slate-300 mb-2" />
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Espace Réservé</p>
         </div>
-
-        {/* Situation Trésorerie (AI) */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 animate-slide-in hover-glow flex flex-col justify-between" style={{ animationDelay: '0.4s' }}>
-          <div>
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <p className="text-slate-500 text-sm font-bold tracking-wider mb-2">VIGILANCE TRÉSORERIE (IA)</p>
-                {riskClients.length > 0 ? (
-                  <>
-                    <p className="text-rose-600 text-3xl font-black mt-1">
-                      {riskClients.length} <span className="text-lg text-slate-800 font-bold">Clients à risques</span>
-                    </p>
-                    <p className="text-rose-500 text-xs mt-2 font-medium flex items-center">
-                      <AlertTriangle className="w-3 h-3 mr-1" /> Attention : Taux d'impayés anormal
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-emerald-600 text-3xl font-black mt-1">Sain</p>
-                    <p className="text-emerald-500 text-xs mt-2 font-medium flex items-center">
-                      <CheckCircle2 className="w-3 h-3 mr-1" /> Aucun risque détecté par l'IA
-                    </p>
-                  </>
-                )}
-              </div>
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${riskClients.length > 0 ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                <ShieldAlert className="w-6 h-6" />
-              </div>
-            </div>
-            
-            {riskClients.length > 0 && (
-              <div className="space-y-2 mt-4">
-                {riskClients.map((client, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs bg-slate-50 p-2 rounded-lg">
-                    <span className="font-bold text-slate-700">{client.nom}</span>
-                    <span className="text-rose-600 font-black">{formatNumber(client.solde_impaye)} F</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {riskClients.length > 0 && (
-            <button className="w-full mt-4 bg-rose-50 text-rose-600 py-3 rounded-xl text-sm font-bold transition-all duration-300 hover:bg-rose-100 hover:scale-105 flex justify-center items-center">
-              <Bell className="w-4 h-4 mr-2" /> Pensez à relancer les clients
-            </button>
-          )}
         </div>
       </div>
 
@@ -515,86 +464,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* IA Analysis Bloc (F2) */}
-      <div className="bg-slate-900 rounded-2xl shadow-xl p-8 animate-slide-in relative overflow-hidden" style={{ animationDelay: '0.7s' }}>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <BrainCircuit className="text-emerald-400 w-6 h-6" />
-              <h3 className="text-xl font-bold text-white tracking-wide">Intelligence Artificielle — Avis Clients</h3>
-            </div>
-            <p className="text-slate-400 text-sm">Générez une synthèse analytique des retours de satisfaction via Gemini.</p>
-          </div>
-          <button 
-            onClick={handleAnalyzeSentiment}
-            disabled={analyzingSentiment}
-            className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
-          >
-            {analyzingSentiment ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Analyse en cours...</>
-            ) : (
-              <><MessageSquare className="w-4 h-4" /> Analyser la satisfaction</>
-            )}
-          </button>
-        </div>
 
-        {sentimentResult && (() => {
-          const total = (sentimentResult.positif || 0) + (sentimentResult.neutre || 0) + (sentimentResult.negatif || 0);
-          const pctPos = total > 0 ? Math.round((sentimentResult.positif / total) * 100) : 0;
-          const pctNeu = total > 0 ? Math.round((sentimentResult.neutre / total) * 100) : 0;
-          const pctNeg = total > 0 ? Math.round((sentimentResult.negatif / total) * 100) : 0;
-          const globalColor = sentimentResult.global === 'POSITIF' ? 'text-emerald-400' : sentimentResult.global === 'NEGATIF' ? 'text-rose-400' : 'text-amber-400';
-          return (
-            <div className="mt-8 pt-8 border-t border-slate-700/50 relative z-10">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                {/* Sentiment global */}
-                <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700 flex flex-col justify-center">
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Sentiment Global</p>
-                  <p className={`text-2xl font-black ${globalColor}`}>{sentimentResult.global}</p>
-                  <p className="text-slate-500 text-xs mt-1">{total} avis analysés</p>
-                </div>
-                {/* Positifs */}
-                <div className="bg-emerald-500/10 rounded-xl p-5 border border-emerald-500/20">
-                  <p className="text-emerald-400 text-3xl font-black mb-1">{pctPos}%</p>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Positifs</p>
-                  <p className="text-slate-500 text-xs mt-1">{sentimentResult.positif} avis</p>
-                </div>
-                {/* Neutres */}
-                <div className="bg-amber-500/10 rounded-xl p-5 border border-amber-500/20">
-                  <p className="text-amber-400 text-3xl font-black mb-1">{pctNeu}%</p>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Neutres</p>
-                  <p className="text-slate-500 text-xs mt-1">{sentimentResult.neutre} avis</p>
-                </div>
-                {/* Négatifs */}
-                <div className="bg-rose-500/10 rounded-xl p-5 border border-rose-500/20">
-                  <p className="text-rose-400 text-3xl font-black mb-1">{pctNeg}%</p>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Négatifs</p>
-                  <p className="text-slate-500 text-xs mt-1">{sentimentResult.negatif} avis</p>
-                </div>
-              </div>
-              {/* Détail des avis */}
-              {sentimentResult.details && sentimentResult.details.length > 0 && (
-                <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50 max-h-48 overflow-y-auto custom-scrollbar">
-                  <p className="text-emerald-400 text-[10px] font-black uppercase tracking-widest mb-3">Détail par Avis</p>
-                  <div className="space-y-2">
-                    {sentimentResult.details.map((d: any) => (
-                      <div key={d.id} className="flex items-start gap-3">
-                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5 ${
-                          d.sentiment === 'POSITIF' ? 'bg-emerald-500/20 text-emerald-400' :
-                          d.sentiment === 'NEGATIF' ? 'bg-rose-500/20 text-rose-400' :
-                          'bg-amber-500/20 text-amber-400'
-                        }`}>{d.sentiment}</span>
-                        <p className="text-slate-400 text-xs leading-relaxed">{d.resume}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-      </div>
 
     </div>
   );

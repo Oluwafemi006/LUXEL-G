@@ -135,11 +135,14 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         )
         final_solde = max(solde_result['solde'], Decimal('0'))
 
+        devis = Devis.objects.filter(reparation__vehicule__client=client).order_by('-date_creation')
+
         return Response({
             'client': ClientSerializer(client).data,
             'vehicules': MiniVehiculeSerializer(vehicules, many=True).data,
             'reparations': ReparationSerializer(reparations, many=True).data,
             'factures': FactureSerializer(factures, many=True).data,
+            'devis': DevisSerializer(devis, many=True).data,
             'rdvs': AppointmentSerializer(Appointment.objects.filter(client=client).order_by('-date_rdv'), many=True).data,
             'solde_impaye': final_solde,
             'notifications': NotificationClientSerializer(NotificationClient.objects.filter(client=client).order_by('-date_envoi'), many=True).data,

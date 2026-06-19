@@ -15,31 +15,34 @@ class ReparationViewSet(viewsets.ModelViewSet):
         reparation = serializer.save()
         if reparation.statut == 'TERMINE':
             import threading
-            def send_notifications():
-                client = reparation.vehicule.client
-                immat = reparation.vehicule.immatriculation
+            
+            client_contact = reparation.vehicule.client.contact
+            client_email = reparation.vehicule.client.email
+            client_nom = reparation.vehicule.client.nom
+            client_prenoms = reparation.vehicule.client.prenoms
+            immat = reparation.vehicule.immatriculation
+
+            def send_notifications(contact, email, nom, prenoms, immatriculation):
                 try:
-                    from api.services import send_otp_sms
-                    if client.contact:
+                    if contact:
                         send_otp_sms(
-                            client.contact,
-                            f"Votre véhicule {immat} est prêt ! Vous pouvez passer le récupérer à Luxury Elegance Garage à Parakou."
+                            contact,
+                            f"Votre véhicule {immatriculation} est prêt ! Vous pouvez passer le récupérer à Luxury Elegance Garage à Parakou."
                         )
                     
-                    if client.email:
-                        from django.core.mail import EmailMessage
-                        subject = f"✅ Votre véhicule {immat} est prêt — Luxury Elegance Garage"
-                        body = (f"Bonjour {client.nom} {client.prenoms},\n\n"
+                    if email:
+                        subject = f"✅ Votre véhicule {immatriculation} est prêt — Luxury Elegance Garage"
+                        body = (f"Bonjour {nom} {prenoms},\n\n"
                                 f"Nous avons le plaisir de vous informer que les travaux sur votre véhicule "
-                                f"{immat} sont terminés.\n\n"
+                                f"{immatriculation} sont terminés.\n\n"
                                 f"📍 Adresse : Luxury Elegance Garage, Okedama, Parakou, Bénin\n"
                                 f"📞 Contact : +229 01 92 62 98 60\n\n"
                                 f"Merci de votre confiance.\n\nL'équipe Luxury Elegance Garage")
-                        EmailMessage(subject, body, to=[client.email]).send()
+                        EmailMessage(subject, body, to=[email]).send(fail_silently=True)
                 except Exception as e:
                     logging.getLogger(__name__).warning("Échec envoi notification : %s", e)
             
-            threading.Thread(target=send_notifications).start()
+            threading.Thread(target=send_notifications, args=(client_contact, client_email, client_nom, client_prenoms, immat)).start()
 
     def perform_create(self, serializer):
         reparation = serializer.save()
