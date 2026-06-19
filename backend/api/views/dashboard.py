@@ -80,7 +80,11 @@ class StatsViewSet(viewsets.ViewSet):
             client_stats[cid]['factures_total'] += 1
             if f.statut_paiement == 'PARTIEL':
                 client_stats[cid]['factures_partielles'] += 1
-            client_stats[cid]['solde_impaye'] += float(f.total_ttc - f.montant_paye)
+            
+            # On ne compte que les restes positifs pour le solde impayé
+            reste = float(f.total_ttc - f.montant_paye)
+            if reste > 0:
+                client_stats[cid]['solde_impaye'] += reste
 
         # Calcul des jours depuis la dernière visite
         from api.models import Reparation as Rep

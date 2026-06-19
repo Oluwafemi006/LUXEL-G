@@ -19,6 +19,8 @@ import {
 import Modal from '../components/Modal';
 import RepairForm from '../components/forms/RepairForm';
 import api, { fetchAllPages } from '../services/api';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 interface Repair {
   id: number;
@@ -32,6 +34,13 @@ interface Repair {
   date_creation: string;
   kilometrage?: number;
   devis?: Quote[];
+  etapes?: Etape[];
+}
+
+interface Etape {
+  id: number;
+  description: string;
+  date_ajout: string;
 }
 
 interface Quote {
@@ -49,6 +58,8 @@ const Repairs: React.FC = () => {
   const [editingRepair, setEditingRepair] = useState<Repair | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDetailMobile, setShowDetailMobile] = useState(false);
+  const [newStepDescription, setNewStepDescription] = useState('');
+  const [isSubmittingStep, setIsSubmittingStep] = useState(false);
 
   const fetchRepairs = async (silent = false) => {
     try {
@@ -93,19 +104,23 @@ const Repairs: React.FC = () => {
     }
   };
 
-  const handleUpdateProgress = async (repairId: number, newProgress: number) => {
+
+
+  const handleAddStep = async () => {
+    if (!selectedRepair || !newStepDescription.trim()) return;
+    setIsSubmittingStep(true);
     try {
-      const progression = Math.min(100, Math.max(0, newProgress));
-      const payload: any = { progression };
-      if (progression === 100) {
-        payload.statut = 'TERMINE';
-      } else if (progression > 0) {
-        payload.statut = 'EN_COURS';
-      }
-      await api.patch(`reparations/${repairId}/`, payload);
-      fetchRepairs(true); // silent fetch
+      await api.post('etapes-reparation/', {
+        reparation: selectedRepair.id,
+        description: newStepDescription.trim()
+      });
+      setNewStepDescription('');
+      fetchRepairs(true);
     } catch (error) {
-      console.error('Erreur progression:', error);
+      console.error('Erreur ajout étape:', error);
+      alert("Impossible d'ajouter l'étape.");
+    } finally {
+      setIsSubmittingStep(false);
     }
   };
 
@@ -204,26 +219,20 @@ const Repairs: React.FC = () => {
                 onClick={() => { setSelectedRepair(item); setShowDetailMobile(true); }}
                 className={`p-6 cursor-pointer transition-all duration-500 hover:bg-emerald-50/30 flex items-center gap-5 group ${selectedRepair?.id === item.id ? 'bg-emerald-50/50 border-l-4 border-l-emerald-600 lg:translate-x-1' : ''}`}
               >
-                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all duration-700 ${selectedRepair?.id === item.id ? 'bg-emerald-600 text-white shadow-emerald-200 rotate-3' : 'bg-slate-50 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
-                  {item.progression === 100 ? <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7" /> : <Wrench className="w-6 h-6 sm:w-7 sm:h-7" />}
+                <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shadow-inner transition-all duration-700 ${selectedRepair?.id === item.id ? 'bg-emerald-600 text-white shadow-emerald-200 rotate-3' : 'bg-slate-50 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
+                  {item.statut === 'TERMINE' ? <CheckCircle2 className="w-5 h-5 sm:w-7 sm:h-7" /> : <Wrench className="w-5 h-5 sm:w-7 sm:h-7" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-mono font-black text-emerald-600 text-sm sm:text-base tracking-tighter uppercase truncate">OR-{item.id.toString().padStart(4, '0')}</p>
                   <p className="text-[10px] sm:text-xs font-black text-slate-900 uppercase tracking-tight truncate mt-0.5">{item.vehicule_plate}</p>
                 </div>
                 <div className="text-right flex flex-col items-end gap-2">
-                   <span className={`text-[7px] sm:text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${
+                    <span className={`text-[7px] sm:text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${
                       item.statut === 'EN_COURS' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 
                       item.statut === 'TERMINE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400'
                     }`}>
                       {item.statut === 'EN_COURS' ? 'En cours' : item.statut === 'TERMINE' ? 'Terminé' : item.statut}
                     </span>
-                    <div className="w-12 sm:w-16 bg-slate-100 h-1 rounded-full overflow-hidden shadow-inner">
-                      <div 
-                        className={`${item.progression === 100 ? 'bg-emerald-500' : 'bg-emerald-400'} h-full transition-all duration-1000`} 
-                        style={{ width: `${item.progression}%` }}
-                      ></div>
-                    </div>
                 </div>
               </div>
             ))}
@@ -338,64 +347,71 @@ const Repairs: React.FC = () => {
 
                 {/* Progression & Actions */}
                 <div className="flex-1 p-6 sm:p-10 space-y-8 sm:space-y-10 overflow-y-auto custom-scrollbar bg-white">
-                   <div className="space-y-8 sm:space-y-10">
+                   <div className="space-y-6 sm:space-y-8">
                       <div className="flex justify-between items-end">
                         <div className="space-y-1 sm:space-y-2">
-                          <h3 className="text-[10px] sm:text-sm font-black uppercase tracking-widest text-slate-400">Progression</h3>
-                          <p className="text-4xl sm:text-6xl font-black text-emerald-600 tracking-tighter italic">{selectedRepair.progression}<span className="text-xl sm:text-2xl not-italic text-emerald-200">%</span></p>
+                          <h3 className="text-[10px] sm:text-sm font-black uppercase tracking-widest text-slate-400">Suivi des Étapes</h3>
+                          <p className="text-xl sm:text-3xl font-black text-emerald-600 tracking-tighter italic">Historique d'Intervention</p>
                         </div>
-                        <div className={`p-3 sm:p-4 rounded-2xl sm:rounded-3xl ${selectedRepair.progression === 100 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'} transition-all duration-700`}>
-                          {selectedRepair.progression === 100 ? <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10" /> : <Clock className="w-8 h-8 sm:w-10 sm:h-10" />}
+                        <div className={`p-3 sm:p-4 rounded-2xl sm:rounded-3xl ${selectedRepair.statut === 'TERMINE' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'} transition-all duration-700`}>
+                          {selectedRepair.statut === 'TERMINE' ? <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10" /> : <Clock className="w-8 h-8 sm:w-10 sm:h-10" />}
                         </div>
                       </div>
 
-                      <div className="card-luxury p-6 sm:p-10 bg-slate-50/50 space-y-8 sm:space-y-10">
-                        <div className="flex items-center gap-4 sm:gap-8">
-                          <button 
-                            onClick={() => handleUpdateProgress(selectedRepair.id, selectedRepair.progression - 10)}
-                            className="w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center rounded-xl bg-white border border-emerald-100/50 text-slate-400 shadow-lg active:scale-90"
-                          >
-                            <span className="text-2xl sm:text-3xl font-black">-</span>
-                          </button>
-                          
-                          <div className="flex-1 h-4 sm:h-6 bg-white rounded-full overflow-hidden p-1 sm:p-1.5 border border-emerald-100/30 shadow-inner relative group">
-                            <div 
-                              className={`h-full rounded-full transition-all duration-1000 ${selectedRepair.progression === 100 ? 'bg-emerald-500' : 'bg-emerald-400'}`}
-                              style={{ width: `${selectedRepair.progression}%` }}
-                            ></div>
+                      <div className="card-luxury p-6 sm:p-8 bg-slate-50/50 space-y-6">
+                        {/* Liste des étapes */}
+                        <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                          {selectedRepair.etapes && selectedRepair.etapes.length > 0 ? (
+                            selectedRepair.etapes.map((etape) => (
+                              <div key={etape.id} className="bg-white p-4 rounded-xl border border-emerald-100/50 shadow-sm flex items-start gap-4">
+                                <div className="mt-1 w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-bold text-slate-700">{etape.description}</p>
+                                  <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest">{format(new Date(etape.date_ajout), "d MMMM yyyy 'à' HH:mm", { locale: fr })}</p>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-xs font-bold text-slate-400 italic text-center py-4">Aucune étape enregistrée pour le moment.</p>
+                          )}
+                        </div>
+
+                        {/* Ajout d'étape */}
+                        {selectedRepair.statut !== 'TERMINE' && (
+                          <div className="flex flex-col gap-3 pt-4 border-t border-slate-200/50">
+                            <textarea 
+                              value={newStepDescription}
+                              onChange={(e) => setNewStepDescription(e.target.value)}
+                              placeholder="Décrivez la nouvelle étape franchie..."
+                              className="w-full bg-white border border-emerald-100/50 rounded-xl px-4 py-3 outline-none focus:border-emerald-500/50 text-sm font-medium resize-none shadow-inner"
+                              rows={2}
+                            />
+                            <div className="flex gap-4">
+                              <button 
+                                onClick={handleAddStep}
+                                disabled={isSubmittingStep || !newStepDescription.trim()}
+                                className="flex-1 py-3 px-4 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest shadow-lg disabled:opacity-50 transition-all hover:bg-slate-800"
+                              >
+                                {isSubmittingStep ? 'Ajout...' : 'Ajouter l\'étape'}
+                              </button>
+                              <button 
+                                onClick={() => handleUpdateStatus(selectedRepair.id, 'TERMINE')}
+                                className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700"
+                              >
+                                Terminer la réparation
+                              </button>
+                            </div>
                           </div>
-
-                          <button 
-                            onClick={() => handleUpdateProgress(selectedRepair.id, selectedRepair.progression + 10)}
-                            className="w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center rounded-xl bg-white border border-emerald-100/50 text-slate-400 shadow-lg active:scale-90"
-                          >
-                            <span className="text-2xl sm:text-3xl font-black">+</span>
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 sm:gap-6">
-                           <button 
-                            onClick={() => handleUpdateProgress(selectedRepair.id, 50)}
-                            className="py-3 sm:py-4 px-4 sm:px-6 rounded-2xl bg-white border border-emerald-100/30 text-[9px] sm:text-[10px] font-black uppercase tracking-widest"
-                           >
-                            Étape 50%
-                           </button>
-                           <button 
-                            onClick={() => handleUpdateProgress(selectedRepair.id, 100)}
-                            className="py-3 sm:py-4 px-4 sm:px-6 rounded-2xl bg-slate-900 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest"
-                           >
-                            Terminé
-                           </button>
-                        </div>
+                        )}
                       </div>
                    </div>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-20 sm:p-40 opacity-20 text-slate-400 grayscale">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 bg-emerald-50 rounded-xl flex items-center justify-center mb-10 shadow-inner">
-                <Wrench className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-600" />
+            <div className="flex-1 flex flex-col items-center justify-center p-10 sm:p-40 opacity-20 text-slate-400 grayscale">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 bg-emerald-50 rounded-xl flex items-center justify-center mb-6 sm:mb-10 shadow-inner">
+                <Wrench className="w-8 h-8 sm:w-12 sm:h-12 text-emerald-600" />
               </div>
               <p className="font-black uppercase tracking-[0.5em] text-xl sm:text-2xl text-center">Atelier Technique</p>
               <p className="text-[10px] font-bold mt-6 tracking-[0.3em] text-center">SÉLECTIONNEZ UN ORDRE DE RÉPARATION</p>

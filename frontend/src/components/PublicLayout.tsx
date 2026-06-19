@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom';
-import { Home, Wrench, CalendarCheck, UserCircle, Images } from 'lucide-react';
+import { Home, Wrench, CalendarCheck, UserCircle, Images, MapPin } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 import '../pages/PublicPortal.css';
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+  </svg>
+);
+
+const FacebookIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+  </svg>
+);
+
+const TikTokIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.01.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
   </svg>
 );
 
@@ -101,14 +113,14 @@ const PublicLayout: React.FC = () => {
           className={`bn-item ${location.pathname === '/' && activeSection === 'accueil' ? 'active' : ''}`}
           onClick={() => handleNavClick('accueil')}
         >
-          <Home className="bn-icon w-5 h-5" />
+          <Home className="bn-icon w-4 h-4" />
           <span className="bn-label">Accueil</span>
         </button>
         <button 
           className={`bn-item ${location.pathname === '/' && activeSection === 'services' ? 'active' : ''}`}
           onClick={() => handleNavClick('services')}
         >
-          <Wrench className="bn-icon w-5 h-5" />
+          <Wrench className="bn-icon w-4 h-4" />
           <span className="bn-label">Services</span>
         </button>
         
@@ -117,7 +129,7 @@ const PublicLayout: React.FC = () => {
           className="bn-item bn-rdv"
           onClick={() => handleNavClick('rdv')}
         >
-          <CalendarCheck className="bn-icon w-6 h-6" />
+          <CalendarCheck className="bn-icon w-5 h-5" />
           <span className="bn-label">RDV</span>
         </button>
 
@@ -125,58 +137,41 @@ const PublicLayout: React.FC = () => {
           className={`bn-item ${location.pathname === '/' && activeSection === 'galerie' ? 'active' : ''}`}
           onClick={() => handleNavClick('galerie')}
         >
-          <Images className="bn-icon w-5 h-5" />
+          <Images className="bn-icon w-4 h-4" />
           <span className="bn-label">Galerie</span>
         </button>
         <Link 
           to="/espace-client"
           className={`bn-item ${location.pathname === '/espace-client' ? 'active' : ''}`}
         >
-          <UserCircle className="bn-icon w-5 h-5" />
+          <UserCircle className="bn-icon w-4 h-4" />
           <span className="bn-label">Client</span>
         </Link>
       </nav>
 
       {/* ─── FOOTER ─── */}
-      <footer className="footer bg-white border-t border-emerald-100">
-        <div className="footer-top">
-          <div>
-            <img src={logoImg} alt="Luxury Elegance Garage" className="footer-logo" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.25)) brightness(1.1)' }} />
-            <p className="footer-desc">L'excellence automobile au cœur du Bénin. Rigueur, expertise et professionnalisme.</p>
-          </div>
-          <div className="footer-col">
-            <h4>Services</h4>
-            <ul>
-              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Mécanique & Électricité</button></li>
-              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Tôlerie & Peinture</button></li>
-              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Pneumatique & Parallélisme</button></li>
-              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Diagnostic & Scannage</button></li>
-              <li><button onClick={() => handleNavClick('services')} className="bg-transparent border-none p-0 cursor-pointer text-left">Vente & Location</button></li>
-            </ul>
-          </div>
-          <div className="footer-col">
-            <h4>Garage</h4>
-            <ul>
-              <li><button onClick={() => handleNavClick('pourquoi')} className="bg-transparent border-none p-0 cursor-pointer text-left">À propos</button></li>
-              <li><button onClick={() => handleNavClick('galerie')} className="bg-transparent border-none p-0 cursor-pointer text-left">Galerie</button></li>
-              <li><button onClick={() => handleNavClick('temoignages')} className="bg-transparent border-none p-0 cursor-pointer text-left">Avis clients</button></li>
-              <li><button onClick={() => handleNavClick('rdv')} className="bg-transparent border-none p-0 cursor-pointer text-left">Rendez-vous</button></li>
-              <li><Link to="/login" className="hover:text-white transition-colors">Portail Staff</Link></li>
-            </ul>
-          </div>
-          <div className="footer-col">
-            <h4>Contact</h4>
-            <ul>
-              <li><a href="https://maps.google.com/?q=Okedama+Parakou+Benin" target="_blank" rel="noreferrer">Okedama, Parakou</a></li>
-              <li><a href="tel:+2290155119999">+229 01 55 11 99 99</a></li>
-              <li><a href="mailto:k29296028@gmail.com">k29296028@gmail.com</a></li>
-              <li className="mt-4"><a href="https://wa.me/2290155119999" className="text-[#25D366] font-semibold flex items-center gap-2"><WhatsAppIcon className="w-4 h-4" /> WhatsApp</a></li>
-            </ul>
-          </div>
+      <footer className="footer bg-white border-t border-emerald-100 flex flex-col items-center pt-10 pb-6 px-4">
+        <img src={logoImg} alt="Luxury Elegance Garage" className="h-12 w-auto mb-6" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.25)) brightness(1.1)' }} />
+        
+        {/* Ligne des icônes réseaux sociaux et contact */}
+        <div className="flex gap-6 mb-8 items-center justify-center">
+          <a href="https://wa.me/2290155119999" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-[#25D366] transition-colors p-2 bg-slate-50 hover:bg-emerald-50 rounded-full" aria-label="WhatsApp">
+            <WhatsAppIcon className="w-5 h-5" />
+          </a>
+          <a href="https://www.facebook.com/profile.php?id=61569971612897" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-[#1877F2] transition-colors p-2 bg-slate-50 hover:bg-blue-50 rounded-full" aria-label="Facebook">
+            <FacebookIcon className="w-5 h-5" />
+          </a>
+          <a href="https://vm.tiktok.com/ZS9jUmHbwRhoP-yE3LE/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-black transition-colors p-2 bg-slate-50 hover:bg-slate-200 rounded-full" aria-label="TikTok">
+            <TikTokIcon className="w-5 h-5" />
+          </a>
+          <a href="https://maps.app.goo.gl/o8DkRCZdENc7SncY7?g_st=aw" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-rose-500 transition-colors p-2 bg-slate-50 hover:bg-rose-50 rounded-full" aria-label="Google Maps">
+            <MapPin className="w-5 h-5" />
+          </a>
         </div>
-        <div className="footer-bottom">
-          <span className="footer-copy">© 2026 Luxury Élégance Garage de Parakou</span>
-          <span className="footer-motto">Excellence · Confiance · Expertise</span>
+
+        <div className="text-center">
+          <span className="block font-inter text-[10px] text-slate-400 mb-2">© 2026 Luxury Élégance Garage de Parakou</span>
+          <span className="block font-inter text-[9px] font-black tracking-widest text-emerald-600 uppercase">Excellence · Confiance · Expertise</span>
         </div>
       </footer>
 

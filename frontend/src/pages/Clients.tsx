@@ -389,9 +389,9 @@ const Clients: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-20 sm:p-40 opacity-20 text-slate-400 grayscale">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 bg-emerald-50 rounded-xl flex items-center justify-center mb-10 shadow-inner">
-                <Users className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-600" />
+            <div className="flex-1 flex flex-col items-center justify-center p-10 sm:p-40 opacity-20 text-slate-400 grayscale">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 bg-emerald-50 rounded-xl flex items-center justify-center mb-6 sm:mb-10 shadow-inner">
+                <Users className="w-8 h-8 sm:w-12 sm:h-12 text-emerald-600" />
               </div>
               <p className="font-black uppercase tracking-[0.5em] text-xl sm:text-2xl text-center">Dossiers Clients</p>
               <p className="text-[10px] font-bold mt-6 tracking-[0.3em] text-center">SÉLECTIONNEZ UN CLIENT DANS LA LISTE</p>

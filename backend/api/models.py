@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
@@ -83,6 +84,12 @@ class Reparation(models.Model):
                 super().save(*args, **kwargs)
                 self.numero_or = f"OR-{self.pk:04d}"
                 return super().save(update_fields=['numero_or'])
+        
+        # Validation métier : Un OR ne peut être clôturé que si 75% du montant TTC est payé
+        if self.statut == 'TERMINE' and hasattr(self, 'facture') and self.facture:
+            if not self.facture.is_minimum_paid():
+                raise ValidationError("Règle métier non respectée : Au moins 75% de la facture doit être réglé avant de clôturer l'Ordre de Réparation.")
+                
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -107,6 +114,17 @@ class LignePiece(models.Model):
 
     def __str__(self):
         return f"{self.description} ({self.quantite})"
+
+class EtapeReparation(models.Model):
+    reparation = models.ForeignKey(Reparation, on_delete=models.CASCADE, related_name='etapes')
+    date_ajout = models.DateTimeField(auto_now_add=True)
+    description = models.CharField(max_length=255)
+
+    class Meta:
+        ordering = ['-date_ajout']
+
+    def __str__(self):
+        return f"Étape pour {self.reparation.numero_or} : {self.description}"
 
 class Facture(models.Model):
     TYPE_CHOICES = [
@@ -163,6 +181,16 @@ class Facture(models.Model):
         if self.total_ttc <= 0 and self.montant_paye <= 0 and self.pk is None:
             self.statut_paiement = 'SOLDE'
         super().save(*args, **kwargs)
+
+    @property
+    def pourcentage_paye(self):
+        if self.total_ttc <= 0:
+            return 100 if self.statut_paiement == 'SOLDE' else 0
+        return round((self.montant_paye / self.total_ttc) * 100, 2)
+
+    def is_minimum_paid(self):
+        from decimal import Decimal
+        return self.montant_paye >= (self.total_ttc * Decimal('0.75'))
 
     def __str__(self):
         return f"{self.type} - {self.numero_facture or 'Sans N°'}"

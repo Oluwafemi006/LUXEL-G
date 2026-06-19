@@ -9,41 +9,37 @@ logger = logging.getLogger(__name__)
 # --- SERVICES SMS ---
 def send_sms(phone_number, message):
     """
-    Service d'envoi de SMS via Brevo (Sendinblue).
+    Service d'envoi de SMS via Twilio.
     """
     logger.debug("[SMS] Tentative d'envoi à %s : %s", phone_number, message)
 
-    api_key = getattr(settings, 'BREVO_API_KEY', os.getenv('BREVO_API_KEY'))
+    account_sid = getattr(settings, 'TWILIO_ACCOUNT_SID', os.getenv('TWILIO_ACCOUNT_SID'))
+    auth_token = getattr(settings, 'TWILIO_AUTH_TOKEN', os.getenv('TWILIO_AUTH_TOKEN'))
+    twilio_number = getattr(settings, 'TWILIO_PHONE_NUMBER', os.getenv('TWILIO_PHONE_NUMBER'))
     
-    if not api_key:
-        logger.info("[SMS] Config Brevo manquante. SMS non envoyé (Simulation).")
+    if not account_sid or not auth_token or not twilio_number:
+        logger.info("[SMS] Config Twilio manquante. SMS non envoyé (Simulation).")
         return False
 
-    import sib_api_v3_sdk
-    from sib_api_v3_sdk.rest import ApiException
-
-    configuration = sib_api_v3_sdk.Configuration()
-    configuration.api_key['api-key'] = api_key
-
-    api_instance = sib_api_v3_sdk.TransactionalSMSApi(sib_api_v3_sdk.ApiClient(configuration))
-    
-    clean_phone = phone_number.replace(' ', '').replace('+', '')
-    if not clean_phone.startswith('229'):
-        clean_phone = '229' + clean_phone
-
-    send_transac_sms = sib_api_v3_sdk.SendTransacSms(
-        sender="LUXEL-G",
-        recipient=clean_phone,
-        content=message,
-        type="transactional"
-    )
-
     try:
-        api_instance.send_transac_sms(send_transac_sms)
-        logger.info("[SMS] SMS envoyé via Brevo à %s", clean_phone)
+        from twilio.rest import Client
+        client = Client(account_sid, auth_token)
+        
+        clean_phone = phone_number.replace(' ', '').replace('+', '')
+        if not clean_phone.startswith('229'):
+            clean_phone = '+229' + clean_phone
+        elif clean_phone.startswith('229'):
+            clean_phone = '+' + clean_phone
+
+        client.messages.create(
+            body=message,
+            from_=twilio_number,
+            to=clean_phone
+        )
+        logger.info("[SMS] SMS envoyé via Twilio à %s", clean_phone)
         return True
-    except ApiException as e:
-        logger.error("[SMS] Erreur Brevo SMS: %s", e)
+    except ImportError:
+        logger.error("[SMS] La librairie twilio n'est pas installée. SMS simulé.")
         return False
     except Exception as e:
         logger.error("[SMS] Erreur critique SMS: %s", e)
@@ -241,6 +237,38 @@ def generate_emecef_invoice(facture):
                 message_erreur=err_text
             )
             return None
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+        logger.error("[e-MECeF] API Injoignable : %s", str(e))
+        # En mode Sandbox, on simule si l'API de la DGI est en panne ou injoignable
+        if getattr(settings, 'KKIAPAY_SANDBOX', True):
+            logger.info("[e-MECeF] Repli sur simulation (API injoignable en Sandbox).")
+            result = {
+                "uid": f"SIM-ERR-{facture.id}",
+                "codeMECeF": "SIM-CODE-ERR-MEC-EF-9999",
+                "qrCode": "https://e-mecef.impots.bj/verify/SIM-ERR",
+                "counters": "0/0",
+                "status": "SUCCESS"
+            }
+            LogNormalisationEmecef.objects.create(
+                facture=facture,
+                statut='SIMULATION',
+                payload_envoye=payload,
+                reponse_recue=result,
+                code_http=None,
+                uid_emecef=result['uid'],
+                message_erreur=f"Repli auto suite à erreur : {str(e)}"
+            )
+            return result
+
+        LogNormalisationEmecef.objects.create(
+            facture=facture,
+            statut='ECHEC',
+            payload_envoye=payload,
+            reponse_recue=None,
+            code_http=None,
+            message_erreur=f"API injoignable : {str(e)}"
+        )
+        return None
     except Exception as e:
         logger.error("[e-MECeF] Erreur critique : %s", str(e))
         LogNormalisationEmecef.objects.create(
@@ -283,20 +311,38 @@ def valider_et_normaliser_facture(facture, request_user=None):
         facture.numero_facture = f"FAC-{year}-{count:04d}"
         facture.type = 'DEFINITIVE'
         facture.date_validation = timezone.now()
-        
-        # NOTE : La décrémentation des stocks est désormais gérée automatiquement 
-        # par les signaux post_save sur le modèle LignePiece pour une gestion en temps réel.
-
-        # Normalisation e-MECeF uniquement si le client l'a demandée
-        if facture.demande_normalisation and not facture.is_normalised:
-            res_emecef = generate_emecef_invoice(facture)
-            if res_emecef:
-                facture.emecef_uid = res_emecef.get('uid')
-                facture.emecef_code = res_emecef.get('codeMECeF')
-                facture.emecef_qr_code = res_emecef.get('qrCode')
-                facture.emecef_counters = res_emecef.get('counters')
-                facture.emecef_status = res_emecef.get('status')
-                facture.is_normalised = True
-
         facture.save()
-        return facture
+
+    # Normalisation e-MECeF asynchrone pour ne pas bloquer le paiement
+    if facture.demande_normalisation and not facture.is_normalised:
+        client = facture.reparation.vehicule.client
+        if not client.ifu:
+            logger.info("[e-MECeF] Normalisation ignorée silencieusement car IFU manquant pour la facture %s.", facture.id)
+            facture.demande_normalisation = False
+            facture.save(update_fields=['demande_normalisation'])
+        else:
+            import threading
+            def run_normalization():
+                try:
+                    # On recharge la facture pour être sûr d'avoir l'état post-commit
+                    from api.models import Facture
+                    f_async = Facture.objects.get(pk=facture.id)
+                    res_emecef = generate_emecef_invoice(f_async)
+                    if res_emecef:
+                        f_async.emecef_uid = res_emecef.get('uid')
+                        f_async.emecef_code = res_emecef.get('codeMECeF')
+                        f_async.emecef_qr_code = res_emecef.get('qrCode')
+                        f_async.emecef_counters = res_emecef.get('counters')
+                        f_async.emecef_status = res_emecef.get('status')
+                        f_async.is_normalised = True
+                        f_async.save(update_fields=[
+                            'emecef_uid', 'emecef_code', 'emecef_qr_code', 
+                            'emecef_counters', 'emecef_status', 'is_normalised'
+                        ])
+                        logger.info("[e-MECeF] Facture %s normalisée avec succès (asynchrone).", f_async.id)
+                except Exception as e:
+                    logger.error("[e-MECeF] Erreur lors de la normalisation asynchrone : %s", e)
+            
+            db_transaction.on_commit(lambda: threading.Thread(target=run_normalization).start())
+
+    return facture

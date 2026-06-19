@@ -5,7 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 # Q2 — Import depuis le package views/ (découpage par domaine métier)
 from .views import (
     ClientViewSet, VehiculeViewSet, GlobalSearchView,
-    ReparationViewSet, LigneTravailViewSet, LignePieceViewSet,
+    ReparationViewSet, LigneTravailViewSet, LignePieceViewSet, EtapeReparationViewSet,
     FactureViewSet, DevisViewSet,
     StockViewSet, MouvementCaisseViewSet, MaintenancePredictiveViewSet, StatsViewSet,
     AppointmentViewSet, NotificationClientViewSet, NotificationStaffViewSet, AvisViewSet,
@@ -25,6 +25,7 @@ router.register(r'maintenance-predictive', MaintenancePredictiveViewSet)
 router.register(r'stats', StatsViewSet, basename='stats')
 router.register(r'travaux', LigneTravailViewSet)
 router.register(r'pieces-reparation', LignePieceViewSet)
+router.register(r'etapes-reparation', EtapeReparationViewSet)
 router.register(r'stock', StockViewSet)
 router.register(r'users', UserViewSet, basename='users')
 router.register(r'appointments', AppointmentViewSet)

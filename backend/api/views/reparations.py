@@ -81,6 +81,12 @@ class LigneTravailViewSet(viewsets.ModelViewSet):
     serializer_class = LigneTravailSerializer
     permission_classes = [IsStaffMember]
 
+class EtapeReparationViewSet(viewsets.ModelViewSet):
+    queryset = EtapeReparation.objects.all()
+    serializer_class = EtapeReparationSerializer
+    permission_classes = [IsStaffMember]
+
+
 
 class LignePieceViewSet(viewsets.ModelViewSet):
     queryset = LignePiece.objects.all()

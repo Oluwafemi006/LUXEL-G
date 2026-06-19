@@ -4,7 +4,7 @@ Chaque module regroupe les ViewSets par domaine métier.
 """
 from .permissions import IsDirecteur, IsStaffMember, RDVAnonThrottle, RDVUserThrottle
 from .clients import ClientViewSet, VehiculeViewSet, GlobalSearchView
-from .reparations import ReparationViewSet, LigneTravailViewSet, LignePieceViewSet
+from .reparations import ReparationViewSet, LigneTravailViewSet, LignePieceViewSet, EtapeReparationViewSet
 from .facturation import FactureViewSet, DevisViewSet
 from .stock import StockViewSet, MouvementCaisseViewSet, MaintenancePredictiveViewSet
 from .appointments import AppointmentViewSet, NotificationClientViewSet, NotificationStaffViewSet, AvisViewSet

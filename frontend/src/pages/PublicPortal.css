@@ -567,6 +567,8 @@
   }
 
   .svc-card { padding: 1.5rem; }
+  .svc-icon-w { width: 36px; height: 36px; margin-bottom: 0.8rem; }
+  .svc-icon-w svg { width: 18px; height: 18px; }
   .svc-card:hover { transform: none; box-shadow: none; }
   .svc-card:active { transform: scale(0.98); }
 }
@@ -783,6 +785,8 @@
   .why-badge-n { font-size: 2rem; }
 
   .why-point { padding: 1rem 1rem; }
+  .why-icon { width: 28px; height: 28px; }
+  .why-icon svg { width: 14px; height: 14px; }
   .why-point:hover { transform: none; }
 }
 

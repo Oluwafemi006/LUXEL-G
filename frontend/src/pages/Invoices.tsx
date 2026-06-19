@@ -98,6 +98,8 @@ const Invoices: React.FC = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMode, setPaymentMode] = useState('ESPECE');
+  const [numeroCheque, setNumeroCheque] = useState('');
+  const [demandeNormalisation, setDemandeNormalisation] = useState(false);
   const [isNormalizing, setIsNormalizing] = useState(false);
   const [aiPartLoading, setAiPartLoading] = useState<string | number | null>(null);
   const [isAISuggestionModalOpen, setIsAISuggestionModalOpen] = useState(false);
@@ -123,12 +125,15 @@ const Invoices: React.FC = () => {
   };
 
   const openPaymentModal = (invoice: Invoice) => {
-    // Règle des 75% : si premier paiement, proposer 75%
+    // Par défaut, proposer la totalité s'il reste peu, ou 75% si c'est le début
     if (invoice.montant_paye === 0) {
       setPaymentAmount((invoice.total_ttc * 0.75).toString());
     } else {
       setPaymentAmount((invoice.total_ttc - invoice.montant_paye).toString());
     }
+    setPaymentMode('ESPECE');
+    setNumeroCheque('');
+    setDemandeNormalisation(false);
     setIsPaymentModalOpen(true);
   };
 
@@ -266,7 +271,9 @@ const Invoices: React.FC = () => {
     try {
       const response = await api.post(`factures/${currentInvoiceId}/enregistrer_paiement/`, {
         montant: amount,
-        mode_paiement: paymentMode
+        mode_paiement: paymentMode,
+        numero_cheque: paymentMode === 'CHEQUE' ? numeroCheque : undefined,
+        normaliser: demandeNormalisation
       });
       alert('Paiement enregistré !');
       setIsPaymentModalOpen(false);
@@ -909,23 +916,57 @@ const handleDownloadPDF = async () => {
               </div>
 
               <div className="space-y-6">
+                <div className="flex gap-4">
+                  <button 
+                    type="button"
+                    onClick={() => setPaymentAmount((currentInvoice.total_ttc * 0.75).toString())}
+                    className={`flex-1 p-4 rounded-2xl border-2 transition-all ${paymentAmount === (currentInvoice.total_ttc * 0.75).toString() ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-100 bg-white text-slate-500 hover:border-emerald-200'}`}
+                  >
+                    <span className="block text-[10px] font-black uppercase tracking-widest mb-1">Acompte 75%</span>
+                    <span className="block text-lg font-black italic">{(currentInvoice.total_ttc * 0.75).toLocaleString()} F</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setPaymentAmount((currentInvoice.total_ttc - currentInvoice.montant_paye).toString())}
+                    className={`flex-1 p-4 rounded-2xl border-2 transition-all ${paymentAmount === (currentInvoice.total_ttc - currentInvoice.montant_paye).toString() ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-100 bg-white text-slate-500 hover:border-emerald-200'}`}
+                  >
+                    <span className="block text-[10px] font-black uppercase tracking-widest mb-1">Solde Total</span>
+                    <span className="block text-lg font-black italic">{(currentInvoice.total_ttc - currentInvoice.montant_paye).toLocaleString()} F</span>
+                  </button>
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Moyen de Paiement</label>
                   <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className="w-full bg-slate-50 border border-emerald-100/30 rounded-2xl px-6 py-4 outline-none focus:border-emerald-500/50 font-bold text-sm shadow-inner transition-all duration-500 appearance-none">
                     <option value="ESPECE">Espèce</option>
-                    <option value="MOMOPAY">MomoPay</option>
-                    <option value="KKIAPAY">Kkiapay</option>
-                    <option value="VIREMENT">Virement Bancaire</option>
                     <option value="CHEQUE">Chèque</option>
                   </select>
                 </div>
+
+                {paymentMode === 'CHEQUE' && (
+                  <div className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Numéro de Chèque</label>
+                    <input type="text" value={numeroCheque} onChange={(e) => setNumeroCheque(e.target.value)} placeholder="Ex: 000123456" className="w-full bg-emerald-50/50 border border-emerald-200/50 rounded-2xl px-6 py-4 outline-none focus:border-emerald-500 font-bold text-sm shadow-inner" />
+                  </div>
+                )}
+
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Montant versé (FCFA)</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Montant personnalisé (Optionnel)</label>
                   <div className="relative">
-                    <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full bg-emerald-50/50 border border-emerald-200/50 rounded-2xl px-8 py-5 outline-none focus:border-emerald-500 font-black text-3xl text-emerald-600 shadow-inner" placeholder="0" autoFocus />
+                    <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full bg-emerald-50/50 border border-emerald-200/50 rounded-2xl px-8 py-5 outline-none focus:border-emerald-500 font-black text-3xl text-emerald-600 shadow-inner" placeholder="0" />
                     <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-emerald-200">F</span>
                   </div>
                 </div>
+
+                {!currentInvoice.is_normalised && (
+                  <label className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl cursor-pointer hover:bg-emerald-50 hover:border-emerald-200 transition-all">
+                    <input type="checkbox" checked={demandeNormalisation} onChange={(e) => setDemandeNormalisation(e.target.checked)} className="w-5 h-5 accent-emerald-600 rounded" />
+                    <div>
+                      <p className="text-sm font-black text-slate-900">Générer la facture normalisée DGI</p>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-0.5">Requis si le client le demande explicitement</p>
+                    </div>
+                  </label>
+                )}
                 
                 <div className="flex gap-4 pt-6">
                   <button 

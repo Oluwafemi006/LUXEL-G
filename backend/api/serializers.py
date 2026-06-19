@@ -3,7 +3,7 @@ from .models import (
     Client, Vehicule, Reparation, Stock, MouvementStock,
     LigneTravail, LignePiece, Facture, MouvementCaisse, Devis, 
     MaintenancePredictive, Appointment, NotificationClient, Avis, UserProfile,
-    NotificationStaff
+    NotificationStaff, EtapeReparation
 )
 from django.contrib.auth.models import User
 
@@ -11,6 +11,13 @@ class LigneTravailSerializer(serializers.ModelSerializer):
     class Meta:
         model = LigneTravail
         fields = '__all__'
+
+class EtapeReparationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EtapeReparation
+        fields = ['id', 'reparation', 'description', 'date_ajout']
+        read_only_fields = ['date_ajout']
+
 
 class LignePieceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -60,6 +67,7 @@ class ReparationSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='vehicule.client.nom')
     client_contact = serializers.ReadOnlyField(source='vehicule.client.contact')
     email = serializers.ReadOnlyField(source='vehicule.client.email')
+    etapes = EtapeReparationSerializer(many=True, read_only=True)
 
     class Meta:
         model = Reparation

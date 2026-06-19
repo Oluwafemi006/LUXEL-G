@@ -68,7 +68,11 @@ class ClientSpaceViewSet(viewsets.ViewSet):
                 send_otp_sms(client.contact, code)
                 sent_method = "SMS"
 
-            return Response({'message': f'Code de connexion envoyé par {sent_method}.'})
+            response_data = {'message': f'Code de connexion envoyé par {sent_method}.'}
+            if getattr(settings, 'DEV_EXPOSE_OTP', False):
+                response_data['dev_otp_code'] = code
+                
+            return Response(response_data)
         except Exception as e:
             logger.error("[OTP] Échec envoi %s : %s", sent_method, e)
             return Response({
@@ -124,15 +128,20 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             .order_by('-date_creation')
         )
         solde_result = factures.filter(type='DEFINITIVE').aggregate(
-            solde=Sum(ExpressionWrapper(F('total_ttc') - F('montant_paye'), output_field=DjangoDecimalField()))
+            solde=Coalesce(
+                Sum(ExpressionWrapper(F('total_ttc') - F('montant_paye'), output_field=DjangoDecimalField())),
+                Decimal('0')
+            )
         )
+        final_solde = max(solde_result['solde'], Decimal('0'))
+
         return Response({
             'client': ClientSerializer(client).data,
             'vehicules': MiniVehiculeSerializer(vehicules, many=True).data,
             'reparations': ReparationSerializer(reparations, many=True).data,
             'factures': FactureSerializer(factures, many=True).data,
             'rdvs': AppointmentSerializer(Appointment.objects.filter(client=client).order_by('-date_rdv'), many=True).data,
-            'solde_impaye': solde_result['solde'] or Decimal('0'),
+            'solde_impaye': final_solde,
             'notifications': NotificationClientSerializer(NotificationClient.objects.filter(client=client).order_by('-date_envoi'), many=True).data,
             'alertes': MaintenancePredictiveSerializer(MaintenancePredictive.objects.filter(vehicule__client=client, actif=True), many=True).data,
             'avis': AvisSerializer(Avis.objects.filter(client=client).order_by('-date_creation'), many=True).data,
