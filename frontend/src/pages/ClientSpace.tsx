@@ -379,6 +379,31 @@ const ClientSpace: React.FC = () => {
     }
   };
 
+  const downloadDevis = async (devisId: number) => {
+    try {
+      const response = await api.get(`client-space/download-devis/?devis_id=${devisId}`, { responseType: 'blob' });
+      
+      let filename = `Devis_${devisId}.pdf`;
+      const disposition = response.headers['content-disposition'];
+      if (disposition && disposition.indexOf('attachment') !== -1) {
+          const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+          if (matches != null && matches[1]) { 
+            filename = matches[1].replace(/['"]/g, '');
+          }
+      }
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      alert('Erreur lors du téléchargement du devis.');
+    }
+  };
+
   // --- PAIEMENT KKIAPAY ---
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
   const [paySuccess, setPaySuccess] = useState<{ message: string; montant: string } | null>(null);
@@ -998,6 +1023,13 @@ const ClientSpace: React.FC = () => {
                           <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-slate-300 text-slate-500 bg-white">
                             {dev.statut || 'DEVIS'}
                           </span>
+                          <button
+                            onClick={() => downloadDevis(dev.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded text-[9px] font-bebas tracking-widest uppercase hover:bg-slate-800 transition-all active:scale-95 shadow-md flex-shrink-0"
+                            title="Télécharger le PDF"
+                          >
+                            <Download className="w-3.5 h-3.5" /> PDF
+                          </button>
                         </div>
                       </div>
                     </div>

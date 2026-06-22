@@ -438,25 +438,34 @@ const handleDownloadPDF = async () => {
         setCurrentInvoice(resInvoice.data);
       }
 
+      const updatedLaborLines = [];
       for (const line of laborLines) {
         if (line.description && line.montant > 0) {
           if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
-            await api.post('travaux/', { description: line.description, montant: line.montant, reparation: selectedRepair.id });
+            const res = await api.post('travaux/', { description: line.description, montant: line.montant, reparation: selectedRepair.id });
+            updatedLaborLines.push(res.data);
           } else {
-            await api.patch(`travaux/${line.id}/`, { description: line.description, montant: line.montant });
+            const res = await api.patch(`travaux/${line.id}/`, { description: line.description, montant: line.montant });
+            updatedLaborLines.push(res.data);
           }
         }
       }
+      setLaborLines(updatedLaborLines.length > 0 ? updatedLaborLines : [{ id: 'tmp1', description: '', montant: 0 }]);
+
+      const updatedPartLines = [];
       for (const line of partLines) {
         if (line.description && line.prix_unitaire > 0) {
           const pData = { reference: line.reference, description: line.description, quantite: line.quantite, prix_unitaire: line.prix_unitaire, reparation: selectedRepair.id, article_stock: line.article_stock };
           if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
-            await api.post('pieces-reparation/', pData);
+            const res = await api.post('pieces-reparation/', pData);
+            updatedPartLines.push(res.data);
           } else {
-            await api.patch(`pieces-reparation/${line.id}/`, pData);
+            const res = await api.patch(`pieces-reparation/${line.id}/`, pData);
+            updatedPartLines.push(res.data);
           }
         }
       }
+      setPartLines(updatedPartLines.length > 0 ? updatedPartLines : [{ id: 'tmp2', reference: '', description: '', quantite: 1, prix_unitaire: 0 }]);
       alert('Sauvegarde réussie !');
       fetchInvoices(true);
     } catch (error) {

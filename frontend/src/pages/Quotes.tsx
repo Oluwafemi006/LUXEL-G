@@ -338,15 +338,21 @@ const Quotes: React.FC = () => {
       }
 
       // Sauvegarde des lignes (uniquement si remplies)
+      const updatedLaborLines = [];
       for (const line of laborLines) {
         if (line.description.trim() && line.montant > 0) {
           if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
-            await api.post('travaux/', { description: line.description, montant: line.montant, reparation: selectedRepair.id });
+            const res = await api.post('travaux/', { description: line.description, montant: line.montant, reparation: selectedRepair.id });
+            updatedLaborLines.push(res.data);
           } else {
-            await api.patch(`travaux/${line.id}/`, { description: line.description, montant: line.montant });
+            const res = await api.patch(`travaux/${line.id}/`, { description: line.description, montant: line.montant });
+            updatedLaborLines.push(res.data);
           }
         }
       }
+      setLaborLines(updatedLaborLines.length > 0 ? updatedLaborLines : [{ id: 'tmp1', description: '', montant: 0 }]);
+
+      const updatedPartLines = [];
       for (const line of partLines) {
         if (line.description.trim() && line.prix_unitaire > 0) {
           const partData = { 
@@ -358,12 +364,15 @@ const Quotes: React.FC = () => {
             article_stock: line.article_stock
           };
           if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
-            await api.post('pieces-reparation/', partData);
+            const res = await api.post('pieces-reparation/', partData);
+            updatedPartLines.push(res.data);
           } else {
-            await api.patch(`pieces-reparation/${line.id}/`, partData);
+            const res = await api.patch(`pieces-reparation/${line.id}/`, partData);
+            updatedPartLines.push(res.data);
           }
         }
       }
+      setPartLines(updatedPartLines.length > 0 ? updatedPartLines : [{ id: 'tmp2', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
 
       alert('Enregistrement réussi !');
       fetchQuotes(true);

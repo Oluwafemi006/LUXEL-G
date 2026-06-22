@@ -49,6 +49,70 @@ def send_otp_sms(phone_number, code):
     """Compatibilité pour les codes OTP."""
     return send_sms(phone_number, f"LUXEL-G : Votre code de connexion est {code}. Valide 10 min.")
 
+
+# --- SERVICES WHATSAPP (Meta Cloud API) ---
+def _normalize_phone_wa(phone: str) -> str:
+    """Normalise un numéro pour WhatsApp (format E.164 sans '+')."""
+    clean = phone.replace(' ', '').replace('+', '').replace('-', '')
+    if clean.startswith('00229'):
+        clean = clean[2:]  # retirer le double préfixe
+    if not clean.startswith('229'):
+        clean = '229' + clean
+    return clean
+
+
+def send_whatsapp_message(phone_number: str, message: str) -> bool:
+    """
+    Envoie un message WhatsApp via Meta Cloud API.
+    Nécessite META_WA_ACCESS_TOKEN et META_WA_PHONE_ID dans les variables d'environnement.
+    """
+    access_token = getattr(settings, 'META_WA_ACCESS_TOKEN', os.getenv('META_WA_ACCESS_TOKEN'))
+    phone_id = getattr(settings, 'META_WA_PHONE_ID', os.getenv('META_WA_PHONE_ID'))
+
+    if not access_token or not phone_id:
+        logger.info("[WhatsApp] Config Meta manquante (META_WA_ACCESS_TOKEN / META_WA_PHONE_ID). Message non envoyé.")
+        return False
+
+    to = _normalize_phone_wa(phone_number)
+    url = f"https://graph.facebook.com/v19.0/{phone_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "text",
+        "text": {"body": message}
+    }
+
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=10)
+        if resp.status_code == 200:
+            logger.info("[WhatsApp] Message envoyé à %s", to)
+            return True
+        else:
+            logger.warning("[WhatsApp] Erreur API Meta (%s) : %s", resp.status_code, resp.text)
+            return False
+    except Exception as e:
+        logger.error("[WhatsApp] Erreur réseau : %s", e)
+        return False
+
+
+def send_whatsapp_otp(phone_number: str, code: str) -> bool:
+    """
+    Envoie un code OTP par WhatsApp (Meta Cloud API).
+    Retourne True si succès, False sinon.
+    """
+    message = (
+        f"🔐 *Luxury Elegance Garage*\n\n"
+        f"Votre code de connexion : *{code}*\n\n"
+        f"⏱ Valide pendant 10 minutes.\n"
+        f"Ne le partagez jamais."
+    )
+    return send_whatsapp_message(phone_number, message)
+
+
 # --- SERVICES IA (REMOVED) ---
 # Les helpers d'IA (Google Gemini, chatbot, suggestions, analyse de sentiment)
 # ont été retirés du projet sur demande. Pour garder la compatibilité,

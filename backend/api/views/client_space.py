@@ -2,6 +2,7 @@
 import logging
 import secrets
 from django.db.models import Sum, F, ExpressionWrapper, DecimalField as DjangoDecimalField
+from django.db.models.functions import Coalesce
 from ._imports import *
 from api.throttling import ClientOTPThrottle
 
@@ -64,9 +65,14 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             else:
                 if not client.contact:
                     return Response({'error': 'Aucun numéro de téléphone associé.'}, status=status.HTTP_400_BAD_REQUEST)
-                from api.services import send_otp_sms
-                send_otp_sms(client.contact, code)
-                sent_method = "SMS"
+                from api.services import send_whatsapp_otp, send_otp_sms
+                # Essai WhatsApp en priorité, fallback sur SMS
+                wa_sent = send_whatsapp_otp(client.contact, code)
+                if wa_sent:
+                    sent_method = "WhatsApp"
+                else:
+                    send_otp_sms(client.contact, code)
+                    sent_method = "SMS"
 
             response_data = {'message': f'Code de connexion envoyé par {sent_method}.'}
             if getattr(settings, 'DEV_EXPOSE_OTP', False):
@@ -78,6 +84,7 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             return Response({
                 'error': f"Échec de l'envoi du code par {sent_method}. Veuillez réessayer."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     @action(detail=False, methods=['post'])
     def verify_otp(self, request):
@@ -135,7 +142,11 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         )
         final_solde = max(solde_result['solde'], Decimal('0'))
 
-        devis = Devis.objects.filter(reparation__vehicule__client=client).order_by('-date_creation')
+        # Exclure les devis liés à des factures soldées
+        reparations_soldees = factures.filter(statut_paiement='SOLDE').values_list('reparation_id', flat=True)
+        devis = Devis.objects.filter(reparation__vehicule__client=client)\
+                             .exclude(reparation_id__in=reparations_soldees)\
+                             .order_by('-date_creation')
 
         return Response({
             'client': ClientSerializer(client).data,
@@ -215,6 +226,24 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         else:
             filename = f"Proforma_OR-{facture.reparation.id:04d}.pdf"
             
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    @action(detail=False, methods=['get'], url_path='download-devis')
+    def download_devis_pdf(self, request):
+        try:
+            client = request.user.client_profile
+        except AttributeError:
+            return Response({'error': 'Accès non autorisé'}, status=status.HTTP_403_FORBIDDEN)
+        devis_id = request.query_params.get('devis_id')
+        if not devis_id:
+            return Response({'error': 'ID devis requis'}, status=status.HTTP_400_BAD_REQUEST)
+        devis = Devis.objects.filter(id=devis_id, reparation__vehicule__client=client).first()
+        if not devis:
+            return Response({'error': 'Devis non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        pdf = generate_document_pdf(devis, doc_type="DEVIS")
+        response = HttpResponse(pdf, content_type='application/pdf')
+        filename = f"Devis_{devis.numero_devis or 'Brouillon'}.pdf"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
