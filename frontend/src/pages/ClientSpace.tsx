@@ -33,6 +33,14 @@ import {
 import api, { resolveMediaUrl } from '../services/api';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { auth } from '../services/firebase';
+import { RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from 'firebase/auth';
+
+declare global {
+  interface Window {
+    recaptchaVerifier: any;
+  }
+}
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -111,6 +119,7 @@ const ClientSpace: React.FC = () => {
 
   const [otpStep, setOtpStep] = useState<'PHONE' | 'OTP'>('PHONE');
   const [resendTimer, setResendTimer] = useState(0);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   // Timer pour le renvoi d'OTP
   useEffect(() => {
@@ -234,20 +243,48 @@ const ClientSpace: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.post('client-space/request_otp/', { identifier });
-      setOtpStep('OTP');
-      setResendTimer(60);
-      
-      let msg = response.data.message;
-      if (response.data.dev_otp_code) {
-        msg += `\n\n[MODE DEV] Votre code OTP est : ${response.data.dev_otp_code}`;
+      if (loginMethod === 'PHONE') {
+         // Vérifier d'abord si le client existe (évite d'utiliser le quota Firebase pour les inconnus)
+         await api.post('client-space/request_otp/', { identifier, check_only: true });
+         
+         if (!window.recaptchaVerifier) {
+           window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+             size: 'invisible',
+           });
+         }
+         
+         let formattedPhone = phone.replace(/\s+/g, '');
+         if (formattedPhone.startsWith('01') && formattedPhone.length === 10) {
+            formattedPhone = '+229' + formattedPhone;
+         } else if (!formattedPhone.startsWith('+')) {
+            formattedPhone = '+229' + formattedPhone;
+         }
+
+         const result = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
+         setConfirmationResult(result);
+         setOtpStep('OTP');
+         setResendTimer(60);
+      } else {
+         const response = await api.post('client-space/request_otp/', { identifier });
+         setOtpStep('OTP');
+         setResendTimer(60);
+         let msg = response.data.message;
+         if (response.data.dev_otp_code) {
+            msg += `\n\n[MODE DEV] Votre code OTP est : ${response.data.dev_otp_code}`;
+         }
+         alert(msg);
       }
-      alert(msg);
     } catch (err: any) {
       if (err.response?.status === 404) {
-        setError("NON_INSCRIT"); // Code spécial pour afficher le bouton RDV
+        setError("NON_INSCRIT");
+      } else if (err.code === 'auth/invalid-phone-number') {
+        setError("Numéro de téléphone invalide.");
       } else {
-        setError(err.response?.data?.error || 'Une erreur est survenue.');
+        setError(err.response?.data?.error || err.message || 'Une erreur est survenue.');
+      }
+      if (window.recaptchaVerifier && err.code) {
+         window.recaptchaVerifier.clear();
+         window.recaptchaVerifier = null;
       }
     } finally {
       setLoading(false);
@@ -261,12 +298,25 @@ const ClientSpace: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.post('client-space/verify_otp/', { identifier, code: otp });
-      localStorage.setItem('client_access_token', response.data.access);
-      localStorage.setItem('client_refresh_token', response.data.refresh);
-      fetchClientData();
+      if (loginMethod === 'PHONE' && confirmationResult) {
+         const userCredential = await confirmationResult.confirm(otp);
+         const token = await userCredential.user.getIdToken();
+         const response = await api.post('client-space/verify_firebase_token/', { id_token: token });
+         localStorage.setItem('client_access_token', response.data.access);
+         localStorage.setItem('client_refresh_token', response.data.refresh);
+         fetchClientData();
+      } else {
+         const response = await api.post('client-space/verify_otp/', { identifier, code: otp });
+         localStorage.setItem('client_access_token', response.data.access);
+         localStorage.setItem('client_refresh_token', response.data.refresh);
+         fetchClientData();
+      }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Code invalide.');
+      if (err.code === 'auth/invalid-verification-code') {
+          setError('Code invalide.');
+      } else {
+          setError(err.response?.data?.error || 'Code invalide ou erreur réseau.');
+      }
     } finally {
       setLoading(false);
     }
@@ -635,6 +685,7 @@ const ClientSpace: React.FC = () => {
                    </a>
                 </div>
               )}
+              <div id="recaptcha-container"></div>
             </form>
           ) : (
             <form onSubmit={handleVerifyOTP} className="space-y-6">

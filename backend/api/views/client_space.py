@@ -43,6 +43,9 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         if not client:
             return Response({'error': 'Client non trouvé. Veuillez contacter le garage.'}, status=status.HTTP_404_NOT_FOUND)
 
+        if request.data.get('check_only'):
+            return Response({'message': 'Client trouvé, prêt pour Firebase Auth.'})
+
         # S4 — Invalider les OTP précédents
         ClientOTP.objects.filter(client=client, is_used=False).update(is_used=True)
         code = f"{secrets.randbelow(1000000):06d}"
@@ -65,14 +68,10 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             else:
                 if not client.contact:
                     return Response({'error': 'Aucun numéro de téléphone associé.'}, status=status.HTTP_400_BAD_REQUEST)
-                from api.services import send_whatsapp_otp, send_otp_sms
-                # Essai WhatsApp en priorité, fallback sur SMS
-                wa_sent = send_whatsapp_otp(client.contact, code)
-                if wa_sent:
-                    sent_method = "WhatsApp"
-                else:
-                    send_otp_sms(client.contact, code)
-                    sent_method = "SMS"
+                # Phone OTP is now handled directly by frontend via Firebase
+                # We just return success since check_only already handled the validation,
+                # but if they still reach here without check_only for a phone, just tell them.
+                return Response({'message': 'Veuillez utiliser l\'authentification par SMS sur le portail.'})
 
             response_data = {'message': f'Code de connexion envoyé par {sent_method}.'}
             if getattr(settings, 'DEV_EXPOSE_OTP', False):
@@ -114,6 +113,42 @@ class ClientSpaceViewSet(viewsets.ViewSet):
 
         refresh = RefreshToken.for_user(client.user)
         return Response({'refresh': str(refresh), 'access': str(refresh.access_token), 'client_id': client.id})
+
+    @action(detail=False, methods=['post'])
+    def verify_firebase_token(self, request):
+        import firebase_admin.auth as firebase_auth
+        id_token = request.data.get('id_token')
+        if not id_token:
+            return Response({'error': 'Token Firebase requis.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Vérifier le token Firebase
+            decoded_token = firebase_auth.verify_id_token(id_token)
+            phone_number = decoded_token.get('phone_number') # ex: +2290102030405
+            if not phone_number:
+                return Response({'error': 'Le token ne contient pas de numéro de téléphone.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Nettoyer le numéro comme stocké en BDD (ex: 0102030405)
+            clean_phone = _clean_phone(phone_number)
+            
+            # Trouver le client (on cherche la correspondance la plus large)
+            client = Client.objects.filter(contact__endswith=clean_phone[-8:]).first()
+            if not client:
+                return Response({'error': 'Numéro non reconnu dans notre base de données.'}, status=status.HTTP_404_NOT_FOUND)
+            
+            if not client.user:
+                user, _ = User.objects.get_or_create(
+                    username=f"client_{clean_phone}", defaults={'email': client.email}
+                )
+                client.user = user
+                client.save()
+
+            refresh = RefreshToken.for_user(client.user)
+            return Response({'refresh': str(refresh), 'access': str(refresh.access_token), 'client_id': client.id})
+            
+        except Exception as e:
+            logger.error("[FIREBASE AUTH] Erreur de vérification token : %s", str(e))
+            return Response({'error': 'Token Firebase invalide ou expiré.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     @action(detail=False, methods=['get'])
     def data(self, request):

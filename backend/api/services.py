@@ -6,50 +6,6 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# --- SERVICES SMS ---
-def send_sms(phone_number, message):
-    """
-    Service d'envoi de SMS via Twilio.
-    """
-    logger.debug("[SMS] Tentative d'envoi à %s : %s", phone_number, message)
-
-    account_sid = getattr(settings, 'TWILIO_ACCOUNT_SID', os.getenv('TWILIO_ACCOUNT_SID'))
-    auth_token = getattr(settings, 'TWILIO_AUTH_TOKEN', os.getenv('TWILIO_AUTH_TOKEN'))
-    twilio_number = getattr(settings, 'TWILIO_PHONE_NUMBER', os.getenv('TWILIO_PHONE_NUMBER'))
-    
-    if not account_sid or not auth_token or not twilio_number:
-        logger.info("[SMS] Config Twilio manquante. SMS non envoyé (Simulation).")
-        return False
-
-    try:
-        from twilio.rest import Client
-        client = Client(account_sid, auth_token)
-        
-        clean_phone = phone_number.replace(' ', '').replace('+', '')
-        if not clean_phone.startswith('229'):
-            clean_phone = '+229' + clean_phone
-        elif clean_phone.startswith('229'):
-            clean_phone = '+' + clean_phone
-
-        client.messages.create(
-            body=message,
-            from_=twilio_number,
-            to=clean_phone
-        )
-        logger.info("[SMS] SMS envoyé via Twilio à %s", clean_phone)
-        return True
-    except ImportError:
-        logger.error("[SMS] La librairie twilio n'est pas installée. SMS simulé.")
-        return False
-    except Exception as e:
-        logger.error("[SMS] Erreur critique SMS: %s", e)
-        return False
-
-def send_otp_sms(phone_number, code):
-    """Compatibilité pour les codes OTP."""
-    return send_sms(phone_number, f"LUXEL-G : Votre code de connexion est {code}. Valide 10 min.")
-
-
 # --- SERVICES WHATSAPP (Meta Cloud API) ---
 def _normalize_phone_wa(phone: str) -> str:
     """Normalise un numéro pour WhatsApp (format E.164 sans '+')."""
