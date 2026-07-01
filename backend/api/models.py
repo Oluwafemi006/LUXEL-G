@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 
 class UserProfile(models.Model):
@@ -413,25 +413,78 @@ class LogNormalisationEmecef(models.Model):
 
 # --- SIGNALS POUR L'AUTOMATISATION DU STOCK (REQUIS PAR LE MÉMOIRE) ---
 
+@receiver(pre_save, sender=LignePiece)
+def memorize_stock_state(sender, instance, **kwargs):
+    """Mémorise l'ancienne quantité et l'ancien article avant la sauvegarde."""
+    if instance.pk:
+        try:
+            old_instance = LignePiece.objects.get(pk=instance.pk)
+            instance._old_quantite = old_instance.quantite
+            instance._old_article_stock = old_instance.article_stock
+        except LignePiece.DoesNotExist:
+            pass
+
 @receiver(post_save, sender=LignePiece)
-def update_stock_on_piece_added(sender, instance, created, **kwargs):
-    """Décrémente automatiquement le stock physique lorsqu'une pièce est ajoutée à une réparation."""
-    if created and instance.article_stock:
-        article = instance.article_stock
-        if article.quantite >= instance.quantite:
+def update_stock_on_piece_added_or_updated(sender, instance, created, **kwargs):
+    """Gère le décompte ou le rajout au stock physique lors d'un ajout ou d'une modification de pièce."""
+    if created:
+        if instance.article_stock:
+            article = instance.article_stock
             article.quantite -= instance.quantite
             article.save()
-            # Enregistrement du mouvement de stock pour la traçabilité
             MouvementStock.objects.create(
                 article=article,
                 type_mouvement='SORTIE',
                 quantite=instance.quantite,
                 description=f"Sortie auto : Réparation {instance.reparation.numero_or or f'OR-{instance.reparation.id}'}"
             )
+    else:
+        old_article = getattr(instance, '_old_article_stock', None)
+        old_quantite = getattr(instance, '_old_quantite', 0)
+        
+        # Cas 1 : L'article a changé
+        if old_article != instance.article_stock:
+            # Réincrémenter l'ancien
+            if old_article:
+                old_article.quantite += old_quantite
+                old_article.save()
+                MouvementStock.objects.create(
+                    article=old_article, type_mouvement='ENTREE', quantite=old_quantite,
+                    description=f"Retour auto (changement article) : Réparation {instance.reparation.numero_or or f'OR-{instance.reparation.id}'}"
+                )
+            # Décrémenter le nouveau
+            if instance.article_stock:
+                article = instance.article_stock
+                article.quantite -= instance.quantite
+                article.save()
+                MouvementStock.objects.create(
+                    article=article, type_mouvement='SORTIE', quantite=instance.quantite,
+                    description=f"Sortie auto (changement article) : Réparation {instance.reparation.numero_or or f'OR-{instance.reparation.id}'}"
+                )
+        
+        # Cas 2 : L'article est le même, mais la quantité a changé
+        elif instance.article_stock and old_quantite != instance.quantite:
+            diff = instance.quantite - old_quantite
+            article = instance.article_stock
+            
+            if diff > 0:
+                article.quantite -= diff
+                article.save()
+                MouvementStock.objects.create(
+                    article=article, type_mouvement='SORTIE', quantite=diff,
+                    description=f"Sortie auto (ajustement +) : Réparation {instance.reparation.numero_or or f'OR-{instance.reparation.id}'}"
+                )
+            elif diff < 0:
+                article.quantite += abs(diff)
+                article.save()
+                MouvementStock.objects.create(
+                    article=article, type_mouvement='ENTREE', quantite=abs(diff),
+                    description=f"Retour auto (ajustement -) : Réparation {instance.reparation.numero_or or f'OR-{instance.reparation.id}'}"
+                )
 
 @receiver(post_delete, sender=LignePiece)
 def update_stock_on_piece_deleted(sender, instance, **kwargs):
-    """Réincrémente le stock si une pièce est retirée de l'ordre de réparation avant facturation."""
+    """Réincrémente le stock si une pièce est retirée de l'ordre de réparation."""
     if instance.article_stock:
         article = instance.article_stock
         article.quantite += instance.quantite

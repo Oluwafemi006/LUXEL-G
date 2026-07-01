@@ -18,9 +18,7 @@ import {
   Car,
   Users,
   Trash2,
-  Sparkles,
-  XCircle,
-  Info
+
 } from 'lucide-react';
 import api, { fetchAllPages } from '../services/api';
 import StockSearchInput from '../components/StockSearchInput';
@@ -101,9 +99,7 @@ const Invoices: React.FC = () => {
   const [numeroCheque, setNumeroCheque] = useState('');
   const [demandeNormalisation, setDemandeNormalisation] = useState(false);
   const [isNormalizing, setIsNormalizing] = useState(false);
-  const [aiPartLoading, setAiPartLoading] = useState<string | number | null>(null);
-  const [isAISuggestionModalOpen, setIsAISuggestionModalOpen] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
+
 
   // États de saisie
   const [isDefinitive, setIsDefinitive] = useState(false);
@@ -112,17 +108,6 @@ const Invoices: React.FC = () => {
   const [partLines, setPartLines] = useState<PartLine[]>([]);
   // AI part suggestion feature removed
 
-  const selectAISuggestion = (_suggestion: any) => {
-    setAiSuggestions([]);
-    setIsAISuggestionModalOpen(false);
-  };
-
-  const handleAISuggestPart = async (lineId: string | number) => {
-    setAiPartLoading(lineId);
-    setTimeout(() => {
-      setAiPartLoading(null);
-    }, 0);
-  };
 
   const openPaymentModal = (invoice: Invoice) => {
     // Par défaut, proposer la totalité s'il reste peu, ou 75% si c'est le début
@@ -373,6 +358,12 @@ const handleDownloadPDF = async () => {
       if (!window.confirm('Voulez-vous vraiment supprimer cette ligne de travaux ?')) return;
       try {
         await api.delete(`travaux/${id}/`);
+        if (currentInvoiceId) {
+          const newLabors = laborLines.filter(l => l.id !== id);
+          const newTotalLabor = newLabors.reduce((sum, line) => sum + Number(line.montant), 0);
+          const newGrandTotal = newTotalLabor + totalParts;
+          await api.patch(`factures/${currentInvoiceId}/`, { total_ht: newGrandTotal, total_ttc: newGrandTotal });
+        }
       } catch (error) {
         console.error('Erreur suppression ligne travaux:', error);
         return;
@@ -386,6 +377,12 @@ const handleDownloadPDF = async () => {
       if (!window.confirm('Voulez-vous vraiment supprimer cette pièce ?')) return;
       try {
         await api.delete(`pieces-reparation/${id}/`);
+        if (currentInvoiceId) {
+          const newParts = partLines.filter(p => p.id !== id);
+          const newTotalParts = newParts.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0);
+          const newGrandTotal = totalLabor + newTotalParts;
+          await api.patch(`factures/${currentInvoiceId}/`, { total_ht: newGrandTotal, total_ttc: newGrandTotal });
+        }
       } catch (error) {
         console.error('Erreur suppression ligne pièce:', error);
         return;
@@ -455,7 +452,7 @@ const handleDownloadPDF = async () => {
       const updatedPartLines = [];
       for (const line of partLines) {
         if (line.description && line.prix_unitaire > 0) {
-          const pData = { reference: line.reference, description: line.description, quantite: line.quantite, prix_unitaire: line.prix_unitaire, reparation: selectedRepair.id, article_stock: line.article_stock };
+          const pData = { reference: line.reference, description: line.description, quantite: line.quantite, prix_unitaire: line.prix_unitaire, reparation: selectedRepair.id, article_stock: line.article_stock || null };
           if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
             const res = await api.post('pieces-reparation/', pData);
             updatedPartLines.push(res.data);
@@ -764,16 +761,7 @@ const handleDownloadPDF = async () => {
                                <div className="flex flex-col gap-2">
                                 <div className="flex items-center gap-2">
                                     <input disabled={(currentInvoice?.montant_paye ?? 0) > 0} value={line.description} onChange={(e) => updatePart(line.id, 'description', e.target.value)} className="w-full bg-transparent outline-none font-black text-sm text-slate-900 uppercase disabled:opacity-60" placeholder="Nom de la pièce..."/>
-                                    {!(currentInvoice?.montant_paye && currentInvoice.montant_paye > 0) && (
-                                        <button 
-                                            onClick={() => handleAISuggestPart(line.id)}
-                                            disabled={aiPartLoading === line.id}
-                                            className={`p-2 rounded-xl transition-all duration-500 ${aiPartLoading === line.id ? 'bg-emerald-50 text-emerald-600 animate-pulse' : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
-                                            title="Assistant IA (Nomenclature)"
-                                        >
-                                            <Sparkles className={`w-3.5 h-3.5 ${aiPartLoading === line.id ? 'animate-spin' : ''}`} />
-                                        </button>
-                                    )}
+
                                 </div>
                                 {!(currentInvoice?.montant_paye && currentInvoice.montant_paye > 0) && (
                                   <StockSearchInput 
@@ -998,78 +986,7 @@ const handleDownloadPDF = async () => {
         </div>
       )}
 
-      {/* Modal Suggestions IA Luxury */}
-      {isAISuggestionModalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4 animate-in fade-in duration-700">
-          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl border border-emerald-100/50 animate-in zoom-in-95 duration-700 overflow-hidden">
-            <div className="p-8 sm:p-10 space-y-8">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-inner">
-                    <Sparkles className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-black text-slate-900 italic tracking-tighter uppercase leading-none">Assistant Pièces IA</h2>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Suggestions basées sur le stock et l'expertise mécanique</p>
-                  </div>
-                </div>
-                <button onClick={() => setIsAISuggestionModalOpen(false)} className="p-2 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all">
-                  <XCircle className="w-6 h-6 text-slate-300" />
-                </button>
-              </div>
 
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                {aiSuggestions.map((s, idx) => (
-                  <div 
-                    key={idx} 
-                    onClick={() => selectAISuggestion(s)}
-                    className="p-6 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-white hover:border-emerald-500 hover:shadow-xl hover:shadow-emerald-900/5 transition-all duration-500 cursor-pointer group relative overflow-hidden"
-                  >
-                    <div className="flex justify-between items-start relative z-10">
-                      <div className="space-y-2 flex-1">
-                        <div className="flex items-center gap-3">
-                           <h3 className="text-lg font-black text-slate-900 uppercase group-hover:text-emerald-600 transition-colors">{s.nom}</h3>
-                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${s.source === 'STOCK_LOCAL' ? 'bg-emerald-600 text-white' : 'bg-blue-100 text-blue-600'}`}>
-                             {s.source === 'STOCK_LOCAL' ? 'En Stock' : 'Suggestion IA'}
-                           </span>
-                        </div>
-                        <p className="text-xs text-slate-500 font-medium leading-relaxed italic">"{s.role}"</p>
-                        <div className="flex gap-4">
-                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                              <Info className="w-3 h-3" /> {s.categorie}
-                           </span>
-                           {s.reference_standard && (
-                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 font-mono">
-                                REF: {s.reference_standard}
-                            </span>
-                           )}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-black text-slate-900 italic tracking-tighter">{Number(s.prix_indicatif).toLocaleString()} F</p>
-                        <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Prix Indicatif</p>
-                      </div>
-                    </div>
-                    <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-emerald-500/5 rounded-full blur-xl group-hover:scale-150 transition-transform duration-1000"></div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-slate-900 p-6 rounded-2xl flex items-center gap-6 group overflow-hidden relative">
-                 <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center relative z-10">
-                    <Wrench className="w-6 h-6 text-emerald-400" />
-                 </div>
-                 <div className="relative z-10">
-                   <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-1">Note Technique</p>
-                   <p className="text-xs text-slate-400 font-medium leading-tight">
-                     Les prix suggérés sont des moyennes du marché à Parakou. Ajustez-les selon votre fournisseur réel.
-                   </p>
-                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -74,6 +74,16 @@
     background-color: #a7f3d0;
     color: #065f46;
   }
+
+  /* Masquer les flèches des inputs number (prix, quantités) */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
 }
 
 /* ────────────────────────────────────────────────

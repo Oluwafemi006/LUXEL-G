@@ -24,6 +24,20 @@ class LignePieceSerializer(serializers.ModelSerializer):
         model = LignePiece
         fields = '__all__'
 
+    def validate(self, data):
+        article = data.get('article_stock')
+        # Si on ne met pas à jour la quantité, on prend celle de l'instance
+        quantite = data.get('quantite', self.instance.quantite if self.instance else 1)
+        
+        if article:
+            diff = quantite
+            if self.instance and self.instance.article_stock == article:
+                diff = quantite - self.instance.quantite
+                
+            if diff > 0 and article.quantite < diff:
+                raise serializers.ValidationError({"quantite": f"Stock insuffisant. Il ne reste que {article.quantite} unité(s)."})
+        return data
+
 class FactureSerializer(serializers.ModelSerializer):
     client_name = serializers.ReadOnlyField(source='reparation.vehicule.client.nom')
     vehicule_plate = serializers.ReadOnlyField(source='reparation.vehicule.immatriculation')

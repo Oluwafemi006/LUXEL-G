@@ -13,7 +13,6 @@ import {
   Edit,
   CheckCircle2,
   Clock,
-  Sparkles,
   ArrowLeft
 } from 'lucide-react';
 import Modal from '../components/Modal';
@@ -51,15 +50,6 @@ const Vehicles: React.FC = () => {
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [vehicleHistory, setVehicleHistory] = useState<Repair[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const handleGenerateAISummary = async () => {
-    if (aiLoading) return;
-    setAiLoading(true);
-    setAiSummary(null);
-    setAiLoading(false);
-  };
-  // AI summary removed: endpoint unavailable
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +90,6 @@ const Vehicles: React.FC = () => {
 
   useEffect(() => {
     if (selectedVehicle) {
-      setAiSummary(null);
       const fetchHistory = async () => {
         try {
           setHistoryLoading(true);
@@ -287,34 +276,11 @@ const Vehicles: React.FC = () => {
                       Interventions
                     </h3>
                     <div className="flex flex-wrap gap-3 w-full sm:w-auto">
-                        <button 
-                            onClick={handleGenerateAISummary}
-                            disabled={aiLoading || vehicleHistory.length === 0}
-                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${aiLoading ? 'bg-slate-100 text-slate-400 animate-pulse' : 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 disabled:opacity-50'}`}
-                        >
-                            <Sparkles className={`w-3 h-3 ${aiLoading ? 'animate-spin' : ''}`} />
-                            {aiLoading ? 'Analyse...' : 'Résumé IA'}
-                        </button>
                         <div className="flex items-center gap-2 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
                           <span className="text-[9px] sm:text-[10px] font-black text-emerald-700 uppercase tracking-widest">{vehicleHistory.length} Dossiers</span>
                         </div>
                     </div>
                   </div>
-
-                  {aiSummary && (
-                    <div className="p-6 sm:p-8 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white rounded-3xl shadow-2xl relative overflow-hidden group">
-                        <div className="relative z-10 space-y-4">
-                            <div className="flex items-center gap-3">
-                                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-300" />
-                                <h4 className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.3em] text-emerald-200">Résumé Intelligent</h4>
-                            </div>
-                            <p className="text-base sm:text-lg font-medium leading-relaxed italic">
-                                "{aiSummary}"
-                            </p>
-                        </div>
-                        <Sparkles className="absolute -right-10 -bottom-10 w-32 h-32 sm:w-40 sm:h-40 text-white/5 rotate-12 group-hover:rotate-45 transition-transform duration-1000" />
-                    </div>
-                  )}
 
                   {historyLoading ? (
                     <div className="py-20 sm:py-40 text-center flex flex-col items-center gap-4">

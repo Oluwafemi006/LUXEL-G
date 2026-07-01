@@ -227,7 +227,7 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
         if not doc_number:
             doc_number = f"ESTIM-OR-{obj.reparation.id}"
 
-    doc_title = f"{display_type} N° {doc_number or 'BROUILLON'}"
+    doc_title = f"{display_type} N° {doc_number or f'OR-{obj.reparation.id:04d}'}"
     elements.append(Paragraph(doc_title, styles['Heading2']))
     elements.append(Paragraph(f"Date: {obj.date_creation.strftime('%d/%m/%Y')}", styles['Normal']))
     elements.append(Spacer(1, 1*cm))

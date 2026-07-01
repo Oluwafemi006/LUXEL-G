@@ -278,7 +278,7 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             return Response({'error': 'Devis non trouvé'}, status=status.HTTP_404_NOT_FOUND)
         pdf = generate_document_pdf(devis, doc_type="DEVIS")
         response = HttpResponse(pdf, content_type='application/pdf')
-        filename = f"Devis_{devis.numero_devis or 'Brouillon'}.pdf"
+        filename = f"Devis_{devis.numero_devis or f'OR-{devis.reparation.id:04d}'}.pdf"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 

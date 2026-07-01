@@ -293,7 +293,7 @@ class DevisViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Lien invalide ou expiré'}, status=status.HTTP_403_FORBIDDEN)
         pdf = generate_document_pdf(devis, doc_type="DEVIS")
         response = HttpResponse(pdf, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Devis_{devis.numero_devis or "Brouillon"}.pdf"'
+        response['Content-Disposition'] = f'attachment; filename="Devis_{devis.numero_devis or f"OR-{devis.reparation.id:04d}"}.pdf"'
         return response
 
     @action(detail=True, methods=['post'])
@@ -304,16 +304,16 @@ class DevisViewSet(viewsets.ModelViewSet):
             return Response({'error': "Le client n'a pas d'adresse email."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             pdf = generate_document_pdf(devis, doc_type="DEVIS")
-            subject = f"Devis Luxury Elegance Garage - {devis.numero_devis or 'Brouillon'}"
+            subject = f"Devis Luxury Elegance Garage - {devis.numero_devis or f'OR-{devis.reparation.id:04d}'}"
             body = (f"Bonjour {devis.reparation.vehicule.client.nom},\n\n"
                     f"Veuillez trouver ci-joint le devis pour le véhicule {devis.reparation.vehicule.immatriculation}.\n"
                     f"Total Estimé : {devis.total_ttc} FCFA.\n\nCordialement,\nL'équipe Luxury Elegance Garage")
             email = EmailMessage(subject, body, to=[client.email])
-            email.attach(f"Devis_{devis.numero_devis or 'Brouillon'}.pdf", pdf, 'application/pdf')
+            email.attach(f"Devis_{devis.numero_devis or f'OR-{devis.reparation.id:04d}'}.pdf", pdf, 'application/pdf')
             email.send()
             NotificationClient.objects.create(
                 client=client, type='DEVIS_ENVOYE',
-                message=f"Le devis {devis.numero_devis or 'Brouillon'} vous a été envoyé par email."
+                message=f"Le devis {devis.numero_devis or f'OR-{devis.reparation.id:04d}'} vous a été envoyé par email."
             )
             return Response({'message': 'Email envoyé avec succès !'})
         except Exception as e:

@@ -17,10 +17,9 @@ import {
   Wrench,
   Car,
   Users,
-  Info,
   Trash2,
   ArrowLeft,
-  Sparkles,
+  Info,
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import api, { fetchAllPages } from '../services/api';
@@ -99,20 +98,7 @@ const Quotes: React.FC = () => {
   const [laborLines, setLaborLines] = useState<LaborLine[]>([]);
   const [partLines, setPartLines] = useState<PartLine[]>([]);
   const [notes, setNotes] = useState('');
-  const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
-  const [isAISuggestionModalOpen, setIsAISuggestionModalOpen] = useState(false);
-  const [activePartLineId, setActivePartLineId] = useState<string | number | null>(null);
 
-  const selectAISuggestion = (suggestion: any) => {
-    if (activePartLineId) {
-        updatePart(activePartLineId, 'description', suggestion.nom);
-        if (suggestion.reference_standard) updatePart(activePartLineId, 'reference', suggestion.reference_standard);
-        if (suggestion.prix_indicatif) updatePart(activePartLineId, 'prix_unitaire', suggestion.prix_indicatif);
-    }
-    setIsAISuggestionModalOpen(false);
-    setAiSuggestions([]);
-    setActivePartLineId(null);
-  };
 
   const fetchRepairs = async () => {
     try {
@@ -270,6 +256,12 @@ const Quotes: React.FC = () => {
       if (!window.confirm('Voulez-vous vraiment supprimer cette ligne ?')) return;
       try {
         await api.delete(`travaux/${id}/`);
+        if (currentQuoteId) {
+          const newLabors = laborLines.filter(l => l.id !== id);
+          const newTotalLabor = newLabors.reduce((sum, line) => sum + Number(line.montant), 0);
+          const newGrandTotal = newTotalLabor + totalParts;
+          await api.patch(`devis/${currentQuoteId}/`, { total_ht: newGrandTotal, total_ttc: newGrandTotal });
+        }
       } catch (error) {
         console.error('Erreur suppression ligne:', error);
         return;
@@ -283,6 +275,12 @@ const Quotes: React.FC = () => {
       if (!window.confirm('Voulez-vous vraiment supprimer cette pièce ?')) return;
       try {
         await api.delete(`pieces-reparation/${id}/`);
+        if (currentQuoteId) {
+          const newParts = partLines.filter(p => p.id !== id);
+          const newTotalParts = newParts.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0);
+          const newGrandTotal = totalLabor + newTotalParts;
+          await api.patch(`devis/${currentQuoteId}/`, { total_ht: newGrandTotal, total_ttc: newGrandTotal });
+        }
       } catch (error) {
         console.error('Erreur suppression pièce:', error);
         return;
@@ -361,7 +359,7 @@ const Quotes: React.FC = () => {
             quantite: line.quantite, 
             prix_unitaire: line.prix_unitaire, 
             reparation: selectedRepair.id,
-            article_stock: line.article_stock
+            article_stock: line.article_stock || null
           };
           if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
             const res = await api.post('pieces-reparation/', partData);
@@ -730,77 +728,7 @@ const Quotes: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Modal Suggestions IA Luxury */}
-      {isAISuggestionModalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4 animate-in fade-in duration-700">
-          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl border border-emerald-100/50 animate-in zoom-in-95 duration-700 overflow-hidden">
-            <div className="p-8 sm:p-10 space-y-8">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-inner">
-                    <Sparkles className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-black text-slate-900 italic tracking-tighter uppercase leading-none">Assistant Pièces IA</h2>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Stock local et Intelligence Artificielle</p>
-                  </div>
-                </div>
-                <button onClick={() => setIsAISuggestionModalOpen(false)} className="p-2 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all">
-                  <XCircle className="w-6 h-6 text-slate-300" />
-                </button>
-              </div>
 
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                {aiSuggestions.map((s, idx) => (
-                  <div 
-                    key={idx} 
-                    onClick={() => selectAISuggestion(s)}
-                    className="p-6 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-white hover:border-emerald-500 hover:shadow-xl hover:shadow-emerald-900/5 transition-all duration-500 cursor-pointer group relative overflow-hidden"
-                  >
-                    <div className="flex justify-between items-start relative z-10">
-                      <div className="space-y-2 flex-1">
-                        <div className="flex items-center gap-3">
-                           <h3 className="text-lg font-black text-slate-900 uppercase group-hover:text-emerald-600 transition-colors">{s.nom}</h3>
-                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${s.source === 'STOCK_LOCAL' ? 'bg-emerald-600 text-white' : 'bg-blue-100 text-blue-600'}`}>
-                             {s.source === 'STOCK_LOCAL' ? 'En Stock' : 'Suggestion IA'}
-                           </span>
-                        </div>
-                        <p className="text-xs text-slate-500 font-medium leading-relaxed italic">"{s.role}"</p>
-                        <div className="flex gap-4">
-                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                              <Info className="w-3 h-3" /> {s.categorie}
-                           </span>
-                           {s.reference_standard && (
-                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 font-mono">
-                                REF: {s.reference_standard}
-                            </span>
-                           )}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-black text-slate-900 italic tracking-tighter">{Number(s.prix_indicatif).toLocaleString()} F</p>
-                        <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Prix Estimé</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-slate-900 p-6 rounded-2xl flex items-center gap-6">
-                 <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
-                    <Wrench className="w-6 h-6 text-emerald-400" />
-                 </div>
-                 <div className="flex-1">
-                   <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-1">Expertise Garage</p>
-                   <p className="text-xs text-slate-400 font-medium">
-                     L'IA vous aide à ne plus faire d'erreurs sur les noms de pièces. Vérifiez toujours la compatibilité réelle.
-                   </p>
-                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

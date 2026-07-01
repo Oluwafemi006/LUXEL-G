@@ -114,7 +114,7 @@ interface Maintenance {
 const ClientSpace: React.FC = () => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [loginMethod, setLoginMethod] = useState<'PHONE' | 'EMAIL'>('PHONE');
+  const [loginMethod] = useState<'PHONE' | 'EMAIL'>('EMAIL'); // Firebase temporairement désactivé
   const [otp, setOtp] = useState('');
 
   const [otpStep, setOtpStep] = useState<'PHONE' | 'OTP'>('PHONE');
@@ -628,7 +628,9 @@ const ClientSpace: React.FC = () => {
                     </>
                   )}
                 </div>
-                <div className="flex justify-end mt-2">
+                {/* 
+                  Firebase Phone Auth est en attente de carte bancaire
+                  <div className="flex justify-end mt-2">
                   <button 
                     type="button" 
                     onClick={() => setLoginMethod(loginMethod === 'PHONE' ? 'EMAIL' : 'PHONE')}
@@ -638,6 +640,7 @@ const ClientSpace: React.FC = () => {
                     {loginMethod === 'PHONE' ? 'Utiliser mon adresse mail' : 'Utiliser mon téléphone'}
                   </button>
                 </div>
+                */}
               </div>
               {error && error !== "NON_INSCRIT" && (
                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-md flex items-center gap-2">
