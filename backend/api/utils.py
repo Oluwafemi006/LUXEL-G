@@ -280,9 +280,11 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
     elements.append(Spacer(1, 0.5*cm))
 
     # 5. Totals
+    tva_val = getattr(obj, 'tva', 0) or 0
+    tva_pct = "18%" if tva_val > 0 else "0%"
     total_data = [
         ["", "", "TOTAL HT:", f"{obj.total_ht:,.0f}".replace(',', ' ') + " F"],
-        ["", "", "TVA (0%):", "0 F"],
+        ["", "", f"TVA ({tva_pct}):", f"{tva_val:,.0f}".replace(',', ' ') + " F"],
         ["", "", "TOTAL TTC:", f"{obj.total_ttc:,.0f}".replace(',', ' ') + " F"],
     ]
     

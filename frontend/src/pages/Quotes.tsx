@@ -98,6 +98,7 @@ const Quotes: React.FC = () => {
   const [laborLines, setLaborLines] = useState<LaborLine[]>([]);
   const [partLines, setPartLines] = useState<PartLine[]>([]);
   const [notes, setNotes] = useState('');
+  const [applyTva, setApplyTva] = useState(false);
 
 
   const fetchRepairs = async () => {
@@ -221,10 +222,12 @@ const Quotes: React.FC = () => {
       setCurrentQuoteId(existingQuote.id);
       setCurrentQuote(existingQuote);
       setNotes(existingQuote.notes || '');
+      setApplyTva(Number(existingQuote.tva) > 0);
     } else {
       setCurrentQuoteId(null);
       setCurrentQuote(null);
       setNotes('');
+      setApplyTva(false);
     }
     setShowDetailMobile(true);
   };
@@ -246,7 +249,9 @@ const Quotes: React.FC = () => {
 
   const totalLabor = useMemo(() => laborLines.reduce((sum, line) => sum + Number(line.montant), 0), [laborLines]);
   const totalParts = useMemo(() => partLines.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0), [partLines]);
-  const grandTotal = totalLabor + totalParts;
+  const grandTotalHT = totalLabor + totalParts;
+  const tvaAmount = applyTva ? Math.round(grandTotalHT * 0.18) : 0;
+  const grandTotal = grandTotalHT + tvaAmount;
 
   const addLaborLine = () => setLaborLines([...laborLines, { id: `tmp${Date.now()}`, description: '', montant: 0 }]);
   const addPartLine = () => setPartLines([...partLines, { id: `tmp${Date.now()}`, reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
@@ -259,8 +264,9 @@ const Quotes: React.FC = () => {
         if (currentQuoteId) {
           const newLabors = laborLines.filter(l => l.id !== id);
           const newTotalLabor = newLabors.reduce((sum, line) => sum + Number(line.montant), 0);
-          const newGrandTotal = newTotalLabor + totalParts;
-          await api.patch(`devis/${currentQuoteId}/`, { total_ht: newGrandTotal, total_ttc: newGrandTotal });
+          const newHT = newTotalLabor + totalParts;
+          const newTVA = applyTva ? Math.round(newHT * 0.18) : 0;
+          await api.patch(`devis/${currentQuoteId}/`, { total_ht: newHT, tva: newTVA, total_ttc: newHT + newTVA });
         }
       } catch (error) {
         console.error('Erreur suppression ligne:', error);
@@ -278,8 +284,9 @@ const Quotes: React.FC = () => {
         if (currentQuoteId) {
           const newParts = partLines.filter(p => p.id !== id);
           const newTotalParts = newParts.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0);
-          const newGrandTotal = totalLabor + newTotalParts;
-          await api.patch(`devis/${currentQuoteId}/`, { total_ht: newGrandTotal, total_ttc: newGrandTotal });
+          const newHT = totalLabor + newTotalParts;
+          const newTVA = applyTva ? Math.round(newHT * 0.18) : 0;
+          await api.patch(`devis/${currentQuoteId}/`, { total_ht: newHT, tva: newTVA, total_ttc: newHT + newTVA });
         }
       } catch (error) {
         console.error('Erreur suppression pièce:', error);
@@ -318,8 +325,8 @@ const Quotes: React.FC = () => {
       const quoteData = {
         reparation: selectedRepair.id,
         statut: newStatut || (currentQuote?.statut || 'BROUILLON'),
-        total_ht: grandTotal,
-        tva: 0,
+        total_ht: grandTotalHT,
+        tva: tvaAmount,
         total_ttc: grandTotal,
         notes: notes
       };
@@ -696,10 +703,20 @@ const Quotes: React.FC = () => {
 
                   <div className="w-full xl:w-80 bg-slate-900 text-white p-6 sm:p-8 rounded-xl shadow-2xl relative overflow-hidden group">
                     <div className="relative z-10">
+                      <div className="flex items-center gap-2 mb-4">
+                        <input type="checkbox" id="tva-quote" checked={applyTva} onChange={(e) => setApplyTva(e.target.checked)} className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 border-slate-700 bg-slate-800" />
+                        <label htmlFor="tva-quote" className="text-xs font-bold text-slate-300 uppercase tracking-widest cursor-pointer">TVA (18%)</label>
+                      </div>
                       <div className="flex justify-between items-center mb-4">
-                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Montant Global</span>
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Montant Global TTC</span>
                         <p className="text-2xl sm:text-3xl font-black italic tracking-tighter text-white">{(grandTotal).toLocaleString()} F</p>
                       </div>
+                      {applyTva && (
+                        <div className="flex justify-between items-center text-slate-400 mt-2 border-t border-slate-700 pt-2">
+                           <span className="text-[9px] font-bold uppercase tracking-[0.1em]">Total HT</span>
+                           <span className="text-sm font-bold">{(grandTotalHT).toLocaleString()} F</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

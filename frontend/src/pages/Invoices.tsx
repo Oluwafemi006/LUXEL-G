@@ -106,6 +106,7 @@ const Invoices: React.FC = () => {
   const [kmsEntree, setKmsEntree] = useState('');
   const [laborLines, setLaborLines] = useState<LaborLine[]>([]);
   const [partLines, setPartLines] = useState<PartLine[]>([]);
+  const [applyTva, setApplyTva] = useState(false);
   // AI part suggestion feature removed
 
 
@@ -183,7 +184,7 @@ const Invoices: React.FC = () => {
       
       setLaborLines(repairData.travaux.length > 0 ? repairData.travaux : [{ id: 'tmp1', description: '', montant: 0 }]);
       setPartLines(repairData.pieces.length > 0 ? repairData.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
-      
+      setApplyTva(Number(invoice.tva) > 0);
       setViewMode('CREATE');
     } catch (error) {
       console.error('Erreur chargement détails facture:', error);
@@ -218,10 +219,12 @@ const Invoices: React.FC = () => {
       setCurrentInvoiceId(existingInvoice.id);
       setCurrentInvoice(existingInvoice);
       setIsDefinitive(existingInvoice.type === 'DEFINITIVE');
+      setApplyTva(Number(existingInvoice.tva) > 0);
     } else {
       setCurrentInvoiceId(null);
       setCurrentInvoice(null);
       setIsDefinitive(false);
+      setApplyTva(false);
     }
   };
 
@@ -348,7 +351,9 @@ const handleDownloadPDF = async () => {
 
   const totalLabor = useMemo(() => laborLines.reduce((sum, line) => sum + Number(line.montant), 0), [laborLines]);
   const totalParts = useMemo(() => partLines.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0), [partLines]);
-  const grandTotal = totalLabor + totalParts;
+  const grandTotalHT = totalLabor + totalParts;
+  const tvaAmount = applyTva ? Math.round(grandTotalHT * 0.18) : 0;
+  const grandTotal = grandTotalHT + tvaAmount;
 
   const addLaborLine = () => setLaborLines([...laborLines, { id: `tmp${Date.now()}`, description: '', montant: 0 }]);
   const addPartLine = () => setPartLines([...partLines, { id: `tmp${Date.now()}`, reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
@@ -361,8 +366,9 @@ const handleDownloadPDF = async () => {
         if (currentInvoiceId) {
           const newLabors = laborLines.filter(l => l.id !== id);
           const newTotalLabor = newLabors.reduce((sum, line) => sum + Number(line.montant), 0);
-          const newGrandTotal = newTotalLabor + totalParts;
-          await api.patch(`factures/${currentInvoiceId}/`, { total_ht: newGrandTotal, total_ttc: newGrandTotal });
+          const newHT = newTotalLabor + totalParts;
+          const newTVA = applyTva ? Math.round(newHT * 0.18) : 0;
+          await api.patch(`factures/${currentInvoiceId}/`, { total_ht: newHT, tva: newTVA, total_ttc: newHT + newTVA });
         }
       } catch (error) {
         console.error('Erreur suppression ligne travaux:', error);
@@ -380,8 +386,9 @@ const handleDownloadPDF = async () => {
         if (currentInvoiceId) {
           const newParts = partLines.filter(p => p.id !== id);
           const newTotalParts = newParts.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0);
-          const newGrandTotal = totalLabor + newTotalParts;
-          await api.patch(`factures/${currentInvoiceId}/`, { total_ht: newGrandTotal, total_ttc: newGrandTotal });
+          const newHT = totalLabor + newTotalParts;
+          const newTVA = applyTva ? Math.round(newHT * 0.18) : 0;
+          await api.patch(`factures/${currentInvoiceId}/`, { total_ht: newHT, tva: newTVA, total_ttc: newHT + newTVA });
         }
       } catch (error) {
         console.error('Erreur suppression ligne pièce:', error);
@@ -419,8 +426,8 @@ const handleDownloadPDF = async () => {
       const invoiceData = {
         reparation: selectedRepair.id,
         type: isDefinitive ? 'DEFINITIVE' : 'PROFORMA',
-        total_ht: grandTotal,
-        tva: 0,
+        total_ht: grandTotalHT,
+        tva: tvaAmount,
         total_ttc: grandTotal
       };
       
@@ -850,13 +857,17 @@ const handleDownloadPDF = async () => {
                           <p className="text-[10px] font-bold text-slate-300">Compteurs: {currentInvoice.emecef_counters}</p>
                         </div>
                       )}
+                      <div className="flex items-center gap-2 mb-4">
+                        <input type="checkbox" id="tva-invoice" checked={applyTva} onChange={(e) => setApplyTva(e.target.checked)} className="w-4 h-4 rounded text-emerald-500 border-slate-700 bg-slate-800" />
+                        <label htmlFor="tva-invoice" className="text-xs font-bold text-slate-300 uppercase tracking-widest cursor-pointer">Appliquer TVA (18%)</label>
+                      </div>
                       <div className="flex justify-between items-center mb-6">
                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Total Hors Taxes</span>
-                        <span className="text-lg font-bold">{(grandTotal).toLocaleString()} F</span>
+                        <span className="text-lg font-bold">{(grandTotalHT).toLocaleString()} F</span>
                       </div>
-                      <div className="flex justify-between items-center mb-6 opacity-40">
-                        <span className="text-[10px] font-black uppercase tracking-[0.3em]">TVA (0%)</span>
-                        <span className="text-lg font-bold">0 F</span>
+                      <div className="flex justify-between items-center mb-6" style={{ opacity: applyTva ? 1 : 0.3 }}>
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em]">TVA (18%)</span>
+                        <span className="text-lg font-bold">{tvaAmount.toLocaleString()} F</span>
                       </div>
                       <div className="pt-6 border-t border-slate-800">
                         <div className="flex justify-between items-end">
