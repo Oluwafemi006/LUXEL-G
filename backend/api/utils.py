@@ -256,12 +256,12 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
     
     # Labor - Filtrage des lignes vides
     for t in obj.reparation.travaux.all():
-        if t.description.strip() and t.montant > 0:
+        if t.description.strip() and t.montant >= 0:
             items_data.append([t.description, "1", f"{t.montant:,.0f}".replace(',', ' '), f"{t.montant:,.0f}".replace(',', ' ')])
     
     # Parts - Filtrage des lignes vides
     for p in obj.reparation.pieces.all():
-        if p.description.strip() and p.prix_unitaire > 0:
+        if p.description.strip() and p.prix_unitaire >= 0:
             total_p = p.quantite * p.prix_unitaire
             items_data.append([p.description, str(p.quantite), f"{p.prix_unitaire:,.0f}".replace(',', ' '), f"{total_p:,.0f}".replace(',', ' ')])
 

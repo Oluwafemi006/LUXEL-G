@@ -352,7 +352,7 @@ const Quotes: React.FC = () => {
 
       const updatedPartLines = [];
       for (const line of partLines) {
-        if (line.description.trim() && line.prix_unitaire > 0) {
+        if (line.description.trim() && line.prix_unitaire >= 0) {
           const partData = { 
             reference: line.reference, 
             description: line.description, 
@@ -374,9 +374,10 @@ const Quotes: React.FC = () => {
 
       alert('Enregistrement réussi !');
       fetchQuotes(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur sauvegarde:', error);
-      alert('Erreur lors de la sauvegarde.');
+      const msg = error.response?.data?.quantite?.[0] || error.response?.data?.error || 'Erreur lors de la sauvegarde (Vérifiez le stock).';
+      alert(msg);
     }
   };
 

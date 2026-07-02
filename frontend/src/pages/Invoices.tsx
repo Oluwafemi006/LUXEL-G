@@ -451,7 +451,7 @@ const handleDownloadPDF = async () => {
 
       const updatedPartLines = [];
       for (const line of partLines) {
-        if (line.description && line.prix_unitaire > 0) {
+        if (line.description && line.prix_unitaire >= 0) {
           const pData = { reference: line.reference, description: line.description, quantite: line.quantite, prix_unitaire: line.prix_unitaire, reparation: selectedRepair.id, article_stock: line.article_stock || null };
           if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
             const res = await api.post('pieces-reparation/', pData);
@@ -465,9 +465,10 @@ const handleDownloadPDF = async () => {
       setPartLines(updatedPartLines.length > 0 ? updatedPartLines : [{ id: 'tmp2', reference: '', description: '', quantite: 1, prix_unitaire: 0 }]);
       alert('Sauvegarde réussie !');
       fetchInvoices(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur sauvegarde:', error);
-      alert('Erreur sauvegarde.');
+      const msg = error.response?.data?.quantite?.[0] || error.response?.data?.error || 'Erreur lors de la sauvegarde (Vérifiez le stock).';
+      alert(msg);
     }
   };
 
