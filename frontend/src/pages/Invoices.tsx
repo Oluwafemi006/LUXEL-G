@@ -457,24 +457,39 @@ const handleDownloadPDF = async () => {
       setLaborLines(updatedLaborLines.length > 0 ? updatedLaborLines : [{ id: 'tmp1', description: '', montant: 0 }]);
 
       const updatedPartLines = [];
+      const partErrors: string[] = [];
       for (const line of partLines) {
         if (line.description && line.prix_unitaire >= 0) {
           const pData = { reference: line.reference, description: line.description, quantite: line.quantite, prix_unitaire: line.prix_unitaire, reparation: selectedRepair.id, article_stock: line.article_stock || null };
-          if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
-            const res = await api.post('pieces-reparation/', pData);
-            updatedPartLines.push(res.data);
-          } else {
-            const res = await api.patch(`pieces-reparation/${line.id}/`, pData);
-            updatedPartLines.push(res.data);
+          try {
+            if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
+              const res = await api.post('pieces-reparation/', pData);
+              updatedPartLines.push(res.data);
+            } else {
+              const res = await api.patch(`pieces-reparation/${line.id}/`, pData);
+              updatedPartLines.push(res.data);
+            }
+          } catch (partError: any) {
+            const errMsg = partError.response?.data?.quantite?.[0]
+              || partError.response?.data?.non_field_errors?.[0]
+              || partError.response?.data?.error
+              || `Erreur sur la pièce "${line.description}"`;
+            partErrors.push(errMsg);
+            updatedPartLines.push(line); // garder en local pour correction
           }
         }
       }
       setPartLines(updatedPartLines.length > 0 ? updatedPartLines : [{ id: 'tmp2', reference: '', description: '', quantite: 1, prix_unitaire: 0 }]);
-      alert('Sauvegarde réussie !');
+
+      if (partErrors.length > 0) {
+        alert(`Sauvegarde partielle !\n\nLes pièces suivantes n'ont pas été enregistrées :\n• ${partErrors.join('\n• ')}\n\nVérifiez le stock ou les données saisies.`);
+      } else {
+        alert('Sauvegarde réussie !');
+      }
       fetchInvoices(true);
     } catch (error: any) {
       console.error('Erreur sauvegarde:', error);
-      const msg = error.response?.data?.quantite?.[0] || error.response?.data?.error || 'Erreur lors de la sauvegarde (Vérifiez le stock).';
+      const msg = error.response?.data?.error || 'Erreur lors de la sauvegarde.';
       alert(msg);
     }
   };
