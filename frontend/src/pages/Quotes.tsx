@@ -120,6 +120,22 @@ const Quotes: React.FC = () => {
     }
   };
 
+  // Recharge une réparation depuis le serveur et met à jour l'affichage
+  const refreshCurrentRepair = async (repairId: number) => {
+    try {
+      const res = await api.get(`reparations/${repairId}/`);
+      const freshRepair = res.data;
+      // Mettre à jour la liste des réparations
+      setRepairs(prev => prev.map(r => r.id === freshRepair.id ? freshRepair : r));
+      // Mettre à jour les lignes affichées avec les données fraîches
+      setSelectedRepair(freshRepair);
+      if (freshRepair.pieces.length > 0) setPartLines(freshRepair.pieces);
+      if (freshRepair.travaux.length > 0) setLaborLines(freshRepair.travaux);
+    } catch (e) {
+      console.error('Erreur refresh réparation:', e);
+    }
+  };
+
   const fetchStock = async () => {
     try {
       setStock(await fetchAllPages<StockItem>('stock/'));
@@ -395,7 +411,9 @@ const Quotes: React.FC = () => {
       } else {
         alert('Enregistrement réussi !');
       }
-      fetchQuotes(true);
+      // Recharger les données fraîches depuis le serveur (pièces + travaux)
+      await fetchQuotes(true);
+      await refreshCurrentRepair(selectedRepair.id);
     } catch (error: any) {
       console.error('Erreur sauvegarde:', error);
       const msg = error.response?.data?.error || 'Erreur lors de la sauvegarde.';

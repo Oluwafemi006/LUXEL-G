@@ -254,14 +254,14 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
     # 4. Items Table (Parts & Labor)
     items_data = [["DESCRIPTION", "QTÉ", "P.U (FCFA)", "TOTAL (FCFA)"]]
     
-    # Labor - Filtrage des lignes vides
+    # Labor - Filtrage des lignes vides (montant >= 0 pour les travaux offerts)
     for t in obj.reparation.travaux.all():
-        if t.description.strip() and t.montant > 0:
+        if t.description.strip() and t.montant >= 0:
             items_data.append([t.description, "1", f"{t.montant:,.0f}".replace(',', ' '), f"{t.montant:,.0f}".replace(',', ' ')])
     
-    # Parts - Filtrage des lignes vides
+    # Parts - Filtrage des lignes vides (prix_unitaire >= 0 pour les pièces offertes)
     for p in obj.reparation.pieces.all():
-        if p.description.strip() and p.prix_unitaire > 0:
+        if p.description.strip() and p.prix_unitaire >= 0:
             total_p = p.quantite * p.prix_unitaire
             items_data.append([p.description, str(p.quantite), f"{p.prix_unitaire:,.0f}".replace(',', ' '), f"{total_p:,.0f}".replace(',', ' ')])
 
@@ -279,11 +279,13 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
     elements.append(items_table)
     elements.append(Spacer(1, 0.5*cm))
 
-    # 5. Totals
+    # 5. Totals — TVA dynamique basée sur les données réelles de l'objet
+    tva_val = float(getattr(obj, 'tva', 0) or 0)
+    tva_pct_label = "18%" if tva_val > 0 else "0%"
     total_data = [
-        ["", "", "TOTAL HT:", f"{obj.total_ht:,.0f}".replace(',', ' ') + " F"],
-        ["", "", "TVA (0%):", "0 F"],
-        ["", "", "TOTAL TTC:", f"{obj.total_ttc:,.0f}".replace(',', ' ') + " F"],
+        ["", "", "TOTAL HT:", f"{float(obj.total_ht):,.0f}".replace(',', ' ') + " F"],
+        ["", "", f"TVA ({tva_pct_label}):", f"{tva_val:,.0f}".replace(',', ' ') + " F"],
+        ["", "", "TOTAL TTC:", f"{float(obj.total_ttc):,.0f}".replace(',', ' ') + " F"],
     ]
     
     if doc_type == "FACTURE":

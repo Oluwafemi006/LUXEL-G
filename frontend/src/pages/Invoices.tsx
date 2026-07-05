@@ -144,6 +144,20 @@ const Invoices: React.FC = () => {
     }
   };
 
+  // Recharge une réparation fraîche depuis le serveur après sauvegarde
+  const refreshCurrentRepair = async (repairId: number) => {
+    try {
+      const res = await api.get(`reparations/${repairId}/`);
+      const freshRepair = res.data;
+      setRepairs(prev => prev.map(r => r.id === freshRepair.id ? freshRepair : r));
+      setSelectedRepair(freshRepair);
+      if (freshRepair.pieces.length > 0) setPartLines(freshRepair.pieces);
+      if (freshRepair.travaux.length > 0) setLaborLines(freshRepair.travaux);
+    } catch (e) {
+      console.error('Erreur refresh réparation:', e);
+    }
+  };
+
   const fetchStock = async () => {
     try {
       setStock(await fetchAllPages<StockItem>('stock/'));
@@ -487,6 +501,7 @@ const handleDownloadPDF = async () => {
         alert('Sauvegarde réussie !');
       }
       fetchInvoices(true);
+      if (selectedRepair) await refreshCurrentRepair(selectedRepair.id);
     } catch (error: any) {
       console.error('Erreur sauvegarde:', error);
       const msg = error.response?.data?.error || 'Erreur lors de la sauvegarde.';
