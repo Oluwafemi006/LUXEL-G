@@ -260,10 +260,19 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
             items_data.append([t.description, "1", f"{t.montant:,.0f}".replace(',', ' '), f"{t.montant:,.0f}".replace(',', ' ')])
     
     # Parts - Filtrage des lignes vides (prix_unitaire >= 0 pour les pièces offertes)
+    origine_labels = {
+        'STOCK': 'Stock garage',
+        'COMMANDE_EXTERNE': 'Commande extérieure',
+        'FOURNIE_CLIENT': 'Fournie par le client',
+    }
     for p in obj.reparation.pieces.all():
         if p.description.strip() and p.prix_unitaire >= 0:
             total_p = p.quantite * p.prix_unitaire
-            items_data.append([p.description, str(p.quantite), f"{p.prix_unitaire:,.0f}".replace(',', ' '), f"{total_p:,.0f}".replace(',', ' ')])
+            origine = getattr(p, 'origine_piece', 'STOCK')
+            description = p.description
+            if origine != 'STOCK':
+                description = f"{description} ({origine_labels.get(origine, origine)})"
+            items_data.append([description, str(p.quantite), f"{p.prix_unitaire:,.0f}".replace(',', ' '), f"{total_p:,.0f}".replace(',', ' ')])
 
     items_table = Table(items_data, colWidths=[9*cm, 2*cm, 3*cm, 3*cm])
     items_table.setStyle(TableStyle([

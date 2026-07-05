@@ -104,8 +104,14 @@ class LigneTravail(models.Model):
         return f"{self.description} - {self.montant} FCFA"
 
 class LignePiece(models.Model):
+    ORIGINE_CHOICES = [
+        ('STOCK', 'Stock garage'),
+        ('COMMANDE_EXTERNE', 'Commande extérieure'),
+        ('FOURNIE_CLIENT', 'Fournie par le client'),
+    ]
     reparation = models.ForeignKey(Reparation, on_delete=models.PROTECT, related_name='pieces')
     article_stock = models.ForeignKey('Stock', on_delete=models.SET_NULL, null=True, blank=True)
+    origine_piece = models.CharField(max_length=30, choices=ORIGINE_CHOICES, default='STOCK')
     reference = models.CharField(max_length=100, blank=True, null=True)
     description = models.CharField(max_length=255)
     quantite = models.IntegerField(default=1)

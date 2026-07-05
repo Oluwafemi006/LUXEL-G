@@ -26,6 +26,13 @@ class LignePieceSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         article = data.get('article_stock')
+        origine_piece = data.get(
+            'origine_piece',
+            self.instance.origine_piece if self.instance else 'STOCK'
+        )
+        if origine_piece != 'STOCK':
+            data['article_stock'] = None
+            article = None
         # Si on ne met pas à jour la quantité, on prend celle de l'instance
         quantite = data.get('quantite', self.instance.quantite if self.instance else 1)
         

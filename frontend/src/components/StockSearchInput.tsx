@@ -12,18 +12,21 @@ interface StockItem {
 interface StockSearchInputProps {
   stock: StockItem[];
   onSelect: (item: StockItem) => void;
+  value?: string;
+  onQueryChange?: (value: string) => void;
   placeholder?: string;
   className?: string;
 }
 
-const StockSearchInput: React.FC<StockSearchInputProps> = ({ stock, onSelect, placeholder = "Sélectionner depuis l'inventaire...", className = "" }) => {
+const StockSearchInput: React.FC<StockSearchInputProps> = ({ stock, onSelect, value = '', onQueryChange, placeholder = "Sélectionner depuis l'inventaire...", className = "" }) => {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
+  const displayValue = query || value;
   const filteredStock = stock.filter(item => 
-    item.nom.toLowerCase().includes(query.toLowerCase()) || 
-    item.sku.toLowerCase().includes(query.toLowerCase())
+    item.nom.toLowerCase().includes(displayValue.toLowerCase()) || 
+    item.sku.toLowerCase().includes(displayValue.toLowerCase())
   ).slice(0, 6);
 
   useEffect(() => {
@@ -42,15 +45,20 @@ const StockSearchInput: React.FC<StockSearchInputProps> = ({ stock, onSelect, pl
         <Search className="w-3.5 h-3.5 text-slate-300 group-focus-within:text-emerald-500 transition-colors" />
         <input
           type="text"
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); setIsOpen(true); }}
+          value={displayValue}
+          onChange={(e) => {
+            const nextValue = e.target.value;
+            setQuery(nextValue);
+            onQueryChange?.(nextValue);
+            setIsOpen(true);
+          }}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
           className="w-full bg-transparent border-none outline-none py-2.5 px-3 text-[11px] font-black text-slate-900 placeholder:text-slate-300 uppercase tracking-tighter"
         />
       </div>
 
-      {isOpen && (query.length > 0 || filteredStock.length > 0) && (
+      {isOpen && (displayValue.length > 0 || filteredStock.length > 0) && (
         <div className="absolute z-[60] w-[120%] left-0 mt-2 bg-white border border-emerald-100 shadow-[0_20px_50px_rgba(0,0,0,0.1)] rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="p-2 border-b border-emerald-50 bg-emerald-50/10 flex items-center gap-2">
              <Package className="w-3 h-3 text-emerald-500" />

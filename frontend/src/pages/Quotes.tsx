@@ -34,6 +34,7 @@ interface LaborLine {
 interface PartLine {
   id: string | number;
   article_stock?: number | null;
+  origine_piece?: 'STOCK' | 'COMMANDE_EXTERNE' | 'FOURNIE_CLIENT';
   reference: string;
   description: string;
   quantite: number;
@@ -129,10 +130,12 @@ const Quotes: React.FC = () => {
       setRepairs(prev => prev.map(r => r.id === freshRepair.id ? freshRepair : r));
       // Mettre à jour les lignes affichées avec les données fraîches
       setSelectedRepair(freshRepair);
-      if (freshRepair.pieces.length > 0) setPartLines(freshRepair.pieces);
-      if (freshRepair.travaux.length > 0) setLaborLines(freshRepair.travaux);
+      setPartLines(freshRepair.pieces.length > 0 ? freshRepair.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null, origine_piece: 'STOCK' }]);
+      setLaborLines(freshRepair.travaux.length > 0 ? freshRepair.travaux : [{ id: 'tmp1', description: '', montant: 0 }]);
+      return freshRepair as Repair;
     } catch (e) {
       console.error('Erreur refresh réparation:', e);
+      return null;
     }
   };
 
@@ -175,7 +178,7 @@ const Quotes: React.FC = () => {
       setNotes(quote.notes || '');
       
       setLaborLines(repairData.travaux.length > 0 ? repairData.travaux : [{ id: 'tmp1', description: '', montant: 0 }]);
-      setPartLines(repairData.pieces.length > 0 ? repairData.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
+      setPartLines(repairData.pieces.length > 0 ? repairData.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null, origine_piece: 'STOCK' }]);
       
       setViewMode('CREATE');
       setShowDetailMobile(true);
@@ -231,7 +234,7 @@ const Quotes: React.FC = () => {
     setSelectedRepair(repair);
     setKmsEntree(repair.kilometrage?.toString() || '');
     setLaborLines(repair.travaux.length > 0 ? repair.travaux : [{ id: 'tmp1', description: '', montant: 0 }]);
-    setPartLines(repair.pieces.length > 0 ? repair.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
+    setPartLines(repair.pieces.length > 0 ? repair.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null, origine_piece: 'STOCK' }]);
     
     const existingQuote = quotes.find(q => q.reparation === repair.id);
     if (existingQuote) {
@@ -270,7 +273,7 @@ const Quotes: React.FC = () => {
   const grandTotal = grandTotalHT + tvaAmount;
 
   const addLaborLine = () => setLaborLines([...laborLines, { id: `tmp${Date.now()}`, description: '', montant: 0 }]);
-  const addPartLine = () => setPartLines([...partLines, { id: `tmp${Date.now()}`, reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
+  const addPartLine = () => setPartLines([...partLines, { id: `tmp${Date.now()}`, reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null, origine_piece: 'STOCK' }]);
 
   const removeLaborLine = async (id: string | number) => {
     if (typeof id === 'number') {
@@ -320,6 +323,14 @@ const Quotes: React.FC = () => {
     setPartLines(partLines.map(p => p.id === id ? { ...p, [field]: value } : p));
   };
 
+  const updatePartOrigin = (id: string | number, value: PartLine['origine_piece']) => {
+    setPartLines(partLines.map(p => p.id === id ? {
+      ...p,
+      origine_piece: value,
+      article_stock: value === 'STOCK' ? p.article_stock : null,
+    } : p));
+  };
+
   const handleStockSelect = (id: string | number, stockId: string) => {
     const item = stock.find(s => s.id.toString() === stockId);
     if (item) {
@@ -328,7 +339,8 @@ const Quotes: React.FC = () => {
         article_stock: item.id,
         description: item.nom,
         reference: item.sku,
-        prix_unitaire: item.prix_unitaire
+        prix_unitaire: item.prix_unitaire,
+        origine_piece: 'STOCK'
       } : p));
     }
   };
@@ -359,9 +371,9 @@ const Quotes: React.FC = () => {
       }
 
       // Sauvegarde des lignes (uniquement si remplies)
-      const updatedLaborLines = [];
+      const updatedLaborLines: LaborLine[] = [];
       for (const line of laborLines) {
-        if (line.description.trim() && line.montant > 0) {
+        if (line.description.trim() && line.montant >= 0) {
           if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
             const res = await api.post('travaux/', { description: line.description, montant: line.montant, reparation: selectedRepair.id });
             updatedLaborLines.push(res.data);
@@ -373,7 +385,8 @@ const Quotes: React.FC = () => {
       }
       setLaborLines(updatedLaborLines.length > 0 ? updatedLaborLines : [{ id: 'tmp1', description: '', montant: 0 }]);
 
-      const updatedPartLines = [];
+      const updatedPartLines: PartLine[] = [];
+      const failedPartLines: PartLine[] = [];
       const partErrors: string[] = [];
       for (const line of partLines) {
         if (line.description.trim() && line.prix_unitaire >= 0) {
@@ -383,7 +396,8 @@ const Quotes: React.FC = () => {
             quantite: line.quantite, 
             prix_unitaire: line.prix_unitaire, 
             reparation: selectedRepair.id,
-            article_stock: line.article_stock || null
+            article_stock: line.origine_piece === 'STOCK' ? (line.article_stock || null) : null,
+            origine_piece: line.origine_piece || 'STOCK'
           };
           try {
             if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
@@ -400,20 +414,43 @@ const Quotes: React.FC = () => {
               || `Erreur sur la pièce "${line.description}"`;
             partErrors.push(errMsg);
             // On garde la ligne en état local pour que l'utilisateur puisse corriger
-            updatedPartLines.push(line);
+            failedPartLines.push(line);
           }
         }
       }
-      setPartLines(updatedPartLines.length > 0 ? updatedPartLines : [{ id: 'tmp2', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
+      setPartLines(updatedPartLines.length > 0 ? updatedPartLines : [{ id: 'tmp2', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null, origine_piece: 'STOCK' }]);
+
+      // Recharger les données fraîches, puis aligner les totaux du devis sur les lignes réellement sauvées.
+      const freshRepair = await refreshCurrentRepair(selectedRepair.id);
+      const authoritativeLabor = freshRepair?.travaux ?? updatedLaborLines;
+      const authoritativeParts = freshRepair?.pieces ?? updatedPartLines;
+      const correctedHT =
+        authoritativeLabor.reduce((sum, line) => sum + Number(line.montant), 0) +
+        authoritativeParts.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0);
+      const correctedTVA = applyTva ? Math.round(correctedHT * 0.18) : 0;
+      const correctedQuoteData = {
+        ...quoteData,
+        total_ht: correctedHT,
+        tva: correctedTVA,
+        total_ttc: correctedHT + correctedTVA,
+      };
+      const correctedQuote = await api.patch(`devis/${quoteId}/`, correctedQuoteData);
+      setCurrentQuote(correctedQuote.data);
+
+      if (failedPartLines.length > 0) {
+        const visibleParts = [
+          ...authoritativeParts.filter(saved => !failedPartLines.some(failed => failed.id === saved.id)),
+          ...failedPartLines,
+        ];
+        setPartLines(visibleParts);
+      }
 
       if (partErrors.length > 0) {
         alert(`Enregistrement partiel !\n\nLes lignes suivantes n'ont pas pu être sauvegardées :\n• ${partErrors.join('\n• ')}\n\nVérifiez le stock ou corrigez les données.`);
       } else {
         alert('Enregistrement réussi !');
       }
-      // Recharger les données fraîches depuis le serveur (pièces + travaux)
       await fetchQuotes(true);
-      await refreshCurrentRepair(selectedRepair.id);
     } catch (error: any) {
       console.error('Erreur sauvegarde:', error);
       const msg = error.response?.data?.error || 'Erreur lors de la sauvegarde.';
@@ -666,12 +703,23 @@ const Quotes: React.FC = () => {
                                     <Trash2 className="w-4 h-4" />
                                 </button>
                                 <div className="flex flex-col gap-2">
-                                  <input value={line.description} onChange={(e) => updatePart(line.id, 'description', e.target.value)} className="w-full bg-transparent outline-none font-black text-sm text-slate-900 uppercase" placeholder="Pièce..."/>
                                   <StockSearchInput 
                                     stock={stock} 
                                     onSelect={(item) => handleStockSelect(line.id, item.id.toString())} 
+                                    value={line.description}
+                                    onQueryChange={(value) => updatePart(line.id, 'description', value)}
+                                    placeholder="Pièce..."
                                     className="no-print mt-1"
                                   />
+                                  <select
+                                    value={line.origine_piece || 'STOCK'}
+                                    onChange={(e) => updatePartOrigin(line.id, e.target.value as PartLine['origine_piece'])}
+                                    className="no-print w-full bg-white border border-emerald-100 rounded-xl px-3 py-2 text-[10px] font-black text-slate-600 uppercase outline-none"
+                                  >
+                                    <option value="STOCK">Stock garage</option>
+                                    <option value="COMMANDE_EXTERNE">Commande extérieure</option>
+                                    <option value="FOURNIE_CLIENT">Fournie par le client</option>
+                                  </select>
                                 </div>
                               </td>
                               <td className="py-4">

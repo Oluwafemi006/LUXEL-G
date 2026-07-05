@@ -32,6 +32,7 @@ interface LaborLine {
 interface PartLine {
   id: string | number;
   article_stock?: number | null;
+  origine_piece?: 'STOCK' | 'COMMANDE_EXTERNE' | 'FOURNIE_CLIENT';
   reference: string;
   description: string;
   quantite: number;
@@ -151,10 +152,12 @@ const Invoices: React.FC = () => {
       const freshRepair = res.data;
       setRepairs(prev => prev.map(r => r.id === freshRepair.id ? freshRepair : r));
       setSelectedRepair(freshRepair);
-      if (freshRepair.pieces.length > 0) setPartLines(freshRepair.pieces);
-      if (freshRepair.travaux.length > 0) setLaborLines(freshRepair.travaux);
+      setPartLines(freshRepair.pieces.length > 0 ? freshRepair.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null, origine_piece: 'STOCK' }]);
+      setLaborLines(freshRepair.travaux.length > 0 ? freshRepair.travaux : [{ id: 'tmp1', description: '', montant: 0 }]);
+      return freshRepair as Repair;
     } catch (e) {
       console.error('Erreur refresh réparation:', e);
+      return null;
     }
   };
 
@@ -197,7 +200,7 @@ const Invoices: React.FC = () => {
       setKmsEntree(repairData.kilometrage?.toString() || '');
       
       setLaborLines(repairData.travaux.length > 0 ? repairData.travaux : [{ id: 'tmp1', description: '', montant: 0 }]);
-      setPartLines(repairData.pieces.length > 0 ? repairData.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
+      setPartLines(repairData.pieces.length > 0 ? repairData.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null, origine_piece: 'STOCK' }]);
       setApplyTva(Number(invoice.tva) > 0);
       setViewMode('CREATE');
     } catch (error) {
@@ -226,7 +229,7 @@ const Invoices: React.FC = () => {
     setSelectedRepair(repair);
     setKmsEntree(repair.kilometrage?.toString() || '');
     setLaborLines(repair.travaux.length > 0 ? repair.travaux : [{ id: 'tmp1', description: '', montant: 0 }]);
-    setPartLines(repair.pieces.length > 0 ? repair.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
+    setPartLines(repair.pieces.length > 0 ? repair.pieces : [{ id: 'tmp1', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null, origine_piece: 'STOCK' }]);
     
     const existingInvoice = invoices.find(inv => inv.reparation === repair.id);
     if (existingInvoice) {
@@ -370,7 +373,7 @@ const handleDownloadPDF = async () => {
   const grandTotal = grandTotalHT + tvaAmount;
 
   const addLaborLine = () => setLaborLines([...laborLines, { id: `tmp${Date.now()}`, description: '', montant: 0 }]);
-  const addPartLine = () => setPartLines([...partLines, { id: `tmp${Date.now()}`, reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null }]);
+  const addPartLine = () => setPartLines([...partLines, { id: `tmp${Date.now()}`, reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null, origine_piece: 'STOCK' }]);
 
   const removeLaborLine = async (id: string | number) => {
     if (typeof id === 'number') {
@@ -420,6 +423,14 @@ const handleDownloadPDF = async () => {
     setPartLines(partLines.map(p => p.id === id ? { ...p, [field]: value } : p));
   };
 
+  const updatePartOrigin = (id: string | number, value: PartLine['origine_piece']) => {
+    setPartLines(partLines.map(p => p.id === id ? {
+      ...p,
+      origine_piece: value,
+      article_stock: value === 'STOCK' ? p.article_stock : null,
+    } : p));
+  };
+
   const handleStockSelect = (id: string | number, stockId: string) => {
     const item = stock.find(s => s.id.toString() === stockId);
     if (item) {
@@ -428,7 +439,8 @@ const handleDownloadPDF = async () => {
         article_stock: item.id,
         description: item.nom,
         reference: item.sku,
-        prix_unitaire: item.prix_unitaire
+        prix_unitaire: item.prix_unitaire,
+        origine_piece: 'STOCK'
       } : p));
     }
   };
@@ -456,9 +468,9 @@ const handleDownloadPDF = async () => {
         setCurrentInvoice(resInvoice.data);
       }
 
-      const updatedLaborLines = [];
+      const updatedLaborLines: LaborLine[] = [];
       for (const line of laborLines) {
-        if (line.description && line.montant > 0) {
+        if (line.description.trim() && line.montant >= 0) {
           if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
             const res = await api.post('travaux/', { description: line.description, montant: line.montant, reparation: selectedRepair.id });
             updatedLaborLines.push(res.data);
@@ -470,11 +482,20 @@ const handleDownloadPDF = async () => {
       }
       setLaborLines(updatedLaborLines.length > 0 ? updatedLaborLines : [{ id: 'tmp1', description: '', montant: 0 }]);
 
-      const updatedPartLines = [];
+      const updatedPartLines: PartLine[] = [];
+      const failedPartLines: PartLine[] = [];
       const partErrors: string[] = [];
       for (const line of partLines) {
-        if (line.description && line.prix_unitaire >= 0) {
-          const pData = { reference: line.reference, description: line.description, quantite: line.quantite, prix_unitaire: line.prix_unitaire, reparation: selectedRepair.id, article_stock: line.article_stock || null };
+        if (line.description.trim() && line.prix_unitaire >= 0) {
+          const pData = {
+            reference: line.reference,
+            description: line.description,
+            quantite: line.quantite,
+            prix_unitaire: line.prix_unitaire,
+            reparation: selectedRepair.id,
+            article_stock: line.origine_piece === 'STOCK' ? (line.article_stock || null) : null,
+            origine_piece: line.origine_piece || 'STOCK'
+          };
           try {
             if (typeof line.id === 'string' && line.id.startsWith('tmp')) {
               const res = await api.post('pieces-reparation/', pData);
@@ -489,19 +510,43 @@ const handleDownloadPDF = async () => {
               || partError.response?.data?.error
               || `Erreur sur la pièce "${line.description}"`;
             partErrors.push(errMsg);
-            updatedPartLines.push(line); // garder en local pour correction
+            failedPartLines.push(line); // garder en local pour correction
           }
         }
       }
-      setPartLines(updatedPartLines.length > 0 ? updatedPartLines : [{ id: 'tmp2', reference: '', description: '', quantite: 1, prix_unitaire: 0 }]);
+      setPartLines(updatedPartLines.length > 0 ? updatedPartLines : [{ id: 'tmp2', reference: '', description: '', quantite: 1, prix_unitaire: 0, article_stock: null, origine_piece: 'STOCK' }]);
+
+      // Recharger les données fraîches, puis aligner les totaux de la facture sur les lignes réellement sauvées.
+      const freshRepair = await refreshCurrentRepair(selectedRepair.id);
+      const authoritativeLabor = freshRepair?.travaux ?? updatedLaborLines;
+      const authoritativeParts = freshRepair?.pieces ?? updatedPartLines;
+      const correctedHT =
+        authoritativeLabor.reduce((sum, line) => sum + Number(line.montant), 0) +
+        authoritativeParts.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0);
+      const correctedTVA = applyTva ? Math.round(correctedHT * 0.18) : 0;
+      const correctedInvoiceData = {
+        ...invoiceData,
+        total_ht: correctedHT,
+        tva: correctedTVA,
+        total_ttc: correctedHT + correctedTVA,
+      };
+      const correctedInvoice = await api.patch(`factures/${invoiceId}/`, correctedInvoiceData);
+      setCurrentInvoice(correctedInvoice.data);
+
+      if (failedPartLines.length > 0) {
+        const visibleParts = [
+          ...authoritativeParts.filter(saved => !failedPartLines.some(failed => failed.id === saved.id)),
+          ...failedPartLines,
+        ];
+        setPartLines(visibleParts);
+      }
 
       if (partErrors.length > 0) {
         alert(`Sauvegarde partielle !\n\nLes pièces suivantes n'ont pas été enregistrées :\n• ${partErrors.join('\n• ')}\n\nVérifiez le stock ou les données saisies.`);
       } else {
         alert('Sauvegarde réussie !');
       }
-      fetchInvoices(true);
-      if (selectedRepair) await refreshCurrentRepair(selectedRepair.id);
+      await fetchInvoices(true);
     } catch (error: any) {
       console.error('Erreur sauvegarde:', error);
       const msg = error.response?.data?.error || 'Erreur lors de la sauvegarde.';
@@ -797,16 +842,18 @@ const handleDownloadPDF = async () => {
                                 </button>
                                )}
                                <div className="flex flex-col gap-2">
-                                <div className="flex items-center gap-2">
-                                    <input disabled={(currentInvoice?.montant_paye ?? 0) > 0} value={line.description} onChange={(e) => updatePart(line.id, 'description', e.target.value)} className="w-full bg-transparent outline-none font-black text-sm text-slate-900 uppercase disabled:opacity-60" placeholder="Nom de la pièce..."/>
-
-                                </div>
                                 {!(currentInvoice?.montant_paye && currentInvoice.montant_paye > 0) && (
                                   <StockSearchInput 
                                     stock={stock} 
                                     onSelect={(item) => handleStockSelect(line.id, item.id.toString())} 
+                                    value={line.description}
+                                    onQueryChange={(value) => updatePart(line.id, 'description', value)}
+                                    placeholder="Nom de la pièce..."
                                     className="no-print mt-1"
                                   />
+                                )}
+                                {(currentInvoice?.montant_paye ?? 0) > 0 && (
+                                  <input disabled value={line.description} className="w-full bg-transparent outline-none font-black text-sm text-slate-900 uppercase disabled:opacity-60" placeholder="Nom de la pièce..."/>
                                 )}
                               </div>
                             </td>
