@@ -525,12 +525,22 @@ const ClientSpace: React.FC = () => {
       window.removeKkiapayListener?.('close', onDismissed);
     };
 
+    const closeWidget = () => {
+      window.closeKkiapayWidget?.();
+    };
+
     const onSuccess = async (response: any) => {
       cleanupListeners();
+      closeWidget();
       try {
+        const transactionId = response?.transactionId || response?.transaction_id || response?.id;
+        if (!transactionId) {
+          throw new Error('transactionId manquant dans la réponse Kkiapay.');
+        }
         const res = await api.post('client-space/pay-kkiapay/', {
           invoice_id: invoice.id,
-          transaction_id: response.transactionId,
+          transaction_id: transactionId,
+          transactionId,
           demande_normalisation: demandeNormalisation
         });
         setPaySuccess({
@@ -539,7 +549,12 @@ const ClientSpace: React.FC = () => {
         });
         fetchClientData();
       } catch (err: any) {
-        alert(err.response?.data?.error || 'Erreur lors de la validation du paiement. Contactez le garage.');
+        const backendError = err.response?.data?.error;
+        if (backendError) {
+          alert(backendError);
+        } else {
+          alert('Paiement reçu, mais la confirmation automatique est en attente. La facture sera mise à jour dès validation serveur.');
+        }
       } finally {
         setPayingInvoice(null);
         setIfuModalInvoice(null);
@@ -549,6 +564,7 @@ const ClientSpace: React.FC = () => {
     // Gestion de la fermeture ou de l'échec pour débloquer le bouton
     const onFailed = (err: any) => {
       cleanupListeners();
+      closeWidget();
       console.error("[KKIAPAY] Échec :", err);
       setPayingInvoice(null);
     };
@@ -556,6 +572,7 @@ const ClientSpace: React.FC = () => {
     // Note: Kkiapay peut utiliser 'dismissed' ou 'closed' selon la version
     const onDismissed = () => {
       cleanupListeners();
+      closeWidget();
       setPayingInvoice(null);
     };
 
@@ -572,7 +589,8 @@ const ClientSpace: React.FC = () => {
       name: `${clientData?.client?.nom || ''} ${clientData?.client?.prenoms || ''}`.trim(),
       email: clientData?.client?.email || '',
       phone: clientData?.client?.contact || '',
-      data: JSON.stringify({ invoice_id: invoice.id })
+      data: JSON.stringify({ invoice_id: invoice.id }),
+      callback: `${window.location.origin}/espace-client`
     });
   };
 

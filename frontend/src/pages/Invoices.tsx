@@ -841,7 +841,7 @@ const handleDownloadPDF = async () => {
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                                )}
-                               <div className="flex flex-col gap-2">
+                              <div className="flex flex-col gap-2">
                                 {!(currentInvoice?.montant_paye && currentInvoice.montant_paye > 0) && (
                                   <StockSearchInput 
                                     stock={stock} 
@@ -854,6 +854,17 @@ const handleDownloadPDF = async () => {
                                 )}
                                 {(currentInvoice?.montant_paye ?? 0) > 0 && (
                                   <input disabled value={line.description} className="w-full bg-transparent outline-none font-black text-sm text-slate-900 uppercase disabled:opacity-60" placeholder="Nom de la pièce..."/>
+                                )}
+                                {!(currentInvoice?.montant_paye && currentInvoice.montant_paye > 0) && (
+                                  <select
+                                    value={line.origine_piece || 'STOCK'}
+                                    onChange={(e) => updatePartOrigin(line.id, e.target.value as PartLine['origine_piece'])}
+                                    className="no-print w-full bg-white border border-emerald-100 rounded-xl px-3 py-2 text-[10px] font-black text-slate-600 uppercase outline-none"
+                                  >
+                                    <option value="STOCK">Stock garage</option>
+                                    <option value="COMMANDE_EXTERNE">Commande extérieure</option>
+                                    <option value="FOURNIE_CLIENT">Fournie par le client</option>
+                                  </select>
                                 )}
                               </div>
                             </td>

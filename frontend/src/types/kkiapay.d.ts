@@ -13,4 +13,5 @@ declare function openKkiapayWidget(config: {
 interface Window {
     addKkiapayListener: (event: string, callback: (data: any) => void) => void;
     removeKkiapayListener: (event: string, callback: (data: any) => void) => void;
+    closeKkiapayWidget?: () => void;
 }

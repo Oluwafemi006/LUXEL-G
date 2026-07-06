@@ -62,6 +62,7 @@ class ClientSpaceViewSet(viewsets.ViewSet):
                 EmailMessage(
                     f"Votre code de connexion Luxury Elegance Garage : {code}",
                     f"Bonjour {client.nom} {client.prenoms},\n\nCode : {code}\n\nValide 10 minutes.\n\nLuxury Elegance Garage",
+                    settings.DEFAULT_FROM_EMAIL,
                     to=[client.email]
                 ).send()
                 sent_method = "email"
@@ -79,7 +80,12 @@ class ClientSpaceViewSet(viewsets.ViewSet):
                 
             return Response(response_data)
         except Exception as e:
-            logger.error("[OTP] Échec envoi %s : %s", sent_method, e)
+            logger.exception("[OTP] Échec envoi %s pour %s", sent_method or "email", identifier)
+            if is_email and settings.DEBUG and getattr(settings, 'DEV_EXPOSE_OTP', False):
+                return Response({
+                    'message': "L'email OTP n'a pas pu être envoyé, mais le code est disponible en mode développement.",
+                    'dev_otp_code': code,
+                })
             return Response({
                 'error': f"Échec de l'envoi du code par {sent_method}. Veuillez réessayer."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -375,7 +381,7 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             return Response({'error': 'Accès non autorisé'}, status=status.HTTP_403_FORBIDDEN)
 
         invoice_id = request.data.get('invoice_id')
-        transaction_id = request.data.get('transaction_id')
+        transaction_id = request.data.get('transaction_id') or request.data.get('transactionId')
         demande_normalisation = bool(request.data.get('demande_normalisation', False))
 
         if not invoice_id or not transaction_id:
@@ -404,17 +410,29 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             return Response({'message': 'Cette transaction a déjà été traitée.'}, status=status.HTTP_200_OK)
 
         # Vérification de la transaction Kkiapay
-        from api.services import verify_kkiapay_transaction, valider_et_normaliser_facture
+        from api.services import verify_kkiapay_transaction, finalize_paid_facture
         kkiapay_tx = verify_kkiapay_transaction(transaction_id)
 
-        if not kkiapay_tx or kkiapay_tx.get('status') not in ('SUCCESSFULL', 'SUCCESS'):
+        status_value = str(
+            kkiapay_tx.get('status')
+            or kkiapay_tx.get('transactionStatus')
+            or kkiapay_tx.get('paymentStatus')
+            or ''
+        ).strip().upper()
+        if not kkiapay_tx or status_value not in ('SUCCESSFULL', 'SUCCESS', 'SUCCESSFUL', 'SUCCEEDED', 'PAID', 'APPROVED'):
             logger.warning("[KKIAPAY-CLIENT] Transaction non valide pour facture %s : %s", invoice_id, kkiapay_tx)
             return Response(
                 {'error': "Transaction Kkiapay invalide ou non aboutie."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        montant = Decimal(str(kkiapay_tx.get('amount', 0)))
+        montant = Decimal(str(
+            kkiapay_tx.get('amount')
+            or kkiapay_tx.get('montant')
+            or kkiapay_tx.get('totalAmount')
+            or kkiapay_tx.get('paidAmount')
+            or 0
+        ))
         if montant <= 0:
             return Response({'error': 'Montant invalide'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -427,72 +445,14 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         else:
             montant_enregistre = montant
 
-        with transaction.atomic():
-            facture.montant_paye += montant_enregistre
-            facture.mode_paiement = 'KKIAPAY'
-            facture.statut_paiement = 'SOLDE' if facture.montant_paye >= facture.total_ttc else 'PARTIEL'
-            facture.save()
-
-            MouvementCaisse.objects.create(
-                type_mouvement='RECETTE',
-                categorie='RECETTE_CLIENT',
-                montant=montant_enregistre,
-                description=f"Paiement Kkiapay — Facture {facture.numero_facture or facture.id} (TX: {transaction_id})",
-                facture=facture,
-                date_mouvement=timezone.now().date(),
-                utilisateur=request.user
-            )
-
-            NotificationStaff.objects.create(
-                type='PAIEMENT_RECU',
-                message=f"Paiement Kkiapay de {montant_enregistre:,.0f} F reçu de {client.nom} {client.prenoms} — Facture {facture.numero_facture or facture.id}."
-            )
-
-            if facture.statut_paiement == 'SOLDE':
-                facture.demande_normalisation = demande_normalisation
-                facture.save(update_fields=['demande_normalisation'])
-                facture = valider_et_normaliser_facture(facture, request_user=request.user)
-
-        # Notification de confirmation au client
-        NotificationClient.objects.create(
+        facture = finalize_paid_facture(
+            facture,
+            montant_enregistre,
+            transaction_id,
             client=client,
-            type='PAIEMENT_CONFIRME',
-            message=(
-                f"✅ Votre paiement de {montant_enregistre:,.0f} FCFA pour la facture "
-                f"{facture.numero_facture or f'#{facture.id}'} a bien été enregistré. Merci !"
-            )
+            demande_normalisation=demande_normalisation,
+            request_user=request.user,
         )
-
-        # Envoi de l'email de reçu avec la facture
-        if client.email:
-            try:
-                from django.core.mail import EmailMessage
-                from django.conf import settings
-                from api.utils import generate_document_pdf
-                
-                pdf_content = generate_document_pdf(facture, doc_type="FACTURE")
-                
-                email_subject = f"Reçu de paiement - Facture {facture.numero_facture or facture.id}"
-                email_body = f"""Bonjour {client.nom} {client.prenoms},
-
-Nous avons bien reçu votre paiement de {montant:,.0f} FCFA pour la facture {facture.numero_facture or facture.id}.
-Nous vous remercions pour votre confiance.
-
-Veuillez trouver ci-joint la facture mise à jour.
-
-L'équipe Luxury Elegance Garage"""
-
-                email = EmailMessage(
-                    email_subject,
-                    email_body,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [client.email]
-                )
-                email.attach(f'Facture_{facture.numero_facture or facture.id}.pdf', pdf_content, 'application/pdf')
-                email.send(fail_silently=True)
-                logger.info(f"Email de reçu envoyé à {client.email}")
-            except Exception as e:
-                logger.error(f"Erreur lors de l'envoi de l'email de reçu : {str(e)}")
 
         logger.info("[KKIAPAY-CLIENT] Facture %s — %s FCFA — Client %s", facture.id, montant, client.nom)
         return Response({

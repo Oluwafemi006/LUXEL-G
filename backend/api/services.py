@@ -1,8 +1,10 @@
 import os
 import json
 import logging
+import time
 import requests
 from django.conf import settings
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -147,13 +149,33 @@ def verify_kkiapay_transaction(transaction_id):
         return None
 
     k = Kkiapay(public_key, private_key, secret, sandbox=sandbox)
+
+    success_statuses = {'SUCCESS', 'SUCCESSFULL', 'SUCCESSFUL', 'SUCCEEDED', 'PAID', 'APPROVED'}
+    pending_statuses = {'PENDING', 'PROCESSING', 'IN_PROGRESS'}
+
     try:
-        # Le SDK retourne directement le dictionnaire JSON de la réponse
-        res = k.verify_transaction(transaction_id)
-        
-        # res est un dict (ex: {"status": "SUCCESS", "amount": ...})
-        if isinstance(res, dict) and res.get('status') in ['SUCCESS', 'SUCCESSFULL']:
-            return res
+        # Petite tolérance au délai de propagation Kkiapay après un paiement réussi.
+        for attempt in range(3):
+            res = k.verify_transaction(transaction_id)
+
+            if isinstance(res, dict):
+                status_value = str(
+                    res.get('status')
+                    or res.get('transactionStatus')
+                    or res.get('paymentStatus')
+                    or ''
+                ).strip().upper()
+
+                if status_value in success_statuses:
+                    return res
+
+                if status_value in pending_statuses and attempt < 2:
+                    time.sleep(1.5)
+                    continue
+
+            if attempt < 2:
+                time.sleep(1.5)
+
         return None
     except Exception as e:
         logger.error("[KKIAPAY] Erreur de vérification : %s", repr(e))
@@ -211,20 +233,22 @@ def generate_emecef_invoice(facture):
     }
 
     for t in facture.reparation.travaux.all():
-        payload["items"].append({
-            "name": t.description,
-            "price": int(t.montant),
-            "quantity": 1,
-            "taxGroup": "B"
-        })
+        if t.description.strip() and t.montant >= 0:
+            payload["items"].append({
+                "name": t.description,
+                "price": int(t.montant),
+                "quantity": 1,
+                "taxGroup": "B"
+            })
 
     for p in facture.reparation.pieces.all():
-        payload["items"].append({
-            "name": p.description,
-            "price": int(p.prix_unitaire),
-            "quantity": p.quantite,
-            "taxGroup": "B"
-        })
+        if p.description.strip() and p.prix_unitaire >= 0:
+            payload["items"].append({
+                "name": p.description,
+                "price": int(p.prix_unitaire),
+                "quantity": p.quantite,
+                "taxGroup": "B"
+            })
 
     try:
         response = requests.post(f"{api_url}/api/invoice", headers=headers, json=payload, timeout=15)
@@ -301,39 +325,140 @@ def generate_emecef_invoice(facture):
         )
         return None
 
-def valider_et_normaliser_facture(facture, request_user=None):
+def send_facture_email(facture, client, montant, transaction_id=None):
+    from django.core.mail import EmailMessage
+    from api.utils import generate_document_pdf
+
+    pdf_content = generate_document_pdf(facture, doc_type="FACTURE")
+
+    if facture.type == 'DEFINITIVE' and facture.numero_facture:
+        filename = f"Facture_{facture.numero_facture}.pdf"
+        subject = f"Reçu de paiement - Facture {facture.numero_facture}"
+    else:
+        filename = f"Proforma_OR-{facture.reparation.id:04d}.pdf"
+        subject = f"Reçu de paiement - Proforma OR-{facture.reparation.id:04d}"
+
+    body = (
+        f"Bonjour {client.nom} {client.prenoms},\n\n"
+        f"Nous avons bien reçu votre paiement de {montant:,.0f} FCFA "
+        f"pour la facture {facture.numero_facture or facture.id}.\n"
+        f"Merci pour votre confiance.\n\n"
+        f"Veuillez trouver ci-joint votre document mis à jour.\n\n"
+        f"L'équipe Luxury Elegance Garage"
+    )
+    if transaction_id:
+        body += f"\n\nRéférence transaction : {transaction_id}"
+
+    email = EmailMessage(subject, body, settings.DEFAULT_FROM_EMAIL, [client.email])
+    email.attach(filename, pdf_content, 'application/pdf')
+    email.send()
+
+
+def finalize_paid_facture(
+    facture,
+    montant_enregistre,
+    transaction_id,
+    client=None,
+    demande_normalisation=False,
+    request_user=None,
+    source='Kkiapay',
+    mode_paiement='KKIAPAY',
+    numero_cheque=None,
+    reference_virement=None,
+):
+    from django.db import transaction as db_transaction
+    from api.models import MouvementCaisse, NotificationClient, NotificationStaff
+
+    client = client or facture.reparation.vehicule.client
+    mode_paiement = (mode_paiement or source or 'AUTRE').upper()
+    source_label = source or mode_paiement
+
+    with db_transaction.atomic():
+        facture.montant_paye += montant_enregistre
+        facture.mode_paiement = mode_paiement
+        facture.numero_cheque = numero_cheque or None
+        facture.reference_virement = reference_virement or None
+        facture.statut_paiement = 'SOLDE' if facture.montant_paye >= facture.total_ttc else 'PARTIEL'
+        facture.save()
+
+        reference_suffix = f" (REF: {transaction_id})" if transaction_id else ""
+        MouvementCaisse.objects.create(
+            type_mouvement='RECETTE',
+            categorie='RECETTE_CLIENT',
+            montant=montant_enregistre,
+            description=f"Paiement {source_label} — Facture {facture.numero_facture or facture.id}{reference_suffix}",
+            facture=facture,
+            date_mouvement=timezone.now().date(),
+            utilisateur=request_user if request_user and request_user.is_authenticated else None,
+        )
+
+        NotificationStaff.objects.create(
+            type='PAIEMENT_RECU',
+            message=(
+                f"Paiement {source_label} de {montant_enregistre:,.0f} F reçu de "
+                f"{client.nom} {client.prenoms} — Facture {facture.numero_facture or facture.id}."
+            )
+        )
+
+        if facture.statut_paiement == 'SOLDE':
+            facture.demande_normalisation = demande_normalisation
+            facture.save(update_fields=['demande_normalisation'])
+            facture = valider_et_normaliser_facture(
+                facture,
+                request_user=request_user,
+                sync_normalization=bool(demande_normalisation),
+            )
+
+    NotificationClient.objects.create(
+        client=client,
+        type='PAIEMENT_CONFIRME',
+        message=(
+            f"✅ Votre paiement de {montant_enregistre:,.0f} FCFA pour la facture "
+            f"{facture.numero_facture or f'#{facture.id}'} a bien été enregistré. Merci !"
+        )
+    )
+
+    if client.email:
+        try:
+            send_facture_email(facture, client, montant_enregistre, transaction_id=transaction_id)
+            logger.info("[%s] Email de facture envoyé à %s", source_label.upper(), client.email)
+        except Exception as e:
+            logger.error("[%s] Erreur lors de l'envoi de l'email : %s", source_label.upper(), str(e))
+
+    return facture
+
+
+def valider_et_normaliser_facture(facture, request_user=None, sync_normalization=False):
     """
     Transforme une facture PROFORMA en DEFINITIVE, décrémente les stocks,
     et lance la normalisation e-MECeF. Doit être appelé lorsque la facture est soldée
     ou validée manuellement.
     Retourne la facture mise à jour.
     """
-    if facture.type != 'PROFORMA':
-        return facture
-
     from django.db import transaction as db_transaction
     from django.utils import timezone
     from api.models import Facture, MouvementStock
 
-    with db_transaction.atomic():
-        last_invoice = Facture.objects.filter(type='DEFINITIVE').order_by('numero_facture').last()
-        year = timezone.now().year
-        count = 1
-        if last_invoice and last_invoice.numero_facture and f"FAC-{year}" in last_invoice.numero_facture:
-            try:
-                last_num = int(last_invoice.numero_facture.split('-')[-1])
-                count = last_num + 1
-            except (ValueError, IndexError):
+    if facture.type == 'PROFORMA':
+        with db_transaction.atomic():
+            last_invoice = Facture.objects.filter(type='DEFINITIVE').order_by('numero_facture').last()
+            year = timezone.now().year
+            count = 1
+            if last_invoice and last_invoice.numero_facture and f"FAC-{year}" in last_invoice.numero_facture:
+                try:
+                    last_num = int(last_invoice.numero_facture.split('-')[-1])
+                    count = last_num + 1
+                except (ValueError, IndexError):
+                    count = Facture.objects.filter(type='DEFINITIVE').count() + 1
+            else:
                 count = Facture.objects.filter(type='DEFINITIVE').count() + 1
-        else:
-            count = Facture.objects.filter(type='DEFINITIVE').count() + 1
 
-        facture.numero_facture = f"FAC-{year}-{count:04d}"
-        facture.type = 'DEFINITIVE'
-        facture.date_validation = timezone.now()
-        facture.save()
+            facture.numero_facture = f"FAC-{year}-{count:04d}"
+            facture.type = 'DEFINITIVE'
+            facture.date_validation = timezone.now()
+            facture.save()
 
-    # Normalisation e-MECeF asynchrone pour ne pas bloquer le paiement
+    # Normalisation e-MECeF. Par défaut asynchrone pour ne pas bloquer les appels staff.
     if facture.demande_normalisation and not facture.is_normalised:
         client = facture.reparation.vehicule.client
         if not client.ifu:
@@ -363,6 +488,9 @@ def valider_et_normaliser_facture(facture, request_user=None):
                 except Exception as e:
                     logger.error("[e-MECeF] Erreur lors de la normalisation asynchrone : %s", e)
             
-            db_transaction.on_commit(lambda: threading.Thread(target=run_normalization).start())
+            if sync_normalization:
+                run_normalization()
+            else:
+                db_transaction.on_commit(lambda: threading.Thread(target=run_normalization).start())
 
     return facture

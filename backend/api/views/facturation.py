@@ -3,7 +3,7 @@ import logging
 from django.core import signing
 from django.db import transaction as db_transaction
 from ._imports import *
-from ..services import verify_kkiapay_transaction, generate_emecef_invoice
+from ..services import verify_kkiapay_transaction, generate_emecef_invoice, finalize_paid_facture
 
 logger = logging.getLogger(__name__)
 DOCUMENT_SHARE_SALT = 'luxel-g-document-share'
@@ -72,47 +72,39 @@ class FactureViewSet(viewsets.ModelViewSet):
         if montant <= 0 or montant > (facture.total_ttc - facture.montant_paye):
             return Response({'error': 'Montant invalide'}, status=status.HTTP_400_BAD_REQUEST)
 
-        total_apres = facture.montant_paye + montant
         # M4 — Ne plus forcer 75% si c'est déjà entamé ou selon besoin flexible
         # seuil_75 = facture.total_ttc * Decimal('0.75')
         # if total_apres < seuil_75:
         #    return Response(...)
 
-        facture.montant_paye += montant
-        facture.mode_paiement = mode_paiement
-        facture.numero_cheque = request.data.get('numero_cheque') or None
-        facture.reference_virement = request.data.get('reference_virement') or None
-        facture.statut_paiement = 'SOLDE' if facture.montant_paye >= facture.total_ttc else 'PARTIEL'
-        facture.save()
+        demande_normalisation = str(request.data.get('normaliser', 'false')).lower() == 'true'
+        source_labels = {
+            'ESPECE': 'Espèces',
+            'MOMOPAY': 'MomoPay',
+            'VIREMENT': 'Virement',
+            'CHEQUE': 'Chèque',
+            'KKIAPAY': 'Kkiapay',
+            'AUTRE': 'Autre',
+        }
+
+        facture = finalize_paid_facture(
+            facture,
+            montant,
+            request.data.get('reference_virement') or request.data.get('numero_cheque') or None,
+            client=facture.reparation.vehicule.client,
+            demande_normalisation=demande_normalisation,
+            request_user=request.user,
+            source=source_labels.get(mode_paiement, mode_paiement),
+            mode_paiement=mode_paiement,
+            numero_cheque=request.data.get('numero_cheque'),
+            reference_virement=request.data.get('reference_virement'),
+        )
 
         reparation = facture.reparation
         if reparation.statut == 'EN_ATTENTE':
             reparation.statut = 'EN_COURS'
             reparation.save()
 
-        MouvementCaisse.objects.create(
-            type_mouvement='RECETTE', categorie='RECETTE_CLIENT', montant=montant,
-            description=f"Paiement {facture.numero_facture}", facture=facture,
-            date_mouvement=timezone.now().date(),
-            utilisateur=request.user if request.user.is_authenticated else None
-        )
-
-        # Normalisation automatique e-MECeF au solde (Optionnel)
-        if facture.statut_paiement == 'SOLDE' and not facture.is_normalised:
-            res_emecef = generate_emecef_invoice(facture)
-            if res_emecef:
-                facture.emecef_uid = res_emecef.get('uid')
-                facture.emecef_code = res_emecef.get('codeMECeF')
-                facture.emecef_qr_code = res_emecef.get('qrCode')
-                facture.emecef_counters = res_emecef.get('counters')
-                facture.emecef_status = res_emecef.get('status')
-                facture.is_normalised = True
-                facture.save()
-
-        NotificationStaff.objects.create(
-            type='PAIEMENT_RECU',
-            message=f"Paiement de {montant:,.0f} F reçu pour la facture {facture.numero_facture}."
-        )
         return Response(FactureSerializer(facture).data)
 
     @action(detail=True, methods=['post'])
