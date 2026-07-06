@@ -329,6 +329,7 @@ def send_facture_email(facture, client, montant, transaction_id=None):
     from django.core.mail import EmailMessage
     from api.utils import generate_document_pdf
 
+    facture.refresh_from_db()
     pdf_content = generate_document_pdf(facture, doc_type="FACTURE")
 
     if facture.type == 'DEFINITIVE' and facture.numero_facture:
