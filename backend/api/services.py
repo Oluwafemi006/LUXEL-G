@@ -325,7 +325,7 @@ def generate_emecef_invoice(facture):
         )
         return None
 
-def send_facture_email(facture, client, montant, transaction_id=None):
+def send_facture_email(facture, client, montant=None, transaction_id=None, email_type='payment'):
     from django.core.mail import EmailMessage
     from api.utils import generate_document_pdf
 
@@ -334,19 +334,45 @@ def send_facture_email(facture, client, montant, transaction_id=None):
 
     if facture.type == 'DEFINITIVE' and facture.numero_facture:
         filename = f"Facture_{facture.numero_facture}.pdf"
-        subject = f"Reçu de paiement - Facture {facture.numero_facture}"
+        if email_type == 'normalisation':
+            subject = f"Facture normalisée - {facture.numero_facture}"
+        elif email_type == 'document':
+            subject = f"Facture Luxury Elegance Garage - {facture.numero_facture}"
+        else:
+            subject = f"Reçu de paiement - Facture {facture.numero_facture}"
     else:
         filename = f"Proforma_OR-{facture.reparation.id:04d}.pdf"
-        subject = f"Reçu de paiement - Proforma OR-{facture.reparation.id:04d}"
+        if email_type == 'normalisation':
+            subject = f"Facture normalisée - Proforma OR-{facture.reparation.id:04d}"
+        elif email_type == 'document':
+            subject = f"Proforma Luxury Elegance Garage - OR-{facture.reparation.id:04d}"
+        else:
+            subject = f"Reçu de paiement - Proforma OR-{facture.reparation.id:04d}"
 
-    body = (
-        f"Bonjour {client.nom} {client.prenoms},\n\n"
-        f"Nous avons bien reçu votre paiement de {montant:,.0f} FCFA "
-        f"pour la facture {facture.numero_facture or facture.id}.\n"
-        f"Merci pour votre confiance.\n\n"
-        f"Veuillez trouver ci-joint votre document mis à jour.\n\n"
-        f"L'équipe Luxury Elegance Garage"
-    )
+    if email_type == 'normalisation':
+        body = (
+            f"Bonjour {client.nom} {client.prenoms},\n\n"
+            f"Votre facture {facture.numero_facture or facture.id} a été normalisée avec succès.\n"
+            f"Veuillez trouver ci-joint la version mise à jour avec les informations e-MECeF.\n\n"
+            f"L'équipe Luxury Elegance Garage"
+        )
+    elif email_type == 'document':
+        body = (
+            f"Bonjour {client.nom} {client.prenoms},\n\n"
+            f"Veuillez trouver ci-joint votre document concernant le véhicule "
+            f"{facture.reparation.vehicule.immatriculation}.\n"
+            f"Montant total : {facture.total_ttc:,.0f} FCFA.\n\n"
+            f"L'équipe Luxury Elegance Garage"
+        )
+    else:
+        body = (
+            f"Bonjour {client.nom} {client.prenoms},\n\n"
+            f"Nous avons bien reçu votre paiement de {montant:,.0f} FCFA "
+            f"pour la facture {facture.numero_facture or facture.id}.\n"
+            f"Merci pour votre confiance.\n\n"
+            f"Veuillez trouver ci-joint votre document mis à jour.\n\n"
+            f"L'équipe Luxury Elegance Garage"
+        )
     if transaction_id:
         body += f"\n\nRéférence transaction : {transaction_id}"
 
@@ -422,9 +448,16 @@ def finalize_paid_facture(
     if client.email:
         try:
             send_facture_email(facture, client, montant_enregistre, transaction_id=transaction_id)
+            facture._email_envoye = True
+            facture._email_error = None
             logger.info("[%s] Email de facture envoyé à %s", source_label.upper(), client.email)
         except Exception as e:
+            facture._email_envoye = False
+            facture._email_error = str(e)
             logger.error("[%s] Erreur lors de l'envoi de l'email : %s", source_label.upper(), str(e))
+    else:
+        facture._email_envoye = False
+        facture._email_error = "Le client n'a pas d'adresse email."
 
     return facture
 
@@ -491,6 +524,7 @@ def valider_et_normaliser_facture(facture, request_user=None, sync_normalization
             
             if sync_normalization:
                 run_normalization()
+                facture.refresh_from_db()
             else:
                 db_transaction.on_commit(lambda: threading.Thread(target=run_normalization).start())
 

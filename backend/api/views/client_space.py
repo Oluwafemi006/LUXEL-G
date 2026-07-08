@@ -183,10 +183,11 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         )
         final_solde = max(solde_result['solde'], Decimal('0'))
 
-        # Exclure les devis liés à des factures soldées
-        reparations_soldees = factures.filter(statut_paiement='SOLDE').values_list('reparation_id', flat=True)
+        # Exclure les devis déjà transformés en facture pour éviter les doublons devis/facture côté client.
+        reparations_facturees = factures.values_list('reparation_id', flat=True)
         devis = Devis.objects.filter(reparation__vehicule__client=client)\
-                             .exclude(reparation_id__in=reparations_soldees)\
+                             .exclude(reparation_id__in=reparations_facturees)\
+                             .exclude(statut='FACTURE')\
                              .order_by('-date_creation')
 
         return Response({
@@ -299,6 +300,21 @@ class ClientSpaceViewSet(viewsets.ViewSet):
             serializer.save()
             return Response(ClientSerializer(client).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['patch'], url_path=r'notifications/(?P<notification_id>[^/.]+)/read')
+    def mark_notification_read(self, request, notification_id=None):
+        try:
+            client = request.user.client_profile
+        except AttributeError:
+            return Response({'error': 'Accès non autorisé'}, status=status.HTTP_403_FORBIDDEN)
+
+        notification = NotificationClient.objects.filter(id=notification_id, client=client).first()
+        if not notification:
+            return Response({'error': 'Notification introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+        notification.lu = True
+        notification.save(update_fields=['lu'])
+        return Response(NotificationClientSerializer(notification).data)
 
     @action(detail=False, methods=['post'], url_path='request-invoice-modification')
     def request_invoice_modification(self, request):

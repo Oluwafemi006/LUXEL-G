@@ -1,9 +1,8 @@
 """Facturation : Factures et Devis."""
 import logging
 from django.core import signing
-from django.db import transaction as db_transaction
 from ._imports import *
-from ..services import verify_kkiapay_transaction, generate_emecef_invoice, finalize_paid_facture
+from ..services import verify_kkiapay_transaction, finalize_paid_facture, valider_et_normaliser_facture, send_facture_email
 
 logger = logging.getLogger(__name__)
 DOCUMENT_SHARE_SALT = 'luxel-g-document-share'
@@ -40,8 +39,6 @@ class FactureViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        from api.services import valider_et_normaliser_facture
-        
         user = request.user if request.user.is_authenticated else None
         facture = valider_et_normaliser_facture(facture, request_user=user)
         
@@ -72,10 +69,19 @@ class FactureViewSet(viewsets.ModelViewSet):
         if montant <= 0 or montant > (facture.total_ttc - facture.montant_paye):
             return Response({'error': 'Montant invalide'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # M4 — Ne plus forcer 75% si c'est déjà entamé ou selon besoin flexible
-        # seuil_75 = facture.total_ttc * Decimal('0.75')
-        # if total_apres < seuil_75:
-        #    return Response(...)
+        reparation = facture.reparation
+        seuil_demarrage = facture.total_ttc * Decimal('0.75')
+        total_apres = facture.montant_paye + montant
+        if reparation.statut == 'EN_ATTENTE' and total_apres < seuil_demarrage:
+            return Response(
+                {
+                    'error': (
+                        "Un acompte minimum de 75% est requis avant le démarrage des réparations "
+                        f"({seuil_demarrage:,.0f} F minimum)."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         demande_normalisation = str(request.data.get('normaliser', 'false')).lower() == 'true'
         source_labels = {
@@ -100,50 +106,57 @@ class FactureViewSet(viewsets.ModelViewSet):
             reference_virement=request.data.get('reference_virement'),
         )
 
-        reparation = facture.reparation
         if reparation.statut == 'EN_ATTENTE':
             reparation.statut = 'EN_COURS'
             reparation.save()
 
-        return Response(FactureSerializer(facture).data)
+        data = FactureSerializer(facture).data
+        data['email_envoye'] = getattr(facture, '_email_envoye', None)
+        email_error = getattr(facture, '_email_error', None)
+        if email_error:
+            data['email_error'] = email_error
+        return Response(data)
 
     @action(detail=True, methods=['post'])
     def verify_kkiapay(self, request, pk=None):
         """Action pour vérifier une transaction Kkiapay depuis le frontend."""
         facture = self.get_object()
-        transaction_id = request.data.get('transaction_id')
+        transaction_id = request.data.get('transaction_id') or request.data.get('transactionId')
+        demande_normalisation = str(request.data.get('normaliser', 'false')).lower() == 'true'
+
         if not transaction_id:
             return Response({'error': 'ID de transaction manquant'}, status=status.HTTP_400_BAD_REQUEST)
 
-        transaction = verify_kkiapay_transaction(transaction_id)
-        if transaction and transaction.status == "SUCCESS":
-            montant = Decimal(str(transaction.amount))
-            with db_transaction.atomic():
-                facture.montant_paye += montant
-                facture.mode_paiement = 'KKIAPAY'
-                facture.statut_paiement = 'SOLDE' if facture.montant_paye >= facture.total_ttc else 'PARTIEL'
-                facture.save()
-                
-                MouvementCaisse.objects.create(
-                    type_mouvement='RECETTE', categorie='RECETTE_CLIENT', montant=montant,
-                    description=f"Paiement Kkiapay {facture.numero_facture} (ID: {transaction_id})", 
-                    facture=facture, date_mouvement=timezone.now().date(),
-                    utilisateur=request.user if request.user.is_authenticated else None
-                )
+        transaction_data = verify_kkiapay_transaction(transaction_id)
+        if not transaction_data:
+            return Response({'error': 'Transaction invalide ou échouée'}, status=status.HTTP_400_BAD_REQUEST)
 
-                if facture.statut_paiement == 'SOLDE' and not facture.is_normalised:
-                    res_emecef = generate_emecef_invoice(facture)
-                    if res_emecef:
-                        facture.emecef_uid = res_emecef.get('uid')
-                        facture.emecef_code = res_emecef.get('codeMECeF')
-                        facture.emecef_qr_code = res_emecef.get('qrCode')
-                        facture.emecef_counters = res_emecef.get('counters')
-                        facture.emecef_status = res_emecef.get('status')
-                        facture.is_normalised = True
-                        facture.save()
+        montant = Decimal(str(
+            transaction_data.get('amount')
+            or transaction_data.get('montant')
+            or transaction_data.get('totalAmount')
+            or transaction_data.get('paidAmount')
+            or 0
+        ))
+        reste_a_payer = facture.total_ttc - facture.montant_paye
+        if montant <= 0:
+            return Response({'error': 'Montant invalide'}, status=status.HTTP_400_BAD_REQUEST)
 
-            return Response(FactureSerializer(facture).data)
-        return Response({'error': 'Transaction invalide ou échouée'}, status=status.HTTP_400_BAD_REQUEST)
+        montant_enregistre = min(montant, reste_a_payer)
+        if montant_enregistre <= 0:
+            return Response({'error': 'Facture déjà soldée'}, status=status.HTTP_400_BAD_REQUEST)
+
+        facture = finalize_paid_facture(
+            facture,
+            montant_enregistre,
+            transaction_id,
+            client=facture.reparation.vehicule.client,
+            demande_normalisation=demande_normalisation,
+            request_user=request.user,
+            source='Kkiapay',
+            mode_paiement='KKIAPAY',
+        )
+        return Response(FactureSerializer(facture).data)
 
     @action(detail=True, methods=['post'])
     def normaliser(self, request, pk=None):
@@ -151,17 +164,43 @@ class FactureViewSet(viewsets.ModelViewSet):
         facture = self.get_object()
         if facture.is_normalised:
             return Response({'error': 'Facture déjà normalisée'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        res = generate_emecef_invoice(facture)
-        if res:
-            facture.emecef_uid = res.get('uid')
-            facture.emecef_code = res.get('codeMECeF')
-            facture.emecef_qr_code = res.get('qrCode')
-            facture.emecef_counters = res.get('counters')
-            facture.emecef_status = res.get('status')
-            facture.is_normalised = True
-            facture.save()
-            return Response(FactureSerializer(facture).data)
+
+        client = facture.reparation.vehicule.client
+        if not client.ifu:
+            return Response({'error': "IFU client requis pour générer une facture normalisée."}, status=status.HTTP_400_BAD_REQUEST)
+
+        facture.demande_normalisation = True
+        facture.save(update_fields=['demande_normalisation'])
+        facture = valider_et_normaliser_facture(
+            facture,
+            request_user=request.user,
+            sync_normalization=True,
+        )
+
+        if facture.is_normalised:
+            email_envoye = False
+            email_error = None
+            if client.email:
+                try:
+                    send_facture_email(facture, client, email_type='normalisation')
+                    email_envoye = True
+                    NotificationClient.objects.create(
+                        client=client,
+                        type='FACTURE_ENVOYEE',
+                        message=(
+                            f"Votre facture normalisée {facture.numero_facture or f'#{facture.id}'} "
+                            "vous a été envoyée par email."
+                        )
+                    )
+                except Exception as e:
+                    email_error = str(e)
+                    logger.error("Erreur envoi email facture normalisée : %s", e)
+
+            data = FactureSerializer(facture).data
+            data['email_envoye'] = email_envoye
+            if email_error:
+                data['email_error'] = email_error
+            return Response(data)
         
         return Response({'error': 'Échec de la normalisation'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -222,20 +261,11 @@ class FactureViewSet(viewsets.ModelViewSet):
         if not client.email:
             return Response({'error': "Le client n'a pas d'adresse email."}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            pdf = generate_document_pdf(facture, doc_type="FACTURE")
-            if facture.type == 'DEFINITIVE' and facture.numero_facture:
-                filename = f"Facture_{facture.numero_facture}.pdf"
-                subject = f"Facture Luxury Elegance Garage - {facture.numero_facture}"
-            else:
-                filename = f"Proforma_OR-{facture.reparation.id:04d}.pdf"
-                subject = f"Devis / Proforma Luxury Elegance Garage - OR-{facture.reparation.id:04d}"
-                
-            body = (f"Bonjour {facture.reparation.vehicule.client.nom},\n\n"
-                    f"Veuillez trouver ci-joint votre document concernant le véhicule {facture.reparation.vehicule.immatriculation}.\n"
-                    f"Montant Total : {facture.total_ttc} FCFA.\n\nCordialement,\nL'équipe Luxury Elegance Garage")
-            email = EmailMessage(subject, body, to=[client.email])
-            email.attach(filename, pdf, 'application/pdf')
-            email.send()
+            send_facture_email(
+                facture,
+                client,
+                email_type='normalisation' if facture.is_normalised else 'document',
+            )
             NotificationClient.objects.create(
                 client=client, type='FACTURE_ENVOYEE',
                 message=f"Votre facture {facture.numero_facture or 'Proforma'} vous a été envoyée par email."

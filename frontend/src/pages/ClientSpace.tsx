@@ -460,6 +460,10 @@ const ClientSpace: React.FC = () => {
   // Modal choix normalisation IFU
   const [ifuModalInvoice, setIfuModalInvoice] = useState<Invoice | null>(null);
 
+  const invoiceTotal = (invoice: Invoice) => Number(invoice.total_ttc) || 0;
+  const invoicePaid = (invoice: Invoice) => Math.min(Number(invoice.montant_paye) || 0, invoiceTotal(invoice));
+  const invoiceReste = (invoice: Invoice) => Math.max(0, invoiceTotal(invoice) - invoicePaid(invoice));
+
   // --- DEMANDE DE MODIFICATION FACTURE ---
   const [modifInvoice, setModifInvoice] = useState<Invoice | null>(null);
   const [modifMessage, setModifMessage] = useState('');
@@ -758,6 +762,11 @@ const ClientSpace: React.FC = () => {
   }
 
   const soldeImpaye = clientData?.solde_impaye ? Number(clientData.solde_impaye) : 0;
+  const displayedNotifications = (clientData?.notifications || []).filter((notification: Notification, index: number, all: Notification[]) => {
+    const key = `${notification.type}|${notification.message}`;
+    return all.findIndex((item: Notification) => `${item.type}|${item.message}` === key) === index;
+  });
+  const unreadNotificationsCount = displayedNotifications.filter((n: Notification) => !n.lu).length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8 font-oswald animate-in fade-in duration-700 pb-24 md:pb-8">
@@ -1038,14 +1047,14 @@ const ClientSpace: React.FC = () => {
                 <div className="bg-slate-900 text-white p-5 rounded-xl text-center">
                   <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-400 mb-1">Total Facturé</p>
                   <p className="text-2xl font-bebas tracking-wider">
-                    {clientData.factures.reduce((s: number, f: Invoice) => s + Number(f.total_ttc), 0).toLocaleString('fr-FR')}
+                    {clientData.factures.reduce((s: number, f: Invoice) => s + invoiceTotal(f), 0).toLocaleString('fr-FR')}
                     <span className="text-sm text-slate-400 ml-1">F</span>
                   </p>
                 </div>
                 <div className="bg-emerald-500 text-white p-5 rounded-xl text-center">
                   <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-emerald-200 mb-1">Déjà Payé</p>
                   <p className="text-2xl font-bebas tracking-wider">
-                    {clientData.factures.reduce((s: number, f: Invoice) => s + Number(f.montant_paye), 0).toLocaleString('fr-FR')}
+                    {clientData.factures.reduce((s: number, f: Invoice) => s + invoicePaid(f), 0).toLocaleString('fr-FR')}
                     <span className="text-sm text-emerald-200 ml-1">F</span>
                   </p>
                 </div>
@@ -1109,8 +1118,10 @@ const ClientSpace: React.FC = () => {
 
                   {/* Liste des factures */}
                   {clientData.factures.map((inv: Invoice) => {
-                const reste = Math.max(0, Number(inv.total_ttc) - Number(inv.montant_paye));
-                const pct = inv.total_ttc > 0 ? Math.round((Number(inv.montant_paye) / Number(inv.total_ttc)) * 100) : 100;
+                const total = invoiceTotal(inv);
+                const paid = invoicePaid(inv);
+                const reste = invoiceReste(inv);
+                const pct = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 100;
                 const isSolde = inv.statut_paiement === 'SOLDE';
                 const isPartiel = inv.statut_paiement === 'PARTIEL';
 
@@ -1384,34 +1395,21 @@ const ClientSpace: React.FC = () => {
               <div className="flex items-center gap-2">
                  <div className="h-1 w-4 bg-emerald-500 rounded-full"></div>
                  <h2 className="text-xl font-bebas text-slate-900 tracking-wider uppercase">Notifications</h2>
-                 {clientData.notifications.filter((n: Notification) => !n.lu).length > 0 && (
+                 {unreadNotificationsCount > 0 && (
                    <span className="ml-1 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full animate-pulse">
-                     {clientData.notifications.filter((n: Notification) => !n.lu).length}
+                     {unreadNotificationsCount}
                    </span>
                  )}
               </div>
               <div className="space-y-3">
-                 {clientData.notifications.length === 0 ? (
+                 {displayedNotifications.length === 0 ? (
                    <div className="p-5 bg-slate-50 rounded-lg border border-slate-100 text-center">
                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Aucune notification</p>
                    </div>
-                 ) : clientData.notifications.map((n: Notification) => (
+                 ) : displayedNotifications.map((n: Notification) => (
                    <div
                      key={n.id}
-                     onClick={async () => {
-                       if (!n.lu) {
-                         try {
-                           await api.patch(`notifications-clients/${n.id}/`, { lu: true });
-                           setClientData((prev: any) => ({
-                             ...prev,
-                             notifications: prev.notifications.map((notif: Notification) =>
-                               notif.id === n.id ? { ...notif, lu: true } : notif
-                             )
-                           }));
-                         } catch { /* silencieux */ }
-                       }
-                     }}
-                     className={`p-5 rounded-lg border shadow-sm transition-all relative overflow-hidden group cursor-pointer ${
+                     className={`p-5 rounded-lg border shadow-sm transition-all relative overflow-hidden group ${
                        n.lu
                          ? 'bg-white border-slate-200 hover:border-emerald-200'
                          : 'bg-emerald-50 border-emerald-300 hover:border-emerald-400'
@@ -1431,6 +1429,25 @@ const ClientSpace: React.FC = () => {
                        </span>
                      </div>
                      <p className="text-[11px] font-bold text-slate-600 leading-relaxed uppercase tracking-tight relative z-10 transition-colors group-hover:text-slate-900">"{n.message}"</p>
+                     {!n.lu && (
+                       <button
+                         type="button"
+                         onClick={async () => {
+                           try {
+                             await api.patch(`client-space/notifications/${n.id}/read/`);
+                             setClientData((prev: any) => ({
+                               ...prev,
+                               notifications: prev.notifications.map((notif: Notification) =>
+                                 notif.id === n.id ? { ...notif, lu: true } : notif
+                               )
+                             }));
+                           } catch { /* silencieux */ }
+                         }}
+                         className="mt-3 relative z-10 text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-white border border-emerald-100 px-3 py-1.5 rounded-md hover:bg-emerald-600 hover:text-white transition-all"
+                       >
+                         Marquer lu
+                       </button>
+                     )}
                      <Bell className="absolute -right-2 -bottom-2 w-10 h-10 text-slate-50 group-hover:text-emerald-50 group-hover:scale-125 transition-all" />
                    </div>
                  ))}

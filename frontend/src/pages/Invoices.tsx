@@ -98,6 +98,7 @@ const Invoices: React.FC = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMode, setPaymentMode] = useState('ESPECE');
   const [numeroCheque, setNumeroCheque] = useState('');
+  const [referencePaiement, setReferencePaiement] = useState('');
   const [demandeNormalisation, setDemandeNormalisation] = useState(false);
   const [isNormalizing, setIsNormalizing] = useState(false);
 
@@ -112,7 +113,6 @@ const Invoices: React.FC = () => {
 
 
   const openPaymentModal = (invoice: Invoice) => {
-    // Par défaut, proposer la totalité s'il reste peu, ou 75% si c'est le début
     if (invoice.montant_paye === 0) {
       setPaymentAmount((invoice.total_ttc * 0.75).toString());
     } else {
@@ -120,6 +120,7 @@ const Invoices: React.FC = () => {
     }
     setPaymentMode('ESPECE');
     setNumeroCheque('');
+    setReferencePaiement('');
     setDemandeNormalisation(false);
     setIsPaymentModalOpen(true);
   };
@@ -266,10 +267,29 @@ const Invoices: React.FC = () => {
     const amount = parseFloat(paymentAmount);
     const resteAPayer = currentInvoice.total_ttc - currentInvoice.montant_paye;
 
-    // Règle des 75% : Retirée selon la demande du client. Le système accepte tout paiement.
+    if (Number.isNaN(amount) || amount <= 0) {
+      alert('Erreur : Le montant saisi est invalide.');
+      return;
+    }
 
     if (amount > resteAPayer) {
       alert(`Erreur : Le montant saisi dépasse le reste à payer (${resteAPayer.toLocaleString()} F).`);
+      return;
+    }
+
+    const seuilDemarrage = currentInvoice.total_ttc * 0.75;
+    if (selectedRepair?.statut === 'EN_ATTENTE' && currentInvoice.montant_paye + amount < seuilDemarrage) {
+      alert(`Erreur : Un acompte minimum de 75% est requis avant le démarrage des réparations (${seuilDemarrage.toLocaleString()} F minimum).`);
+      return;
+    }
+
+    if (paymentMode === 'CHEQUE' && !numeroCheque.trim()) {
+      alert('Erreur : Le numéro de chèque est obligatoire.');
+      return;
+    }
+
+    if (paymentMode === 'VIREMENT' && !referencePaiement.trim()) {
+      alert('Erreur : La référence du virement est obligatoire.');
       return;
     }
 
@@ -277,10 +297,15 @@ const Invoices: React.FC = () => {
       const response = await api.post(`factures/${currentInvoiceId}/enregistrer_paiement/`, {
         montant: amount,
         mode_paiement: paymentMode,
-        numero_cheque: paymentMode === 'CHEQUE' ? numeroCheque : undefined,
+        numero_cheque: paymentMode === 'CHEQUE' ? numeroCheque.trim() : undefined,
+        reference_virement: ['VIREMENT', 'MOMOPAY', 'AUTRE'].includes(paymentMode) ? referencePaiement.trim() : undefined,
         normaliser: demandeNormalisation
       });
-      alert('Paiement enregistré !');
+      if (response.data.email_envoye === false) {
+        alert("Paiement enregistré, mais l'email de facture n'a pas pu être envoyé automatiquement. Vérifiez l'adresse email du client ou utilisez l'envoi manuel.");
+      } else {
+        alert('Paiement enregistré et facture envoyée par email !');
+      }
       setIsPaymentModalOpen(false);
       setPaymentAmount('');
       fetchInvoices(true);
@@ -300,7 +325,11 @@ const Invoices: React.FC = () => {
     try {
       setIsNormalizing(true);
       const response = await api.post(`factures/${currentInvoiceId}/normaliser/`);
-      alert('Facture normalisée avec succès !');
+      if (response.data.email_envoye === false) {
+        alert("Facture normalisée avec succès, mais l'email n'a pas pu être envoyé automatiquement. Vous pouvez utiliser le bouton d'envoi par email.");
+      } else {
+        alert('Facture normalisée avec succès et envoyée par email !');
+      }
       setCurrentInvoice(response.data);
       fetchInvoices(true);
     } catch (error: any) {
@@ -995,33 +1024,34 @@ const handleDownloadPDF = async () => {
                 </div>
                 <h2 className="text-3xl font-black text-slate-900 italic tracking-tighter uppercase">Encaissement</h2>
                 
-                {currentInvoice.montant_paye === 0 && (
-                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl mb-4">
-                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center justify-center gap-2">
-                      <AlertTriangle className="w-3 h-3" /> Avance Requise (75%)
-                    </p>
-                    <p className="text-xs font-bold text-amber-600 mt-1">
-                      Un versement minimum de {(currentInvoice.total_ttc * 0.75).toLocaleString()} F est nécessaire pour accepter le paiement et démarrer les réparations.
-                    </p>
-                  </div>
-                )}
-
                 <div className="flex items-center justify-center gap-2 mt-4 bg-rose-50 px-4 py-2 rounded-full border border-rose-100">
                   <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Reste à payer :</span>
                   <span className="text-sm font-black text-rose-600 italic">{(currentInvoice.total_ttc - currentInvoice.montant_paye).toLocaleString()} F</span>
                 </div>
+                {currentInvoice.montant_paye === 0 && (
+                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl mt-4">
+                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center justify-center gap-2">
+                      <AlertTriangle className="w-3 h-3" /> Acompte requis 75%
+                    </p>
+                    <p className="text-xs font-bold text-amber-600 mt-1">
+                      Le garage exige {(currentInvoice.total_ttc * 0.75).toLocaleString()} F avant le démarrage des réparations.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-6">
                 <div className="flex gap-4">
-                  <button 
-                    type="button"
-                    onClick={() => setPaymentAmount((currentInvoice.total_ttc * 0.75).toString())}
-                    className={`flex-1 p-4 rounded-2xl border-2 transition-all ${paymentAmount === (currentInvoice.total_ttc * 0.75).toString() ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-100 bg-white text-slate-500 hover:border-emerald-200'}`}
-                  >
-                    <span className="block text-[10px] font-black uppercase tracking-widest mb-1">Acompte 75%</span>
-                    <span className="block text-lg font-black italic">{(currentInvoice.total_ttc * 0.75).toLocaleString()} F</span>
-                  </button>
+                  {currentInvoice.montant_paye < currentInvoice.total_ttc * 0.75 && (
+                    <button 
+                      type="button"
+                      onClick={() => setPaymentAmount(Math.min(currentInvoice.total_ttc - currentInvoice.montant_paye, Math.max(0, currentInvoice.total_ttc * 0.75 - currentInvoice.montant_paye)).toString())}
+                      className={`flex-1 p-4 rounded-2xl border-2 transition-all ${paymentAmount === Math.min(currentInvoice.total_ttc - currentInvoice.montant_paye, Math.max(0, currentInvoice.total_ttc * 0.75 - currentInvoice.montant_paye)).toString() ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-100 bg-white text-slate-500 hover:border-emerald-200'}`}
+                    >
+                      <span className="block text-[10px] font-black uppercase tracking-widest mb-1">{currentInvoice.montant_paye > 0 ? 'Compléter 75%' : 'Acompte 75%'}</span>
+                      <span className="block text-lg font-black italic">{Math.min(currentInvoice.total_ttc - currentInvoice.montant_paye, Math.max(0, currentInvoice.total_ttc * 0.75 - currentInvoice.montant_paye)).toLocaleString()} F</span>
+                    </button>
+                  )}
                   <button 
                     type="button"
                     onClick={() => setPaymentAmount((currentInvoice.total_ttc - currentInvoice.montant_paye).toString())}
@@ -1036,7 +1066,10 @@ const handleDownloadPDF = async () => {
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Moyen de Paiement</label>
                   <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className="w-full bg-slate-50 border border-emerald-100/30 rounded-2xl px-6 py-4 outline-none focus:border-emerald-500/50 font-bold text-sm shadow-inner transition-all duration-500 appearance-none">
                     <option value="ESPECE">Espèce</option>
+                    <option value="MOMOPAY">MomoPay</option>
+                    <option value="VIREMENT">Virement bancaire</option>
                     <option value="CHEQUE">Chèque</option>
+                    <option value="AUTRE">Autre</option>
                   </select>
                 </div>
 
@@ -1047,8 +1080,15 @@ const handleDownloadPDF = async () => {
                   </div>
                 )}
 
+                {(paymentMode === 'VIREMENT' || paymentMode === 'MOMOPAY' || paymentMode === 'AUTRE') && (
+                  <div className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Référence de Paiement</label>
+                    <input type="text" value={referencePaiement} onChange={(e) => setReferencePaiement(e.target.value)} placeholder="Ex: REF-2026-001" className="w-full bg-emerald-50/50 border border-emerald-200/50 rounded-2xl px-6 py-4 outline-none focus:border-emerald-500 font-bold text-sm shadow-inner" />
+                  </div>
+                )}
+
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Montant personnalisé (Optionnel)</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Montant encaissé</label>
                   <div className="relative">
                     <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full bg-emerald-50/50 border border-emerald-200/50 rounded-2xl px-8 py-5 outline-none focus:border-emerald-500 font-black text-3xl text-emerald-600 shadow-inner" placeholder="0" />
                     <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-emerald-200">F</span>
