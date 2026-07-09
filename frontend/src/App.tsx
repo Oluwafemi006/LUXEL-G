@@ -12,6 +12,8 @@ import Stock from './pages/Stock';
 import Notifications from './pages/Notifications';
 import Appointments from './pages/Appointments';
 import Users from './pages/Users';
+import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 import PublicLayout from './components/PublicLayout';
 import PublicPortal from './pages/PublicPortal';
 import ClientSpace from './pages/ClientSpace';
@@ -50,6 +52,7 @@ function App() {
         <Route element={<PublicLayout />}>
           <Route path="/" element={<PublicPortal />} />
           <Route path="/espace-client" element={<ClientSpace />} />
+          <Route path="/espace-client/*" element={<NotFound />} />
         </Route>
 
         {/* Login Staff */}
@@ -64,11 +67,14 @@ function App() {
           <Route path="reparations" element={<Repairs />} />
           <Route path="devis" element={<Quotes />} />
           <Route path="factures" element={<Invoices />} />
-          <Route path="caisse" element={<CashFlow />} />
           <Route path="stock" element={<Stock />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="agenda" element={<Appointments />} />
           <Route path="utilisateurs" element={<RoleRoute role="DIRECTEUR"><Users /></RoleRoute>} />
+          <Route path="profil" element={<Profile />} />
+          <Route path="parametres" element={<RoleRoute role="DIRECTEUR"><Settings /></RoleRoute>} />
+          <Route path="caisse" element={<RoleRoute role="DIRECTEUR"><CashFlow /></RoleRoute>} />
+          <Route path="*" element={<NotFound />} />
         </Route>
 
         {/* Redirections par défaut */}

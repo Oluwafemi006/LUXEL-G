@@ -100,6 +100,7 @@ const Quotes: React.FC = () => {
   const [partLines, setPartLines] = useState<PartLine[]>([]);
   const [notes, setNotes] = useState('');
   const [applyTva, setApplyTva] = useState(false);
+  const [defaultTvaRate, setDefaultTvaRate] = useState(0.18);
 
 
   const fetchRepairs = async () => {
@@ -150,6 +151,14 @@ const Quotes: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       await Promise.all([fetchQuotes(), fetchRepairs(), fetchStock()]);
+      try {
+        const res = await api.get('garage-settings/');
+        if (res.data.taux_tva_defaut) {
+          setDefaultTvaRate(Number(res.data.taux_tva_defaut) / 100);
+        }
+      } catch (e) {
+        console.error('Erreur config tva', e);
+      }
     };
     init();
   }, []);
@@ -269,7 +278,7 @@ const Quotes: React.FC = () => {
   const totalLabor = useMemo(() => laborLines.reduce((sum, line) => sum + Number(line.montant), 0), [laborLines]);
   const totalParts = useMemo(() => partLines.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0), [partLines]);
   const grandTotalHT = totalLabor + totalParts;
-  const tvaAmount = applyTva ? Math.round(grandTotalHT * 0.18) : 0;
+  const tvaAmount = applyTva ? Math.round(grandTotalHT * defaultTvaRate) : 0;
   const grandTotal = grandTotalHT + tvaAmount;
 
   const addLaborLine = () => setLaborLines([...laborLines, { id: `tmp${Date.now()}`, description: '', montant: 0 }]);
@@ -284,7 +293,7 @@ const Quotes: React.FC = () => {
           const newLabors = laborLines.filter(l => l.id !== id);
           const newTotalLabor = newLabors.reduce((sum, line) => sum + Number(line.montant), 0);
           const newHT = newTotalLabor + totalParts;
-          const newTVA = applyTva ? Math.round(newHT * 0.18) : 0;
+          const newTVA = applyTva ? Math.round(newHT * defaultTvaRate) : 0;
           await api.patch(`devis/${currentQuoteId}/`, { total_ht: newHT, tva: newTVA, total_ttc: newHT + newTVA });
         }
       } catch (error) {
@@ -304,7 +313,7 @@ const Quotes: React.FC = () => {
           const newParts = partLines.filter(p => p.id !== id);
           const newTotalParts = newParts.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0);
           const newHT = totalLabor + newTotalParts;
-          const newTVA = applyTva ? Math.round(newHT * 0.18) : 0;
+          const newTVA = applyTva ? Math.round(newHT * defaultTvaRate) : 0;
           await api.patch(`devis/${currentQuoteId}/`, { total_ht: newHT, tva: newTVA, total_ttc: newHT + newTVA });
         }
       } catch (error) {
@@ -427,7 +436,7 @@ const Quotes: React.FC = () => {
       const correctedHT =
         authoritativeLabor.reduce((sum, line) => sum + Number(line.montant), 0) +
         authoritativeParts.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0);
-      const correctedTVA = applyTva ? Math.round(correctedHT * 0.18) : 0;
+      const correctedTVA = applyTva ? Math.round(correctedHT * defaultTvaRate) : 0;
       const correctedQuoteData = {
         ...quoteData,
         total_ht: correctedHT,
@@ -786,7 +795,7 @@ const Quotes: React.FC = () => {
                     <div className="relative z-10">
                       <div className="flex items-center gap-2 mb-4">
                         <input type="checkbox" id="tva-quote" checked={applyTva} onChange={(e) => setApplyTva(e.target.checked)} className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 border-slate-700 bg-slate-800" />
-                        <label htmlFor="tva-quote" className="text-xs font-bold text-slate-300 uppercase tracking-widest cursor-pointer">TVA (18%)</label>
+                        <label htmlFor="tva-quote" className="text-xs font-bold text-slate-300 uppercase tracking-widest cursor-pointer">TVA ({(defaultTvaRate * 100).toFixed(0)}%)</label>
                       </div>
                       <div className="flex justify-between items-center mb-4">
                         <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Montant Global TTC</span>

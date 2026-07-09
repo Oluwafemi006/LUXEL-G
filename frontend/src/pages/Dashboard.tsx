@@ -11,7 +11,9 @@ import {
   Clock,
   CheckCircle2,
   Bell,
-  Loader2
+  Loader2,
+  Settings as SettingsIcon,
+  X
 } from 'lucide-react';
 import {
   AreaChart,
@@ -23,6 +25,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import api, { fetchAllPages } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 import './Dashboard.css';
 
@@ -71,6 +74,42 @@ const Dashboard: React.FC = () => {
   // AI features removed: riskClients and sentiment analysis disabled
 
   const [recentRepairs, setRecentRepairs] = useState<RecentIntervention[]>([]);
+
+  const { user, refreshUser } = useAuth();
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [prefs, setPrefs] = useState<string[]>([]);
+  const [savingPrefs, setSavingPrefs] = useState(false);
+
+  // Initialize prefs from user profile
+  useEffect(() => {
+    if (user?.dashboard_preferences?.length) {
+      setPrefs(user.dashboard_preferences);
+    } else {
+      // Default all visible
+      setPrefs(['clients', 'vehicules', 'reparations', 'impayes', 'finance', 'graphique_ca', 'relances', 'interventions']);
+    }
+  }, [user]);
+
+  const togglePref = (widget: string) => {
+    setPrefs(prev =>
+      prev.includes(widget) ? prev.filter(w => w !== widget) : [...prev, widget]
+    );
+  };
+
+  const savePreferences = async () => {
+    setSavingPrefs(true);
+    try {
+      await api.patch('users/dashboard-prefs/', { widgets: prefs });
+      if (refreshUser) await refreshUser();
+      setShowConfigModal(false);
+    } catch (err) {
+      console.error('Erreur sauvegarde préférences', err);
+    } finally {
+      setSavingPrefs(false);
+    }
+  };
+
+  const isVisible = (widget: string) => prefs.includes(widget);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -129,7 +168,7 @@ const Dashboard: React.FC = () => {
           const depenses = dayMovements
             .filter((m: any) => m.type_mouvement === 'DEPENSE')
             .reduce((acc: number, curr: any) => acc + Number(curr.montant), 0);
-            
+
           last6Days.push({ name: dayName, recettes, depenses });
         }
         setChartData(last6Days);
@@ -183,11 +222,18 @@ const Dashboard: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-800">Tableau de Bord</h2>
           <p className="text-slate-500 text-sm mt-1">Suivi global de l'activité du garage</p>
         </div>
+        {user?.role === 'DIRECTEUR' && (
+          <button onClick={() => setShowConfigModal(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:text-emerald-600 transition-colors shadow-sm font-bold text-sm">
+            <SettingsIcon className="w-4 h-4" />
+            Personnaliser l'affichage
+          </button>
+        )}
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Card 1: Clients */}
+        {isVisible('clients') && (
         <div className="card-anim bg-white rounded-2xl shadow-lg p-6 animate-fade-up cursor-pointer" style={{ animationDelay: '0.1s' }} onClick={() => navigate('/staff/clients')}>
           <div className="flex justify-between items-start">
             <div>
@@ -211,8 +257,10 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+        )}
 
         {/* Card 2: Véhicules */}
+        {isVisible('vehicules') && (
         <div className="card-anim bg-white rounded-2xl shadow-lg p-6 animate-fade-up cursor-pointer" style={{ animationDelay: '0.2s' }} onClick={() => navigate('/staff/vehicules')}>
           <div className="flex justify-between items-start">
             <div>
@@ -236,8 +284,10 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+        )}
 
         {/* Card 3: En Cours */}
+        {isVisible('reparations') && (
         <div className="card-anim bg-white rounded-2xl shadow-lg p-6 animate-fade-up cursor-pointer" style={{ animationDelay: '0.3s' }} onClick={() => navigate('/staff/reparations')}>
           <div className="flex justify-between items-start">
             <div>
@@ -261,8 +311,10 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+        )}
 
         {/* Card 4: Factures du Mois */}
+        {isVisible('impayes') && (
         <div className="card-anim bg-white rounded-2xl shadow-lg p-6 animate-fade-up cursor-pointer" style={{ animationDelay: '0.4s' }} onClick={() => navigate('/staff/factures')}>
           <div className="flex justify-between items-start">
             <div>
@@ -286,9 +338,11 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Deuxième ligne - Financial */}
+      {isVisible('finance') && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Finance du Jour */}
         <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl shadow-xl p-6 animate-slide-in" style={{ animationDelay: '0.3s' }}>
@@ -329,10 +383,12 @@ const Dashboard: React.FC = () => {
         </div>
         </div>
       </div>
+      )}
 
       {/* Chart and Relances Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Chart Container */}
+        {isVisible('graphique_ca') ? (
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-lg p-6 chart-container-anim">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-slate-800">Évolution du Chiffre d'Affaires</h3>
@@ -366,8 +422,10 @@ const Dashboard: React.FC = () => {
             </ResponsiveContainer>
           </div>
         </div>
+        ) : <div className="lg:col-span-2 hidden"></div>}
 
         {/* Relances & Maintenance */}
+        {isVisible('relances') && (
         <div className="bg-white rounded-2xl shadow-lg p-6 animate-fade-right" style={{ animationDelay: '0.5s' }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-slate-800 uppercase tracking-wide">Relances & Maint.</h3>
@@ -402,9 +460,11 @@ const Dashboard: React.FC = () => {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Interventions Récentes Table */}
+      {isVisible('interventions') && (
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden animate-slide-in" style={{ animationDelay: '0.6s' }}>
         <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <h3 className="text-lg font-bold text-slate-800">Interventions Récentes</h3>
@@ -463,9 +523,57 @@ const Dashboard: React.FC = () => {
           </table>
         </div>
       </div>
+      )}
 
+      {/* ── Modal Personnalisation Dashboard ── */}
+      {showConfigModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-fade-up">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+              <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Personnaliser l'affichage</h3>
+              <button onClick={() => setShowConfigModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scroll-sm">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Sélectionnez les widgets à afficher</p>
 
+              {[
+                { id: 'clients', label: 'Statistiques Clients', icon: Users },
+                { id: 'vehicules', label: 'Statistiques Véhicules', icon: Car },
+                { id: 'reparations', label: 'Statistiques Réparations', icon: Wrench },
+                { id: 'impayes', label: 'Statistiques Impayés', icon: AlertTriangle },
+                { id: 'finance', label: 'Finance du Jour (Caisse)', icon: Wallet },
+                { id: 'graphique_ca', label: 'Évolution du Chiffre d\'Affaires', icon: TrendingUp },
+                { id: 'relances', label: 'Relances & Maintenance', icon: Bell },
+                { id: 'interventions', label: 'Interventions Récentes', icon: FileText }
+              ].map(widget => (
+                <label key={widget.id} className="flex items-center justify-between p-4 rounded-xl border border-slate-200 cursor-pointer hover:border-emerald-500 hover:bg-emerald-50 transition-all">
+                  <div className="flex items-center gap-3">
+                    <widget.icon className={`w-5 h-5 ${prefs.includes(widget.id) ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <span className={`text-sm font-bold ${prefs.includes(widget.id) ? 'text-slate-900' : 'text-slate-500'}`}>{widget.label}</span>
+                  </div>
+                  <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${prefs.includes(widget.id) ? 'bg-emerald-600 border-emerald-600' : 'border-slate-300'}`}>
+                    {prefs.includes(widget.id) && <CheckCircle2 className="w-4 h-4 text-white" />}
+                  </div>
+                  <input type="checkbox" checked={prefs.includes(widget.id)} onChange={() => togglePref(widget.id)} className="hidden" />
+                </label>
+              ))}
+            </div>
+
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <button onClick={() => setShowConfigModal(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors">
+                Annuler
+              </button>
+              <button onClick={savePreferences} disabled={savingPrefs} className="px-5 py-2.5 rounded-xl font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center gap-2">
+                {savingPrefs ? <Loader2 className="w-4 h-4 animate-spin" /> : <SettingsIcon className="w-4 h-4" />}
+                {savingPrefs ? 'Sauvegarde...' : 'Appliquer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

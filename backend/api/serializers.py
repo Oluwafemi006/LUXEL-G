@@ -3,7 +3,7 @@ from .models import (
     Client, Vehicule, Reparation, Stock, MouvementStock,
     LigneTravail, LignePiece, Facture, MouvementCaisse, Devis, 
     MaintenancePredictive, Appointment, NotificationClient, Avis, UserProfile,
-    NotificationStaff, EtapeReparation
+    NotificationStaff, EtapeReparation, GarageSettings
 )
 from django.contrib.auth.models import User
 
@@ -190,10 +190,14 @@ class AvisSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     role = serializers.CharField(source='profile.role', required=False)
+    photo = serializers.ImageField(source='profile.photo', required=False, allow_null=True)
+    dashboard_preferences = serializers.ListField(
+        source='profile.dashboard_preferences', required=False, child=serializers.CharField()
+    )
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'password']
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'password', 'photo', 'dashboard_preferences']
         extra_kwargs = {'password': {'write_only': True, 'required': False}}
 
     def to_representation(self, instance):
@@ -202,6 +206,8 @@ class UserSerializer(serializers.ModelSerializer):
         # Déterminer le rôle de manière plus précise
         if hasattr(instance, 'profile'):
             ret['role'] = instance.profile.role
+            if not ret.get('dashboard_preferences'):
+                ret['dashboard_preferences'] = instance.profile.DEFAULT_DASHBOARD_WIDGETS.copy()
         elif hasattr(instance, 'client_profile'):
             ret['role'] = 'CLIENT'
         elif instance.is_superuser:
@@ -238,3 +244,23 @@ class UserSerializer(serializers.ModelSerializer):
             profile.save()
             
         return instance
+
+
+class GarageSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GarageSettings
+        fields = [
+            'nom_garage', 'ifu', 'rccm', 'adresse', 'telephone', 'email',
+            'logo', 'solde_ouverture_caisse', 'taux_tva_defaut', 'seuil_alerte_stock_defaut',
+        ]
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, min_length=6)
+
+    def validate_old_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("L'ancien mot de passe est incorrect.")
+        return value

@@ -109,6 +109,7 @@ const Invoices: React.FC = () => {
   const [laborLines, setLaborLines] = useState<LaborLine[]>([]);
   const [partLines, setPartLines] = useState<PartLine[]>([]);
   const [applyTva, setApplyTva] = useState(false);
+  const [defaultTvaRate, setDefaultTvaRate] = useState(0.18);
   // AI part suggestion feature removed
 
 
@@ -173,6 +174,14 @@ const Invoices: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       await Promise.all([fetchInvoices(), fetchRepairs(), fetchStock()]);
+      try {
+        const res = await api.get('garage-settings/');
+        if (res.data.taux_tva_defaut) {
+          setDefaultTvaRate(Number(res.data.taux_tva_defaut) / 100);
+        }
+      } catch (e) {
+        console.error('Erreur config tva', e);
+      }
     };
     init();
   }, []);
@@ -398,7 +407,7 @@ const handleDownloadPDF = async () => {
   const totalLabor = useMemo(() => laborLines.reduce((sum, line) => sum + Number(line.montant), 0), [laborLines]);
   const totalParts = useMemo(() => partLines.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0), [partLines]);
   const grandTotalHT = totalLabor + totalParts;
-  const tvaAmount = applyTva ? Math.round(grandTotalHT * 0.18) : 0;
+  const tvaAmount = applyTva ? Math.round(grandTotalHT * defaultTvaRate) : 0;
   const grandTotal = grandTotalHT + tvaAmount;
 
   const addLaborLine = () => setLaborLines([...laborLines, { id: `tmp${Date.now()}`, description: '', montant: 0 }]);
@@ -413,7 +422,7 @@ const handleDownloadPDF = async () => {
           const newLabors = laborLines.filter(l => l.id !== id);
           const newTotalLabor = newLabors.reduce((sum, line) => sum + Number(line.montant), 0);
           const newHT = newTotalLabor + totalParts;
-          const newTVA = applyTva ? Math.round(newHT * 0.18) : 0;
+          const newTVA = applyTva ? Math.round(newHT * defaultTvaRate) : 0;
           await api.patch(`factures/${currentInvoiceId}/`, { total_ht: newHT, tva: newTVA, total_ttc: newHT + newTVA });
         }
       } catch (error) {
@@ -433,7 +442,7 @@ const handleDownloadPDF = async () => {
           const newParts = partLines.filter(p => p.id !== id);
           const newTotalParts = newParts.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0);
           const newHT = totalLabor + newTotalParts;
-          const newTVA = applyTva ? Math.round(newHT * 0.18) : 0;
+          const newTVA = applyTva ? Math.round(newHT * defaultTvaRate) : 0;
           await api.patch(`factures/${currentInvoiceId}/`, { total_ht: newHT, tva: newTVA, total_ttc: newHT + newTVA });
         }
       } catch (error) {
@@ -552,7 +561,7 @@ const handleDownloadPDF = async () => {
       const correctedHT =
         authoritativeLabor.reduce((sum, line) => sum + Number(line.montant), 0) +
         authoritativeParts.reduce((sum, line) => sum + (Number(line.quantite) * Number(line.prix_unitaire)), 0);
-      const correctedTVA = applyTva ? Math.round(correctedHT * 0.18) : 0;
+      const correctedTVA = applyTva ? Math.round(correctedHT * defaultTvaRate) : 0;
       const correctedInvoiceData = {
         ...invoiceData,
         total_ht: correctedHT,
@@ -976,14 +985,14 @@ const handleDownloadPDF = async () => {
                       )}
                       <div className="flex items-center gap-2 mb-4">
                         <input type="checkbox" id="tva-invoice" checked={applyTva} onChange={(e) => setApplyTva(e.target.checked)} className="w-4 h-4 rounded text-emerald-500 border-slate-700 bg-slate-800" />
-                        <label htmlFor="tva-invoice" className="text-xs font-bold text-slate-300 uppercase tracking-widest cursor-pointer">Appliquer TVA (18%)</label>
+                        <label htmlFor="tva-invoice" className="text-xs font-bold text-slate-300 uppercase tracking-widest cursor-pointer">Appliquer TVA ({(defaultTvaRate * 100).toFixed(0)}%)</label>
                       </div>
                       <div className="flex justify-between items-center mb-6">
                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Total Hors Taxes</span>
                         <span className="text-lg font-bold">{(grandTotalHT).toLocaleString()} F</span>
                       </div>
                       <div className="flex justify-between items-center mb-6" style={{ opacity: applyTva ? 1 : 0.3 }}>
-                        <span className="text-[10px] font-black uppercase tracking-[0.3em]">TVA (18%)</span>
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em]">TVA ({(defaultTvaRate * 100).toFixed(0)}%)</span>
                         <span className="text-lg font-bold">{tvaAmount.toLocaleString()} F</span>
                       </div>
                       <div className="pt-6 border-t border-slate-800">

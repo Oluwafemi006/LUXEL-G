@@ -27,7 +27,8 @@ from api.utils import generate_document_pdf, generate_fiche_reception_pdf
 from api.models import (
     Client, Vehicule, Reparation, Stock, Facture, LigneTravail, LignePiece,
     MouvementCaisse, Devis, MaintenancePredictive, Appointment,
-    NotificationClient, Avis, NotificationStaff, MouvementStock, ClientOTP, EtapeReparation
+    NotificationClient, Avis, NotificationStaff, MouvementStock, ClientOTP, EtapeReparation,
+    GarageSettings, UserProfile
 )
 from api.serializers import (
     ClientSerializer, VehiculeSerializer, ReparationSerializer,
@@ -36,5 +37,6 @@ from api.serializers import (
     MouvementCaisseSerializer, DevisSerializer, MaintenancePredictiveSerializer,
     AppointmentSerializer, NotificationClientSerializer, AvisSerializer,
     NotificationStaffSerializer, MouvementStockSerializer, EtapeReparationSerializer,
+    GarageSettingsSerializer, PasswordChangeSerializer,
 )
 from .permissions import IsDirecteur, IsStaffMember, RDVAnonThrottle, RDVUserThrottle

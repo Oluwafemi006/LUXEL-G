@@ -16,7 +16,9 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
+  UserCog,
+  Settings
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -49,11 +51,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, isMobileOpen, 
     { name: 'Réparations',      icon: Wrench,           path: '/staff/reparations' },
     { name: 'Gestion Devis',    icon: FileText,         path: '/staff/devis' },
     { name: 'Facturation',      icon: Receipt,          path: '/staff/factures' },
-    { name: 'Gestion Caisse',   icon: Wallet,           path: '/staff/caisse' },
+    { name: 'Gestion Caisse',   icon: Wallet,           path: '/staff/caisse',        role: 'DIRECTEUR' },
     { name: 'Gestion Stock',    icon: Package,          path: '/staff/stock' },
     { name: 'Agenda & RDV',     icon: Calendar,         path: '/staff/agenda' },
     { name: 'Notifications',    icon: Bell,             path: '/staff/notifications' },
+    { name: 'Mon Profil',       icon: UserCog,          path: '/staff/profil' },
     { name: 'Utilisateurs',     icon: Users,            path: '/staff/utilisateurs',  role: 'DIRECTEUR' },
+    { name: 'Paramètres',       icon: Settings,         path: '/staff/parametres',    role: 'DIRECTEUR' },
   ];
 
   const filteredItems = menuItems.filter(item => !item.role || item.role === user?.role);

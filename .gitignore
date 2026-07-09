@@ -82,4 +82,5 @@ frontend/.env
 *.key
 *.pid
 backend/db.sqlite3
-\n# Firebase\n*firebase-service-account.json
+# Firebase
+*firebase-service-account.json

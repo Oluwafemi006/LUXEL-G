@@ -5,11 +5,13 @@ import Sidebar from './Sidebar';
 import Modal from './Modal';
 import RepairForm from './forms/RepairForm';
 import GlobalSearch from './GlobalSearch';
-import api from '../services/api';
+import api, { resolveMediaUrl } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [isRepairModalOpen, setIsRepairModalOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -52,6 +54,9 @@ const MainLayout: React.FC = () => {
       alert("Erreur lors de la création de l'ordre de réparation.");
     }
   };
+
+  const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || 'Utilisateur';
+  const displayRole = user?.role === 'DIRECTEUR' ? 'Directeur' : user?.role === 'SECRETAIRE' ? 'Secrétaire' : user?.role || 'Staff';
 
   return (
     /* Conteneur racine : sidebar fixée à gauche, contenu à droite */
@@ -123,11 +128,19 @@ const MainLayout: React.FC = () => {
             {/* Profil utilisateur (Masqué sur mobile compact) */}
             <div className="hidden sm:flex items-center gap-3 pl-4 border-l border-slate-200">
               <div className="text-right leading-none hidden md:block">
-                <p className="text-xs font-oswald font-bold text-slate-900 uppercase tracking-wider">Eddy Boni</p>
-                <p className="text-[9px] font-oswald font-medium text-emerald-600 uppercase tracking-widest mt-0.5">Admin</p>
+                <p className="text-xs font-oswald font-bold text-slate-900 uppercase tracking-wider">{displayName}</p>
+                <p className="text-[9px] font-oswald font-medium text-emerald-600 uppercase tracking-widest mt-0.5">{displayRole}</p>
               </div>
-              <div className="w-9 h-9 bg-slate-100 rounded-md flex items-center justify-center text-slate-400 border border-slate-200 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer">
-                <User className="w-5 h-5" />
+              <div
+                onClick={() => navigate('/staff/profil')}
+                className="w-9 h-9 bg-slate-100 rounded-md flex items-center justify-center text-slate-400 border border-slate-200 hover:bg-emerald-600 hover:border-emerald-600 hover:text-white transition-all cursor-pointer overflow-hidden"
+                title="Mon Profil"
+              >
+                {user?.photo ? (
+                  <img src={resolveMediaUrl(user.photo)} alt="Profil" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-5 h-5" />
+                )}
               </div>
             </div>
           </div>

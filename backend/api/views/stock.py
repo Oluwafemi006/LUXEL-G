@@ -7,6 +7,13 @@ class StockViewSet(viewsets.ModelViewSet):
     serializer_class = StockSerializer
     permission_classes = [IsStaffMember]
 
+    def perform_create(self, serializer):
+        if 'seuil_alerte' not in self.request.data:
+            settings_obj = GarageSettings.load()
+            serializer.save(seuil_alerte=settings_obj.seuil_alerte_stock_defaut)
+        else:
+            serializer.save()
+
     @action(detail=True, methods=['post'])
     def approvisionner(self, request, pk=None):
         item = self.get_object()
@@ -66,7 +73,7 @@ class StockViewSet(viewsets.ModelViewSet):
 class MouvementCaisseViewSet(viewsets.ModelViewSet):
     queryset = MouvementCaisse.objects.all().order_by('-date_creation')
     serializer_class = MouvementCaisseSerializer
-    permission_classes = [IsStaffMember]
+    permission_classes = [IsDirecteur]
 
     @action(detail=False, methods=['get'])
     def synthese(self, request):
@@ -83,8 +90,13 @@ class MouvementCaisseViewSet(viewsets.ModelViewSet):
         ).aggregate(
             s=models.Sum(models.F('total_ttc') - models.F('montant_paye'))
         )['s'] or 0
+
+        settings_obj = GarageSettings.load()
+        solde_initial = settings_obj.solde_ouverture_caisse or 0
+        solde_global = solde_initial + recettes - depenses
+
         return Response({'total_recettes': recettes, 'total_depenses': depenses,
-                         'solde': recettes - depenses, 'recettes_jour': r_j,
+                         'solde': solde_global, 'recettes_jour': r_j,
                          'depenses_jour': d_j, 'total_impayes': impayes})
 
 

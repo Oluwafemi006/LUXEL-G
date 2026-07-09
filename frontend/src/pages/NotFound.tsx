@@ -7,20 +7,28 @@ const NotFound: React.FC = () => {
   const location = useLocation();
   const { isAuthenticated, user } = useAuth();
 
-  // Déterminer si l'utilisateur est dans l'espace interne (/staff/...)
+  // Déterminer l'espace courant pour éviter les croisements public/client/staff.
   const isInStaffArea = location.pathname.startsWith('/staff');
+  const isInClientArea = location.pathname.startsWith('/espace-client');
 
-  // Redirection intelligente selon le rôle
   const getHomePath = () => {
-    if (isInStaffArea && isAuthenticated) {
+    if (isInStaffArea) {
+      if (!isAuthenticated) return '/login';
       return user?.role === 'DIRECTEUR' ? '/staff' : '/staff/reception';
+    }
+    if (isInClientArea) {
+      return '/espace-client';
     }
     return '/';
   };
 
   const getHomeLabel = () => {
-    if (isInStaffArea && isAuthenticated) {
+    if (isInStaffArea) {
+      if (!isAuthenticated) return 'Connexion staff';
       return user?.role === 'DIRECTEUR' ? 'Tableau de bord' : 'Réception';
+    }
+    if (isInClientArea) {
+      return 'Espace client';
     }
     return "Retour à l'accueil";
   };
@@ -69,7 +77,7 @@ const NotFound: React.FC = () => {
             <Home className="w-4 h-4" />
             {getHomeLabel()}
           </NavLink>
-          {!isInStaffArea && (
+          {!isInStaffArea && !isInClientArea && (
             <NavLink
               to="/espace-client"
               className="flex items-center gap-2 px-8 py-3.5 bg-white text-slate-700 border border-slate-200 rounded-lg font-bebas tracking-widest uppercase text-sm hover:bg-slate-50 hover:border-slate-300 transition-all w-full sm:w-auto justify-center"

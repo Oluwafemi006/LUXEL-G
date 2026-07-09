@@ -5,6 +5,7 @@ from api.services import predict_payment_risk
 
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_queryset(self):
         from api.models import UserProfile
@@ -13,14 +14,55 @@ class UserViewSet(viewsets.ModelViewSet):
         ).distinct().order_by('-id')
 
     def get_permissions(self):
-        if self.action == 'me':
-            return [permissions.IsAuthenticated()]
+        if self.action in ['me', 'update_profile', 'change_password']:
+            return [IsStaffMember()]
+        if self.action == 'update_dashboard_prefs':
+            return [IsDirecteur()]
         return [IsDirecteur()]
 
     @action(detail=False, methods=['get'])
     def me(self, request):
         from api.serializers import UserSerializer
         return Response(UserSerializer(request.user).data)
+
+    @action(detail=False, methods=['post', 'patch'], url_path='update-profile')
+    def update_profile(self, request):
+        """Permet à tout utilisateur staff de modifier son nom, prénom et photo."""
+        user = request.user
+        user.first_name = request.data.get('first_name', user.first_name)
+        user.last_name = request.data.get('last_name', user.last_name)
+        user.save(update_fields=['first_name', 'last_name'])
+
+        profile, created = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={'role': 'DIRECTEUR' if user.is_superuser else 'SECRETAIRE'}
+        )
+        if 'photo' in request.FILES:
+            profile.photo = request.FILES['photo']
+            profile.save(update_fields=['photo'])
+
+        return Response(UserSerializer(user).data)
+
+    @action(detail=False, methods=['post'], url_path='change-password')
+    def change_password(self, request):
+        """Change le mot de passe (exige l'ancien mot de passe)."""
+        serializer = PasswordChangeSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        request.user.set_password(serializer.validated_data['new_password'])
+        request.user.save()
+        return Response({'message': 'Mot de passe modifié avec succès.'})
+
+    @action(detail=False, methods=['post', 'patch'], url_path='dashboard-prefs')
+    def update_dashboard_prefs(self, request):
+        """Met à jour les widgets affichés sur le dashboard (Directeur uniquement)."""
+        widgets = request.data.get('widgets', [])
+        profile, created = UserProfile.objects.get_or_create(
+            user=request.user,
+            defaults={'role': 'DIRECTEUR' if request.user.is_superuser else 'SECRETAIRE'}
+        )
+        profile.dashboard_preferences = widgets
+        profile.save(update_fields=['dashboard_preferences'])
+        return Response({'dashboard_preferences': profile.dashboard_preferences})
 
 
 class StatsViewSet(viewsets.ViewSet):

@@ -9,7 +9,7 @@ from .views import (
     FactureViewSet, DevisViewSet,
     StockViewSet, MouvementCaisseViewSet, MaintenancePredictiveViewSet, StatsViewSet,
     AppointmentViewSet, NotificationClientViewSet, NotificationStaffViewSet, AvisViewSet,
-    ClientSpaceViewSet, UserViewSet, kkiapay_webhook,
+    ClientSpaceViewSet, UserViewSet, GarageSettingsViewSet, kkiapay_webhook,
 )
 
 router = DefaultRouter()
@@ -32,6 +32,7 @@ router.register(r'appointments', AppointmentViewSet)
 router.register(r'notifications-clients', NotificationClientViewSet)
 router.register(r'avis', AvisViewSet)
 router.register(r'notifications-staff', NotificationStaffViewSet)
+router.register(r'garage-settings', GarageSettingsViewSet, basename='garage-settings')
 
 urlpatterns = [
     path('', include(router.urls)),

@@ -10,6 +10,7 @@ from .stock import StockViewSet, MouvementCaisseViewSet, MaintenancePredictiveVi
 from .appointments import AppointmentViewSet, NotificationClientViewSet, NotificationStaffViewSet, AvisViewSet
 from .client_space import ClientSpaceViewSet
 from .dashboard import UserViewSet, StatsViewSet
+from .settings import GarageSettingsViewSet
 from .webhooks import kkiapay_webhook
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     'AppointmentViewSet', 'NotificationClientViewSet', 'NotificationStaffViewSet', 'AvisViewSet',
     'ClientSpaceViewSet',
     'UserViewSet', 'StatsViewSet',
+    'GarageSettingsViewSet',
 ]

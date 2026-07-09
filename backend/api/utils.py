@@ -7,11 +7,17 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable, Image
 from reportlab.lib.units import cm
+from api.models import GarageSettings
 
 
 def get_logo_image(width=4*cm):
     """Utility to get the logo image object if it exists."""
-    logo_path = os.path.join(settings.BASE_DIR.parent, 'logo.png')
+    settings_obj = GarageSettings.load()
+    if settings_obj.logo and hasattr(settings_obj.logo, 'path') and os.path.exists(settings_obj.logo.path):
+        logo_path = settings_obj.logo.path
+    else:
+        logo_path = os.path.join(settings.BASE_DIR.parent, 'logo.png')
+
     if os.path.exists(logo_path):
         # Image maintains aspect ratio if only width or height is provided
         img = Image(logo_path)
@@ -44,8 +50,15 @@ def generate_fiche_reception_pdf(reparation):
     small = ParagraphStyle('Small', parent=styles['Normal'], fontSize=8)
 
     # ── EN-TÊTE ────────────────────────────────────────────────
+    settings_obj = GarageSettings.load()
     logo = get_logo_image(width=2.5*cm)
-    company_info = Paragraph('<b>LUXURY ÉLÉGANCE GARAGE</b><br/>Quartier Okedama, von hôpital Ahmadiyya<br/>Parakou, Bénin<br/>Tél : +229 01 92 62 98 60<br/>IFU : 3202487942483 | RCCM : RB/PKO/24B 1195', small)
+    company_info = Paragraph(
+        f'<b>{settings_obj.nom_garage.upper()}</b><br/>'
+        f'{settings_obj.adresse or "Adresse non définie"}<br/>'
+        f'Tél : {settings_obj.telephone or "—"}<br/>'
+        f'IFU : {settings_obj.ifu or "—"} | RCCM : {settings_obj.rccm or "—"}',
+        small
+    )
     
     header_data = [[
         [logo, company_info] if logo else company_info,
@@ -175,7 +188,7 @@ def generate_fiche_reception_pdf(reparation):
     elements.append(Spacer(1, 0.3*cm))
     elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#0056b3')))
     elements.append(Paragraph(
-        '<i>« Notre professionnalisme fait la différence » — Luxury Élégance Garage, Parakou, Bénin</i>',
+        f'<i>« Notre professionnalisme fait la différence » — {settings_obj.nom_garage}</i>',
         ParagraphStyle('Footer', parent=styles['Normal'], fontSize=7, alignment=1, textColor=colors.grey)
     ))
 
@@ -197,13 +210,14 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
     style_emecef = ParagraphStyle('EmecefStyle', parent=styles['Normal'], fontSize=8, leading=10)
 
     # 1. Header (Logo & Company Info)
+    settings_obj = GarageSettings.load()
     logo = get_logo_image(width=4.5*cm)
     company_details = Paragraph(
-        '<b>LUXURY ÉLÉGANCE GARAGE</b><br/>'
+        f'<b>{settings_obj.nom_garage.upper()}</b><br/>'
         'Expertise Automobile & Entretien<br/>'
-        'Quartier Okedama, Parakou, Bénin<br/>'
-        'Tél : +229 01 92 62 98 60<br/>'
-        'IFU : 3202487942483',
+        f'{settings_obj.adresse or "Adresse non définie"}<br/>'
+        f'Tél : {settings_obj.telephone or "—"}<br/>'
+        f'IFU : {settings_obj.ifu or "—"}',
         ParagraphStyle('CompanyInfo', parent=styles['Normal'], fontSize=10, leading=14, alignment=2)
     )
     
@@ -290,7 +304,12 @@ def generate_document_pdf(obj, doc_type="FACTURE"):
 
     # 5. Totals — TVA dynamique basée sur les données réelles de l'objet
     tva_val = float(getattr(obj, 'tva', 0) or 0)
-    tva_pct_label = "18%" if tva_val > 0 else "0%"
+    total_ht_val = float(getattr(obj, 'total_ht', 0) or 0)
+    if tva_val > 0 and total_ht_val > 0:
+        tva_pct = (tva_val / total_ht_val) * 100
+        tva_pct_label = f"{tva_pct:.0f}%"
+    else:
+        tva_pct_label = "0%"
     total_data = [
         ["", "", "TOTAL HT:", f"{float(obj.total_ht):,.0f}".replace(',', ' ') + " F"],
         ["", "", f"TVA ({tva_pct_label}):", f"{tva_val:,.0f}".replace(',', ' ') + " F"],

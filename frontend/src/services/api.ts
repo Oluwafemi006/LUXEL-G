@@ -28,6 +28,16 @@ const api = axios.create({
   },
 });
 
+const getApiPath = (url?: string) => {
+  if (!url) return '';
+  const normalizedUrl = url.startsWith(API_BASE_URL)
+    ? url.slice(API_BASE_URL.length)
+    : url.replace(/^\/+/, '');
+  return normalizedUrl;
+};
+
+const isClientRequest = (url?: string) => getApiPath(url).startsWith('client-space/');
+
 export const fetchAllPages = async <T>(url: string, config: AxiosRequestConfig = {}): Promise<T[]> => {
   const separator = url.includes('?') ? '&' : '?';
   let nextUrl: string | null = `${url}${separator}page_size=500`;
@@ -56,8 +66,8 @@ export const fetchAllPages = async <T>(url: string, config: AxiosRequestConfig =
 // Intercepteur pour ajouter le token JWT approprié (Client ou Staff)
 api.interceptors.request.use(
   (config) => {
-    // Les requêtes du client commencent par "client-space/"
-    const isClient = config.url?.startsWith('client-space/');
+    // Les requêtes de l'espace client passent uniquement par client-space/.
+    const isClient = isClientRequest(config.url);
     const tokenKey = isClient ? 'client_access_token' : 'staff_access_token';
     const token = localStorage.getItem(tokenKey);
     
@@ -90,7 +100,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       
-      const isClient = originalRequest.url?.startsWith('client-space/');
+      const isClient = isClientRequest(originalRequest.url);
       const prefix = isClient ? 'client' : 'staff';
       
       const refreshToken = localStorage.getItem(`${prefix}_refresh_token`);
@@ -114,7 +124,9 @@ api.interceptors.response.use(
         }
       } else {
         if (!isClient) {
-           window.location.href = '/login';
+          window.location.href = '/login';
+        } else {
+          window.dispatchEvent(new CustomEvent('client_auth_error'));
         }
       }
     }

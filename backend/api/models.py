@@ -6,16 +6,68 @@ from django.core.exceptions import ValidationError
 from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 
+
+def default_dashboard_preferences():
+    return [
+        'clients', 'vehicules', 'reparations', 'impayes',
+        'finance', 'graphique_ca', 'relances', 'interventions',
+    ]
+
+
 class UserProfile(models.Model):
     ROLE_CHOICES = [
         ('DIRECTEUR', 'Directeur'),
         ('SECRETAIRE', 'Secrétaire'),
     ]
+    DEFAULT_DASHBOARD_WIDGETS = default_dashboard_preferences()
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='SECRETAIRE')
+    photo = models.ImageField(upload_to='staff_photos/', blank=True, null=True)
+    dashboard_preferences = models.JSONField(
+        default=default_dashboard_preferences,
+        blank=True,
+        verbose_name="Widgets du tableau de bord",
+        help_text="Liste des widgets activés pour le dashboard du Directeur."
+    )
+
+    def save(self, *args, **kwargs):
+        if not self.dashboard_preferences:
+            self.dashboard_preferences = self.DEFAULT_DASHBOARD_WIDGETS.copy()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.user.username} - {self.role}"
+
+
+class GarageSettings(models.Model):
+    """Singleton : paramètres globaux du garage (une seule ligne en BDD)."""
+    nom_garage = models.CharField(max_length=200, default='Luxury Elegance Garage')
+    ifu = models.CharField(max_length=20, blank=True, null=True, verbose_name="IFU")
+    rccm = models.CharField(max_length=50, blank=True, null=True, verbose_name="RCCM")
+    adresse = models.TextField(blank=True, null=True)
+    telephone = models.CharField(max_length=30, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    logo = models.ImageField(upload_to='garage/', blank=True, null=True)
+    solde_ouverture_caisse = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    taux_tva_defaut = models.DecimalField(max_digits=5, decimal_places=2, default=18.00, verbose_name="TVA par défaut (%)")
+    seuil_alerte_stock_defaut = models.IntegerField(default=10, verbose_name="Seuil alerte stock")
+
+    class Meta:
+        verbose_name = "Paramètres du Garage"
+        verbose_name_plural = "Paramètres du Garage"
+
+    def save(self, *args, **kwargs):
+        # Force un seul enregistrement en BDD (Singleton)
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return self.nom_garage
 
 class Client(models.Model):
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='client_profile')
