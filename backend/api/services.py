@@ -71,6 +71,22 @@ def send_whatsapp_otp(phone_number: str, code: str) -> bool:
     return send_whatsapp_message(phone_number, message)
 
 
+def send_sms(phone_number: str, message: str) -> bool:
+    """
+    Compatibilité avec les modules historiques qui appellent send_sms().
+    L'envoi passe actuellement par WhatsApp Meta Cloud API.
+    """
+    return send_whatsapp_message(phone_number, message)
+
+
+def send_otp_sms(phone_number: str, message: str) -> bool:
+    """
+    Compatibilité avec les notifications client historiques.
+    Malgré le nom, ce helper envoie le message fourni tel quel.
+    """
+    return send_sms(phone_number, message)
+
+
 # --- SERVICES IA (REMOVED) ---
 # Les helpers d'IA (Google Gemini, chatbot, suggestions, analyse de sentiment)
 # ont été retirés du projet sur demande. Pour garder la compatibilité,
@@ -155,8 +171,11 @@ def verify_kkiapay_transaction(transaction_id):
 
     try:
         # Petite tolérance au délai de propagation Kkiapay après un paiement réussi.
+        last_response = None
         for attempt in range(3):
             res = k.verify_transaction(transaction_id)
+            if isinstance(res, dict):
+                last_response = res
 
             if isinstance(res, dict):
                 status_value = str(
@@ -176,7 +195,7 @@ def verify_kkiapay_transaction(transaction_id):
             if attempt < 2:
                 time.sleep(1.5)
 
-        return None
+        return last_response
     except Exception as e:
         logger.error("[KKIAPAY] Erreur de vérification : %s", repr(e))
         return None

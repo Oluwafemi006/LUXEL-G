@@ -31,11 +31,24 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-default-key-for-dev')
 # En production, définir DEBUG=False dans le fichier .env
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
+
+def _bool_env(name, default=False):
+    return os.getenv(name, str(default)).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _csv_env(name, default=''):
+    return [
+        value.strip()
+        for value in os.getenv(name, default).split(',')
+        if value.strip()
+    ]
+
+
 # En développement local, autoriser tous les hôtes.
 # En production, définir ALLOWED_HOSTS dans le .env (ex: "luxel-g.com,www.luxel-g.com")
-_allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '')
+_allowed_hosts_env = _csv_env('ALLOWED_HOSTS')
 if _allowed_hosts_env:
-    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',')]
+    ALLOWED_HOSTS = _allowed_hosts_env
 elif DEBUG:
     ALLOWED_HOSTS = ['*']
 else:
@@ -78,10 +91,10 @@ MIDDLEWARE = [
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
-    CORS_ALLOWED_ORIGINS = [
-        origin.strip()
-        for origin in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
-    ]
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = _csv_env('CORS_ALLOWED_ORIGINS')
+
+CSRF_TRUSTED_ORIGINS = _csv_env('CSRF_TRUSTED_ORIGINS')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -299,10 +312,12 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
-    # Uncomment these if using HTTPS
-    # SESSION_COOKIE_SECURE = True
-    # CSRF_COOKIE_SECURE = True
-    # SECURE_SSL_REDIRECT = True
-    # SECURE_HSTS_SECONDS = 31536000
-    # SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    # SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = _bool_env('SESSION_COOKIE_SECURE', True)
+    CSRF_COOKIE_SECURE = _bool_env('CSRF_COOKIE_SECURE', True)
+    SECURE_SSL_REDIRECT = _bool_env('SECURE_SSL_REDIRECT', False)
+    SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = _bool_env('SECURE_HSTS_INCLUDE_SUBDOMAINS', False)
+    SECURE_HSTS_PRELOAD = _bool_env('SECURE_HSTS_PRELOAD', False)
+
+    if _bool_env('USE_X_FORWARDED_PROTO', True):
+        SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

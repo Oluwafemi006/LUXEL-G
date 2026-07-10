@@ -40,4 +40,5 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('search/', GlobalSearchView.as_view(), name='global-search'),
     path('webhooks/kkiapay/', kkiapay_webhook, name='kkiapay_webhook'),
+    path('kkiapay-webhook/', kkiapay_webhook, name='kkiapay_webhook_legacy'),
 ]

@@ -14,26 +14,30 @@ from api.services import verify_kkiapay_transaction, finalize_paid_facture
 logger = logging.getLogger(__name__)
 
 
-def _extract_invoice_id(source):
+def _extract_kkiapay_metadata(source):
     if not source:
-        return None
+        return {}
 
     raw_value = source.get('state') or source.get('data')
     if not raw_value:
-        return None
+        return {}
 
     if isinstance(raw_value, dict):
-        return raw_value.get('invoice_id')
+        return raw_value
 
     if isinstance(raw_value, str):
         try:
             parsed = json.loads(raw_value)
             if isinstance(parsed, dict):
-                return parsed.get('invoice_id')
+                return parsed
         except json.JSONDecodeError:
-            return None
+            return {}
 
-    return None
+    return {}
+
+
+def _extract_invoice_id(source):
+    return _extract_kkiapay_metadata(source).get('invoice_id')
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -51,8 +55,8 @@ def kkiapay_webhook(request):
         return Response({'error': 'transactionId manquant'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Toujours interroger Kkiapay pour éviter l'usurpation (Spoofing)
-    kkiapay_tx = verify_kkiapay_transaction(transaction_id)
-    
+    kkiapay_tx = verify_kkiapay_transaction(transaction_id) or {}
+
     status_value = str(
         kkiapay_tx.get('status')
         or kkiapay_tx.get('transactionStatus')
@@ -62,7 +66,10 @@ def kkiapay_webhook(request):
 
     if not kkiapay_tx or status_value not in ('SUCCESSFULL', 'SUCCESS', 'SUCCESSFUL', 'SUCCEEDED', 'PAID', 'APPROVED'):
         logger.warning(f"[WEBHOOK KKIAPAY] Transaction non valide ou introuvable : {transaction_id}")
-        return Response({'error': 'Transaction invalide'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'error': 'Transaction invalide',
+            'detail': f"Statut Kkiapay: {status_value or 'INCONNU'}",
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     montant = Decimal(str(
         kkiapay_tx.get('amount')
@@ -74,9 +81,15 @@ def kkiapay_webhook(request):
     if montant <= 0:
         return Response({'error': 'Montant invalide'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Récupérer l'ID de la facture depuis les données custom de Kkiapay (state ou data)
-    # Le frontend envoie actuellement data: JSON.stringify({ invoice_id: invoice.id })
-    invoice_id = _extract_invoice_id(kkiapay_tx) or _extract_invoice_id(payload)
+    # Récupérer les métadonnées depuis les données custom de Kkiapay (state ou data).
+    # Le frontend envoie data: JSON.stringify({ invoice_id, demande_normalisation }).
+    kkiapay_metadata = _extract_kkiapay_metadata(kkiapay_tx)
+    payload_metadata = _extract_kkiapay_metadata(payload)
+    invoice_id = (
+        kkiapay_metadata.get('invoice_id')
+        or payload_metadata.get('invoice_id')
+        or payload.get('invoice_id')
+    )
 
     if not invoice_id:
         logger.error(f"[WEBHOOK KKIAPAY] Impossible d'identifier la facture pour la TX: {transaction_id}")
@@ -109,7 +122,11 @@ def kkiapay_webhook(request):
         montant_enregistre,
         transaction_id,
         client=facture.reparation.vehicule.client,
-        demande_normalisation=bool(payload.get('demande_normalisation', False)),
+        demande_normalisation=bool(
+            kkiapay_metadata.get('demande_normalisation')
+            or payload_metadata.get('demande_normalisation')
+            or payload.get('demande_normalisation', False)
+        ),
         request_user=None,
     )
 

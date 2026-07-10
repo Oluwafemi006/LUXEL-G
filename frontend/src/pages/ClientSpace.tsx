@@ -114,7 +114,7 @@ interface Maintenance {
 const ClientSpace: React.FC = () => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [loginMethod] = useState<'PHONE' | 'EMAIL'>('EMAIL'); // Firebase temporairement désactivé
+  const [loginMethod, setLoginMethod] = useState<'PHONE' | 'EMAIL'>('PHONE');
   const [otp, setOtp] = useState('');
 
   const [otpStep, setOtpStep] = useState<'PHONE' | 'OTP'>('PHONE');
@@ -527,6 +527,7 @@ const ClientSpace: React.FC = () => {
       window.removeKkiapayListener?.('failed', onFailed);
       window.removeKkiapayListener?.('dismissed', onDismissed);
       window.removeKkiapayListener?.('close', onDismissed);
+      window.removeKkiapayListener?.('closed', onDismissed);
     };
 
     const closeWidget = () => {
@@ -554,8 +555,9 @@ const ClientSpace: React.FC = () => {
         fetchClientData();
       } catch (err: any) {
         const backendError = err.response?.data?.error;
+        const backendDetail = err.response?.data?.detail;
         if (backendError) {
-          alert(backendError);
+          alert([backendError, backendDetail].filter(Boolean).join('\n'));
         } else {
           alert('Paiement reçu, mais la confirmation automatique est en attente. La facture sera mise à jour dès validation serveur.');
         }
@@ -565,12 +567,10 @@ const ClientSpace: React.FC = () => {
       }
     };
 
-    // Gestion de la fermeture ou de l'échec pour débloquer le bouton
+    // Kkiapay peut émettre "failed" pendant que le widget attend encore la
+    // confirmation mobile money/USSD. On garde donc le listener "success" actif.
     const onFailed = (err: any) => {
-      cleanupListeners();
-      closeWidget();
-      console.error("[KKIAPAY] Échec :", err);
-      setPayingInvoice(null);
+      console.warn("[KKIAPAY] Paiement non confirmé pour le moment :", err);
     };
 
     // Note: Kkiapay peut utiliser 'dismissed' ou 'closed' selon la version
@@ -584,6 +584,7 @@ const ClientSpace: React.FC = () => {
     window.addKkiapayListener('failed', onFailed);
     window.addKkiapayListener('dismissed', onDismissed);
     window.addKkiapayListener('close', onDismissed);
+    window.addKkiapayListener('closed', onDismissed);
 
     window.openKkiapayWidget({
       amount: Math.round(reste),
@@ -593,7 +594,7 @@ const ClientSpace: React.FC = () => {
       name: `${clientData?.client?.nom || ''} ${clientData?.client?.prenoms || ''}`.trim(),
       email: clientData?.client?.email || '',
       phone: clientData?.client?.contact || '',
-      data: JSON.stringify({ invoice_id: invoice.id }),
+      data: JSON.stringify({ invoice_id: invoice.id, demande_normalisation: demandeNormalisation }),
       callback: `${window.location.origin}/espace-client`
     });
   };
@@ -650,9 +651,7 @@ const ClientSpace: React.FC = () => {
                     </>
                   )}
                 </div>
-                {/* 
-                  Firebase Phone Auth est en attente de carte bancaire
-                  <div className="flex justify-end mt-2">
+                <div className="flex justify-end mt-2">
                   <button 
                     type="button" 
                     onClick={() => setLoginMethod(loginMethod === 'PHONE' ? 'EMAIL' : 'PHONE')}
@@ -662,7 +661,6 @@ const ClientSpace: React.FC = () => {
                     {loginMethod === 'PHONE' ? 'Utiliser mon adresse mail' : 'Utiliser mon téléphone'}
                   </button>
                 </div>
-                */}
               </div>
               {error && error !== "NON_INSCRIT" && (
                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-md flex items-center gap-2">
@@ -1047,14 +1045,14 @@ const ClientSpace: React.FC = () => {
                 <div className="bg-slate-900 text-white p-5 rounded-xl text-center">
                   <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-400 mb-1">Total Facturé</p>
                   <p className="text-2xl font-bebas tracking-wider">
-                    {clientData.factures.reduce((s: number, f: Invoice) => s + invoiceTotal(f), 0).toLocaleString('fr-FR')}
+                    {clientData.factures.filter((f: Invoice) => f.type === 'DEFINITIVE').reduce((s: number, f: Invoice) => s + invoiceTotal(f), 0).toLocaleString('fr-FR')}
                     <span className="text-sm text-slate-400 ml-1">F</span>
                   </p>
                 </div>
                 <div className="bg-emerald-500 text-white p-5 rounded-xl text-center">
                   <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-emerald-200 mb-1">Déjà Payé</p>
                   <p className="text-2xl font-bebas tracking-wider">
-                    {clientData.factures.reduce((s: number, f: Invoice) => s + invoicePaid(f), 0).toLocaleString('fr-FR')}
+                    {clientData.factures.filter((f: Invoice) => f.type === 'DEFINITIVE').reduce((s: number, f: Invoice) => s + invoicePaid(f), 0).toLocaleString('fr-FR')}
                     <span className="text-sm text-emerald-200 ml-1">F</span>
                   </p>
                 </div>
@@ -1181,7 +1179,7 @@ const ClientSpace: React.FC = () => {
                               className="flex items-center gap-1.5 px-5 py-2.5 bg-emerald-500 text-white rounded-lg text-[10px] font-bebas tracking-widest uppercase hover:bg-emerald-600 transition-all active:scale-95 shadow-lg shadow-emerald-200 disabled:opacity-50"
                             >
                               <CreditCard className="w-3.5 h-3.5" />
-                              {payingInvoice?.id === inv.id ? 'Paiement...' : `Payer ${reste.toLocaleString('fr-FR')} F`}
+                              {payingInvoice?.id === inv.id ? 'Paiement...' : (inv.type === 'PROFORMA' ? `Accepter et Payer ${reste.toLocaleString('fr-FR')} F` : `Payer ${reste.toLocaleString('fr-FR')} F`)}
                             </button>
                             <button
                               onClick={() => { setModifInvoice(inv); setModifMessage(''); setModifSuccess(false); }}

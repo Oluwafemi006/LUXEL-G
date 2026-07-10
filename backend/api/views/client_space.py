@@ -1,5 +1,6 @@
 """Espace Client — OTP, profil, véhicules, factures, RDV, avis."""
 import logging
+import os
 import secrets
 from django.db.models import Sum, F, ExpressionWrapper, DecimalField as DjangoDecimalField
 from django.db.models.functions import Coalesce
@@ -24,12 +25,34 @@ def _find_client_by_identifier(identifier: str):
     return Client.objects.filter(contact=_clean_phone(identifier)).first()
 
 
+def _ensure_firebase_admin_app():
+    import firebase_admin
+    from firebase_admin import credentials
+
+    if firebase_admin._apps:
+        return
+
+    credential_path = (
+        getattr(settings, 'FIREBASE_SERVICE_ACCOUNT_PATH', None)
+        or os.getenv('FIREBASE_SERVICE_ACCOUNT_PATH')
+    )
+    if not credential_path:
+        credential_path = settings.BASE_DIR / 'firebase-service-account.json'
+    elif not os.path.isabs(str(credential_path)):
+        credential_path = settings.BASE_DIR / str(credential_path)
+
+    if os.path.exists(credential_path):
+        firebase_admin.initialize_app(credentials.Certificate(str(credential_path)))
+    else:
+        firebase_admin.initialize_app()
+
+
 class ClientSpaceViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_permissions(self):
-        if self.action in ['request_otp', 'verify_otp', 'register']:
+        if self.action in ['request_otp', 'verify_otp', 'verify_firebase_token', 'register']:
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
 
@@ -126,8 +149,9 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         id_token = request.data.get('id_token')
         if not id_token:
             return Response({'error': 'Token Firebase requis.'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
+            _ensure_firebase_admin_app()
             # Vérifier le token Firebase
             decoded_token = firebase_auth.verify_id_token(id_token)
             phone_number = decoded_token.get('phone_number') # ex: +2290102030405
@@ -427,7 +451,7 @@ class ClientSpaceViewSet(viewsets.ViewSet):
 
         # Vérification de la transaction Kkiapay
         from api.services import verify_kkiapay_transaction, finalize_paid_facture
-        kkiapay_tx = verify_kkiapay_transaction(transaction_id)
+        kkiapay_tx = verify_kkiapay_transaction(transaction_id) or {}
 
         status_value = str(
             kkiapay_tx.get('status')
@@ -437,8 +461,12 @@ class ClientSpaceViewSet(viewsets.ViewSet):
         ).strip().upper()
         if not kkiapay_tx or status_value not in ('SUCCESSFULL', 'SUCCESS', 'SUCCESSFUL', 'SUCCEEDED', 'PAID', 'APPROVED'):
             logger.warning("[KKIAPAY-CLIENT] Transaction non valide pour facture %s : %s", invoice_id, kkiapay_tx)
+            detail = status_value or 'INCONNU'
             return Response(
-                {'error': "Transaction Kkiapay invalide ou non aboutie."},
+                {
+                    'error': "Transaction Kkiapay invalide ou non aboutie.",
+                    'detail': f"Statut Kkiapay: {detail}",
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 

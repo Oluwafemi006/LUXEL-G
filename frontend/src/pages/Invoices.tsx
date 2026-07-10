@@ -287,7 +287,8 @@ const Invoices: React.FC = () => {
     }
 
     const seuilDemarrage = currentInvoice.total_ttc * 0.75;
-    if (selectedRepair?.statut === 'EN_ATTENTE' && currentInvoice.montant_paye + amount < seuilDemarrage) {
+    const totalApres = Number(currentInvoice.montant_paye) + amount;
+    if (selectedRepair?.statut === 'EN_ATTENTE' && totalApres < seuilDemarrage) {
       alert(`Erreur : Un acompte minimum de 75% est requis avant le démarrage des réparations (${seuilDemarrage.toLocaleString()} F minimum).`);
       return;
     }

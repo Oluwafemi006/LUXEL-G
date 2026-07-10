@@ -24,6 +24,7 @@ from openpyxl.styles import Font, Alignment, PatternFill
 
 
 from api.utils import generate_document_pdf, generate_fiche_reception_pdf
+from api.services import send_otp_sms
 from api.models import (
     Client, Vehicule, Reparation, Stock, Facture, LigneTravail, LignePiece,
     MouvementCaisse, Devis, MaintenancePredictive, Appointment,

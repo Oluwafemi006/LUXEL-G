@@ -24,6 +24,7 @@ import api, { fetchAllPages } from '../services/api';
 interface UnifiedAlert {
   id: string;
   type: 'STOCK' | 'MAINTENANCE' | 'NOUVEAU_RDV' | 'PAIEMENT_RECU' | 'DEMANDE_MODIFICATION_PROFORMA' | 'NOUVEL_AVIS' | 'STOCK_BAS';
+  category: 'CLIENTS' | 'RDV' | 'PAYMENTS' | 'STOCK' | 'MAINTENANCE' | 'SYSTEM';
   title: string;
   message: string;
   date: string;
@@ -32,6 +33,27 @@ interface UnifiedAlert {
   lu?: boolean;
   backendId?: number; // ID en base pour marquer comme lu
 }
+
+type NotificationFilter = 'UNREAD' | 'ALL' | UnifiedAlert['category'];
+
+const getAlertCategory = (type: string): UnifiedAlert['category'] => {
+  if (type === 'DEMANDE_MODIFICATION_PROFORMA' || type === 'NOUVEL_AVIS') return 'CLIENTS';
+  if (type === 'NOUVEAU_RDV') return 'RDV';
+  if (type === 'PAIEMENT_RECU') return 'PAYMENTS';
+  if (type === 'STOCK' || type === 'STOCK_BAS') return 'STOCK';
+  if (type === 'MAINTENANCE') return 'MAINTENANCE';
+  return 'SYSTEM';
+};
+
+const FILTERS: Array<{ id: NotificationFilter; label: string }> = [
+  { id: 'UNREAD', label: 'Non lues' },
+  { id: 'ALL', label: 'Toutes' },
+  { id: 'CLIENTS', label: 'Clients' },
+  { id: 'RDV', label: 'RDV' },
+  { id: 'PAYMENTS', label: 'Paiements' },
+  { id: 'STOCK', label: 'Stock' },
+  { id: 'MAINTENANCE', label: 'Maintenance' },
+];
 
 // Mapping des types de notifications vers leurs paramètres visuels et liens
 const NOTIF_CONFIG: Record<string, { label: string; priority: 'HAUTE' | 'MOYENNE' | 'BASSE'; link: string; icon: React.ReactNode; color: string }> = {
@@ -48,7 +70,7 @@ const Notifications: React.FC = () => {
   const navigate = useNavigate();
   const [alerts, setAlerts] = useState<UnifiedAlert[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'ALL' | 'UNREAD'>('UNREAD');
+  const [filter, setFilter] = useState<NotificationFilter>('UNREAD');
   const [markingAll, setMarkingAll] = useState(false);
 
   const fetchAlerts = useCallback(async () => {
@@ -69,6 +91,7 @@ const Notifications: React.FC = () => {
           id: `notif-${n.id}`,
           backendId: n.id,
           type: n.type,
+          category: getAlertCategory(n.type),
           title: cfg.label,
           message: n.message,
           date: n.date_creation,
@@ -83,12 +106,13 @@ const Notifications: React.FC = () => {
         unified.push({
           id: `stock-${s.id}`,
           type: 'STOCK',
+          category: 'STOCK',
           title: `Rupture Critique : ${s.nom}`,
           message: `Niveau de stock alarmant (${s.quantite} unités restantes). Approvisionnement urgent requis pour éviter tout arrêt de service.`,
           date: new Date().toISOString(),
           priority: 'HAUTE',
           link: '/staff/stock',
-          lu: false,
+          lu: true,
         });
       });
 
@@ -97,19 +121,20 @@ const Notifications: React.FC = () => {
         unified.push({
           id: `maint-${m.id}`,
           type: 'MAINTENANCE',
+          category: 'MAINTENANCE',
           title: `Maintenance : ${m.vehicule_plate}`,
           message: `Maintenance préventive (${m.type_maintenance?.toLowerCase()}) prévue pour le ${new Date(m.date_prochaine_prevue).toLocaleDateString('fr-FR')}.`,
           date: new Date().toISOString(),
           priority: 'BASSE',
           link: '/staff/reparations',
-          lu: false,
+          lu: true,
         });
       });
 
       // Tri : non lus en premier, puis par date
       unified.sort((a, b) => {
-        if (!a.lu && b.lu) return -1;
-        if (a.lu && !b.lu) return 1;
+        if (a.backendId && !a.lu && (!b.backendId || b.lu)) return -1;
+        if (b.backendId && !b.lu && (!a.backendId || a.lu)) return 1;
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       });
 
@@ -142,13 +167,26 @@ const Notifications: React.FC = () => {
     try {
       const unread = alerts.filter(a => a.backendId && !a.lu);
       await Promise.all(unread.map(a => api.patch(`notifications-staff/${a.backendId}/`, { lu: true })));
-      setAlerts(prev => prev.map(a => ({ ...a, lu: true })));
+      setAlerts(prev => prev.map(a => a.backendId ? { ...a, lu: true } : a));
     } catch (e) { /* silencieux */ }
     setMarkingAll(false);
   };
 
-  const displayedAlerts = filter === 'UNREAD' ? alerts.filter(a => !a.lu) : alerts;
-  const unreadCount = alerts.filter(a => !a.lu).length;
+  const backendAlerts = alerts.filter(a => a.backendId);
+  const unreadCount = backendAlerts.filter(a => !a.lu).length;
+  const clientActionCount = alerts.filter(a => ['CLIENTS', 'RDV', 'PAYMENTS'].includes(a.category)).length;
+  const stockCount = alerts.filter(a => a.category === 'STOCK').length;
+  const displayedAlerts = alerts.filter(a => {
+    if (filter === 'UNREAD') return Boolean(a.backendId && !a.lu);
+    if (filter === 'ALL') return true;
+    return a.category === filter;
+  });
+
+  const getFilterCount = (filterId: NotificationFilter) => {
+    if (filterId === 'UNREAD') return unreadCount;
+    if (filterId === 'ALL') return alerts.length;
+    return alerts.filter(a => a.category === filterId).length;
+  };
 
   const getConfig = (type: string) => NOTIF_CONFIG[type] || { label: type, priority: 'MOYENNE', link: '/staff', icon: <Bell className="w-8 h-8" />, color: 'bg-slate-700 shadow-slate-200' };
 
@@ -200,8 +238,8 @@ const Notifications: React.FC = () => {
             <CheckCheck className="w-6 h-6 text-emerald-600" />
           </div>
           <div>
-            <p className="text-2xl font-black text-slate-900">{alerts.length - unreadCount}</p>
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Traitées</p>
+            <p className="text-2xl font-black text-slate-900">{clientActionCount}</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Clients/RDV/Paiements</p>
           </div>
         </div>
         <div className="card-luxury p-6 flex items-center gap-4">
@@ -209,8 +247,8 @@ const Notifications: React.FC = () => {
             <Layers className="w-6 h-6 text-slate-600" />
           </div>
           <div>
-            <p className="text-2xl font-black text-slate-900">{alerts.length}</p>
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Total</p>
+            <p className="text-2xl font-black text-slate-900">{stockCount}</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Alertes stock</p>
           </div>
         </div>
       </div>
@@ -218,19 +256,21 @@ const Notifications: React.FC = () => {
       {/* Notifications List */}
       <div className="card-luxury overflow-hidden min-h-[400px] flex flex-col animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-300">
         <div className="px-8 py-5 border-b border-emerald-50/50 flex items-center justify-between bg-emerald-50/10">
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setFilter('UNREAD')}
-              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'UNREAD' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-slate-400 hover:text-emerald-600'}`}
-            >
-              Non lues {unreadCount > 0 && <span className="ml-1 bg-rose-500 text-white text-[8px] px-1.5 py-0.5 rounded-full">{unreadCount}</span>}
-            </button>
-            <button 
-              onClick={() => setFilter('ALL')}
-              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'ALL' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Toutes ({alerts.length})
-            </button>
+          <div className="flex gap-2 flex-wrap">
+            {FILTERS.map(item => {
+              const count = getFilterCount(item.id);
+              const isActive = filter === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setFilter(item.id)}
+                  className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isActive ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-slate-400 hover:text-emerald-600'}`}
+                >
+                  {item.label}
+                  {count > 0 && <span className={`ml-1 text-[8px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>}
+                </button>
+              );
+            })}
           </div>
           <div className="flex items-center gap-2 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
